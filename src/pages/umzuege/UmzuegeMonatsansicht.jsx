@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import hinzugefügt
 import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Eye, Truck, User, Phone, MapPin, Filter, Search, Check, Clock, AlertTriangle, Home, CheckCircle, XCircle, FileText } from 'lucide-react';
 
 export default function UmzuegeMonatsansicht() {
+  // Navigation-Hook für Routing
+  const navigate = useNavigate(); // Hook hinzugefügt
+  
   // Aktuelles Datum und Jahr
   const [aktuellesDatum, setAktuellesDatum] = useState(new Date());
   const [aktuellesJahr, setAktuellesJahr] = useState(new Date().getFullYear());
@@ -330,10 +334,7 @@ export default function UmzuegeMonatsansicht() {
           
           <button 
             className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center"
-            onClick={() => {
-              // Hier würde normalerweise ein Modal für einen neuen Umzug geöffnet werden
-              alert('Neuen Umzug planen');
-            }}
+            onClick={() => navigate('/umzuege/neu')} // Geändert: Navigiert zur Formularseite
           >
             <Plus className="w-4 h-4 mr-1" />
             Neuer Umzug
@@ -465,10 +466,7 @@ export default function UmzuegeMonatsansicht() {
             
             <button 
               className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center ml-auto"
-              onClick={() => {
-                // Hier würde normalerweise ein Modal für einen neuen Umzug geöffnet werden
-                alert('Neuen Umzug planen');
-              }}
+              onClick={() => navigate('/umzuege/neu')} // Geändert: Navigiert zur Formularseite
             >
               <Plus className="w-4 h-4 mr-1" />
               Neuer Umzug
@@ -714,10 +712,7 @@ export default function UmzuegeMonatsansicht() {
               <div className="space-y-2">
                 <button 
                   className="w-full px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center justify-center"
-                  onClick={() => {
-                    // Hier würde normalerweise das Bearbeitungsformular geöffnet
-                    alert(`Umzug bearbeiten: ${ausgewaehlterUmzug.kunde}`);
-                  }}
+                  onClick={() => navigate(`/umzuege/${ausgewaehlterUmzug.id}/bearbeiten`)} // Geändert: Navigiert zur Bearbeitungsseite
                 >
                   <Edit className="w-4 h-4 mr-2" />
                   Umzug bearbeiten
