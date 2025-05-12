@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, List, Grid } from 'lucide-react';
-import api from '../../services/api';
+import api, { fileService } from '../../services/api';
 
 export default function Zeitachse() {
   // State für Datum und Ansicht

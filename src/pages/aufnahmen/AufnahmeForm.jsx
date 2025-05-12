@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../../services/api';
+import api, { fileService, aufnahmenService } from '../../services/api';
 
 export default function AufnahmeForm() {
   const { id } = useParams();
@@ -57,7 +57,7 @@ export default function AufnahmeForm() {
         try {
           setLoading(true);
           // In einer echten Anwendung würde hier ein API-Aufruf mit der ID stattfinden
-          const response = await api.get(`/aufnahmen/${id}`);
+          const response = await aufnahmenService.getById(id);
           setFormData(response.data);
           
           // Dateien laden
@@ -200,10 +200,10 @@ export default function AufnahmeForm() {
       if (id) {
         // Aktualisieren einer bestehenden Aufnahme
         const filesData = uploadedFiles.map(file => ({ fileId: file._id }));
-        response = await api.put(`/aufnahmen/${id}`, { ...formData, dateien: filesData });
+        response = await aufnahmenService.update(id, { ...formData, dateien: filesData });
       } else {
         // Erstellen einer neuen Aufnahme
-        response = await api.post('/aufnahmen', formData);
+        response = await aufnahmenService.create(formData);
         
         // Wenn Dateien vorhanden sind, diese der neuen Aufnahme zuordnen
         if (uploadedFiles.length > 0 && response.data.aufnahme) {
@@ -211,7 +211,11 @@ export default function AufnahmeForm() {
           
           for (const file of uploadedFiles) {
             // In einer echten Anwendung würde hier ein API-Aufruf zum Aktualisieren der Datei-Referenzen stattfinden
-            await fileService.updateFileBezug(file._id, aufnahmeId, 'Aufnahme');
+            await fileService.uploadFile({
+              file: file,
+              project: aufnahmeId,
+              category: 'Aufnahme'
+            });
           }
         }
       }

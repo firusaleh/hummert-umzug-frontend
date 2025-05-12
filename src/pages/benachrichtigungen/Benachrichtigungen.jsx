@@ -1,21 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, CheckCircle, X, Trash2, Filter, Search } from 'lucide-react';
-import api from '../../services/api';
+import api, { benachrichtigungenService } from '../../services/api';
 
 export default function Benachrichtigungen() {
   const [benachrichtigungen, setBenachrichtigungen] = useState([]);
   const [filter, setFilter] = useState('alle');
   const [suchbegriff, setSuchbegriff] = useState('');
 
-  // Daten laden (simuliert)
+  // Daten laden
   useEffect(() => {
     const fetchBenachrichtigungen = async () => {
       try {
-        // In einer echten Anwendung würde hier ein API-Aufruf stattfinden
-        // const response = await api.get('/benachrichtigungen');
-        // setBenachrichtigungen(response.data);
-
-        // Simulierte Daten für Demo
+        // API-Aufruf für Benachrichtigungen
+        const response = await benachrichtigungenService.getAll();
+        setBenachrichtigungen(response.data);
+      } catch (error) {
+        console.error('Fehler beim Laden der Benachrichtigungen:', error);
+        
+        // Simulierte Daten für Demo im Fehlerfall
         const mockBenachrichtigungen = [
           {
             id: 1,
@@ -65,8 +67,6 @@ export default function Benachrichtigungen() {
         ];
         
         setBenachrichtigungen(mockBenachrichtigungen);
-      } catch (error) {
-        console.error('Fehler beim Laden der Benachrichtigungen:', error);
       }
     };
 
@@ -74,45 +74,57 @@ export default function Benachrichtigungen() {
   }, []);
 
   // Benachrichtigung als gelesen markieren
-  const markAsRead = (id) => {
-    setBenachrichtigungen(
-      benachrichtigungen.map(benachrichtigung => 
-        benachrichtigung.id === id 
-          ? { ...benachrichtigung, gelesen: true } 
-          : benachrichtigung
-      )
-    );
-    
-    // In einer echten Anwendung würde hier ein API-Aufruf stattfinden
-    // api.put(`/benachrichtigungen/${id}/gelesen`);
+  const markAsRead = async (id) => {
+    try {
+      await benachrichtigungenService.markAsRead(id);
+      
+      setBenachrichtigungen(
+        benachrichtigungen.map(benachrichtigung => 
+          benachrichtigung.id === id 
+            ? { ...benachrichtigung, gelesen: true } 
+            : benachrichtigung
+        )
+      );
+    } catch (error) {
+      console.error('Fehler beim Markieren als gelesen:', error);
+    }
   };
 
   // Benachrichtigung löschen
-  const deleteNotification = (id) => {
-    setBenachrichtigungen(
-      benachrichtigungen.filter(benachrichtigung => benachrichtigung.id !== id)
-    );
-    
-    // In einer echten Anwendung würde hier ein API-Aufruf stattfinden
-    // api.delete(`/benachrichtigungen/${id}`);
+  const deleteNotification = async (id) => {
+    try {
+      await benachrichtigungenService.delete(id);
+      
+      setBenachrichtigungen(
+        benachrichtigungen.filter(benachrichtigung => benachrichtigung.id !== id)
+      );
+    } catch (error) {
+      console.error('Fehler beim Löschen der Benachrichtigung:', error);
+    }
   };
 
   // Alle Benachrichtigungen als gelesen markieren
-  const markAllAsRead = () => {
-    setBenachrichtigungen(
-      benachrichtigungen.map(benachrichtigung => ({ ...benachrichtigung, gelesen: true }))
-    );
-    
-    // In einer echten Anwendung würde hier ein API-Aufruf stattfinden
-    // api.put('/benachrichtigungen/alle-gelesen');
+  const markAllAsRead = async () => {
+    try {
+      await benachrichtigungenService.markAllAsRead();
+      
+      setBenachrichtigungen(
+        benachrichtigungen.map(benachrichtigung => ({ ...benachrichtigung, gelesen: true }))
+      );
+    } catch (error) {
+      console.error('Fehler beim Markieren aller Benachrichtigungen als gelesen:', error);
+    }
   };
 
   // Alle Benachrichtigungen löschen
-  const deleteAllNotifications = () => {
-    setBenachrichtigungen([]);
-    
-    // In einer echten Anwendung würde hier ein API-Aufruf stattfinden
-    // api.delete('/benachrichtigungen/alle');
+  const deleteAllNotifications = async () => {
+    try {
+      await benachrichtigungenService.deleteAllRead();
+      
+      setBenachrichtigungen([]);
+    } catch (error) {
+      console.error('Fehler beim Löschen aller Benachrichtigungen:', error);
+    }
   };
 
   // Formatiert das Datum der Benachrichtigung

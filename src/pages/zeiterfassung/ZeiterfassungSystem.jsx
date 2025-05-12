@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, Check, Plus, Edit, Trash2, Search, User, Users, Briefcase } from 'lucide-react';
-import api from '../../services/api';
+import api, { zeiterfassungService } from '../../services/api';
 
 export default function ZeiterfassungSystem() {
   // State für Daten
@@ -25,18 +25,17 @@ export default function ZeiterfassungSystem() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // In einer echten Anwendung würde hier ein API-Aufruf stattfinden
         // Laden der Mitarbeiter
-        const mitarbeiterResponse = await api.get('/mitarbeiter');
+        const mitarbeiterResponse = await zeiterfassungService.getMitarbeiter();
         setMitarbeiter(mitarbeiterResponse.data);
         
         // Laden der Umzugsprojekte
-        const projekteResponse = await api.get('/umzuege?status=in_bearbeitung');
+        const projekteResponse = await zeiterfassungService.getUmzugsprojekte();
         setUmzugsprojekte(projekteResponse.data);
         
         // Laden der Zeiterfassungen
         if (aktuellesProjekt) {
-          const zeiterfassungenResponse = await api.get(`/zeiterfassungen?projektId=${aktuellesProjekt}`);
+          const zeiterfassungenResponse = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
           setZeiterfassungen(zeiterfassungenResponse.data);
         }
       } catch (error) {
@@ -164,7 +163,7 @@ export default function ZeiterfassungSystem() {
     try {
       if (bearbeitungId) {
         // Update einer bestehenden Zeiterfassung
-        await api.put(`/zeiterfassungen/${bearbeitungId}`, zeiterfassungDaten);
+        await zeiterfassungService.updateZeiterfassung(bearbeitungId, zeiterfassungDaten);
         
         // Update im lokalen State
         setZeiterfassungen(zeiterfassungen.map(z => 
@@ -172,7 +171,7 @@ export default function ZeiterfassungSystem() {
         ));
       } else {
         // Erstellen einer neuen Zeiterfassung
-        const response = await api.post('/zeiterfassungen', zeiterfassungDaten);
+        const response = await zeiterfassungService.addZeiterfassung(zeiterfassungDaten);
         
         // Hinzufügen zum lokalen State
         setZeiterfassungen([...zeiterfassungen, response.data]);
@@ -190,7 +189,7 @@ export default function ZeiterfassungSystem() {
   const handleLoeschen = async (id) => {
     if (window.confirm('Möchten Sie diese Zeiterfassung wirklich löschen?')) {
       try {
-        await api.delete(`/zeiterfassungen/${id}`);
+        await zeiterfassungService.deleteZeiterfassung(id);
         
         // Aus lokalem State entfernen
         setZeiterfassungen(zeiterfassungen.filter(z => z._id !== id));
