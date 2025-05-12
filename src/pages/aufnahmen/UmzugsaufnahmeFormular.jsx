@@ -1,118 +1,173 @@
-// Import-Statements für API hinzufügen
-import { umzugsaufnahmeService } from '../../services/api';
+import React, { useState, useEffect } from 'react';
 
-// Im Komponenten-Code, initialData-Laden anpassen
-useEffect(() => {
-  const loadFormularData = async () => {
-    // Wenn initialData als ID übergeben wird
-    if (initialData && typeof initialData === 'string') {
-      try {
-        const response = await umzugsaufnahmeService.getById(initialData);
-        setFormData(response.data);
-      } catch (error) {
-        console.error('Fehler beim Laden der Umzugsaufnahme:', error);
-      }
-    } else if (initialData) {
-      // Wenn initialData direkt als Objekt übergeben wird
-      setFormData(prevData => ({
-        ...prevData,
+export default function UmzugsaufnahmeFormular({ initialData = {}, onSave }) {
+  const [formData, setFormData] = useState({
+    kundenName: '',
+    kontaktperson: '',
+    telefon: '',
+    email: '',
+    auszugsadresse: {
+      strasse: '',
+      hausnummer: '',
+      plz: '',
+      ort: '',
+      land: 'Deutschland',
+      etage: 0,
+      aufzug: false,
+      entfernung: 0
+    },
+    einzugsadresse: {
+      strasse: '',
+      hausnummer: '',
+      plz: '',
+      ort: '',
+      land: 'Deutschland',
+      etage: 0,
+      aufzug: false,
+      entfernung: 0
+    },
+    umzugstyp: 'privat',
+    umzugsvolumen: '',
+    datum: '',
+    uhrzeit: '',
+    angebotspreis: {
+      netto: '',
+      brutto: '',
+      mwst: 19
+    },
+    notizen: '',
+    besonderheiten: '',
+    bewertung: 3
+  });
+
+  // Initialdaten laden, wenn vorhanden
+  useEffect(() => {
+    if (Object.keys(initialData).length > 0) {
+      setFormData({
+        ...formData,
         ...initialData,
+        // Stelle sicher, dass verschachtelte Objekte korrekt übernommen werden
+        auszugsadresse: {
+          ...formData.auszugsadresse,
+          ...(initialData.auszugsadresse || {})
+        },
+        einzugsadresse: {
+          ...formData.einzugsadresse,
+          ...(initialData.einzugsadresse || {})
+        },
+        angebotspreis: {
+          ...formData.angebotspreis,
+          ...(initialData.angebotspreis || {})
+        }
+      });
+    }
+  }, [initialData]);
+
+  // Behandelt Änderungen in Input-Feldern
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    
+    if (name.includes('.')) {
+      // Für verschachtelte Objekte wie auszugsadresse.strasse
+      const [parent, child] = name.split('.');
+      setFormData(prev => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: type === 'checkbox' ? checked : value
+        }
+      }));
+    } else {
+      // Für normale Felder
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
       }));
     }
   };
-  
-  loadFormularData();
-}, [initialData]);
 
-// Bilder-Upload für Inventaritems
-const handleAddPhoto = async (itemId) => {
-  // Erstelle einen unsichtbaren Datei-Input
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = 'image/*';
-  fileInput.multiple = true;
-  
-  fileInput.onchange = async (e) => {
-    const files = Array.from(e.target.files);
+  // Preisberechnung
+  const handlePreisChange = (field, value) => {
+    const numValue = parseFloat(value) || 0;
     
-    try {
-      // Wenn wir bereits eine gespeicherte Umzugsaufnahme haben und das Item eine ID hat
-      if (formData.id && itemId) {
-        // Bilder zum Server hochladen
-        await umzugsaufnahmeService.uploadBilder(formData.id, itemId, files);
-        
-        // Optimistische UI-Aktualisierung
-        const newPhotos = files.map(file => URL.createObjectURL(file));
-        
-        setFormData(prevData => ({
-          ...prevData,
-          inventarItems: prevData.inventarItems.map(item => 
-            item.id === itemId ? 
-              { ...item, fotos: [...item.fotos, ...newPhotos] } : 
-              item
-          )
-        }));
-      } else {
-        // Noch nicht gespeicherte Umzugsaufnahme - nur lokale Vorschau zeigen
-        const newPhotos = files.map(file => ({
-          url: URL.createObjectURL(file),
-          file: file // Original-Datei für späteren Upload speichern
-        }));
-        
-        setFormData(prevData => ({
-          ...prevData,
-          inventarItems: prevData.inventarItems.map(item => 
-            item.id === itemId ? 
-              { ...item, fotos: [...item.fotos, ...newPhotos] } : 
-              item
-          )
-        }));
-      }
-    } catch (error) {
-      console.error('Fehler beim Hochladen der Bilder:', error);
-      alert('Fehler beim Hochladen der Bilder');
+    if (field === 'netto') {
+      const mwst = formData.angebotspreis.mwst || 19;
+      const brutto = numValue * (1 + mwst / 100);
+      setFormData(prev => ({
+        ...prev,
+        angebotspreis: {
+          ...prev.angebotspreis,
+          netto: numValue,
+          brutto: Math.round(brutto * 100) / 100
+        }
+      }));
+    } else if (field === 'brutto') {
+      const mwst = formData.angebotspreis.mwst || 19;
+      const netto = numValue / (1 + mwst / 100);
+      setFormData(prev => ({
+        ...prev,
+        angebotspreis: {
+          ...prev.angebotspreis,
+          brutto: numValue,
+          netto: Math.round(netto * 100) / 100
+        }
+      }));
+    } else if (field === 'mwst') {
+      const netto = formData.angebotspreis.netto || 0;
+      const brutto = netto * (1 + numValue / 100);
+      setFormData(prev => ({
+        ...prev,
+        angebotspreis: {
+          ...prev.angebotspreis,
+          mwst: numValue,
+          brutto: Math.round(brutto * 100) / 100
+        }
+      }));
     }
   };
-  
-  fileInput.click();
-};
 
-// Formular speichern
-const handleSubmit = async () => {
-  try {
-    let responseData;
+  // Formular absenden
+  const handleSubmit = (e) => {
+    e.preventDefault();
     
-    if (formData.id) {
-      // Bestehende Umzugsaufnahme aktualisieren
-      const response = await umzugsaufnahmeService.update(formData.id, formData);
-      responseData = response.data;
+    // Validierung könnte hier hinzugefügt werden
+    
+    if (formData.kundenName && formData.telefon && formData.auszugsadresse.strasse && formData.einzugsadresse.strasse) {
+      onSave(formData);
     } else {
-      // Neue Umzugsaufnahme erstellen
-      const response = await umzugsaufnahmeService.save(formData);
-      responseData = response.data;
-      
-      // Für jedes Item mit temporären Fotos diese hochladen
-      for (const item of formData.inventarItems) {
-        if (item.fotos && item.fotos.some(foto => foto.file)) {
-          const filesToUpload = item.fotos
-            .filter(foto => foto.file)
-            .map(foto => foto.file);
-            
-          if (filesToUpload.length > 0) {
-            await umzugsaufnahmeService.uploadBilder(
-              responseData.id, 
-              item.id, 
-              filesToUpload
-            );
-          }
-        }
-      }
+      alert('Bitte füllen Sie alle erforderlichen Felder aus.');
     }
-    
-    // Callback mit den gespeicherten Daten aufrufen
-    onSave(responseData);
-  } catch (error) {
-    console.error('Fehler beim Speichern der Umzugsaufnahme:', error);
-    alert('Fehler beim Speichern der Umzugsaufnahme');
-  }
-};
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Form content here - this is just a skeleton */}
+      <div className="bg-white p-4 rounded shadow">
+        <h2 className="text-xl font-semibold mb-4">Kundendaten</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Kundenname *</label>
+            <input
+              type="text"
+              name="kundenName"
+              value={formData.kundenName}
+              onChange={handleInputChange}
+              className="w-full p-2 border rounded"
+              required
+            />
+          </div>
+          {/* Other form fields */}
+        </div>
+      </div>
+      
+      <div className="flex justify-end space-x-3">
+        <button type="button" className="px-4 py-2 border rounded">
+          Abbrechen
+        </button>
+        <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded">
+          Speichern
+        </button>
+      </div>
+    </form>
+  );
+}

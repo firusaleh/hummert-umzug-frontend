@@ -1,146 +1,573 @@
-// Import-Statements ändern
-import { zeiterfassungService } from '../../services/api';
+import React, { useState, useEffect } from 'react';
+import { Clock, Calendar, Check, Plus, Edit, Trash2, Search, User, Users, Briefcase } from 'lucide-react';
+import api from '../../services/api';
 
-// useEffect-Hook für das Laden der Daten ändern
-useEffect(() => {
-  const fetchData = async () => {
-    try {
-      // Mitarbeiter laden
-      const mitarbeiterResponse = await zeiterfassungService.getMitarbeiter();
-      setMitarbeiter(mitarbeiterResponse.data);
-      
-      // Umzugsprojekte laden
-      const projekteResponse = await zeiterfassungService.getUmzugsprojekte();
-      setUmzugsprojekte(projekteResponse.data);
-      
-      // Wenn ein Projekt ausgewählt ist, Zeiterfassungen dafür laden
-      if (aktuellesProjekt) {
-        const zeiterfassungenResponse = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt.id);
-        setZeiterfassungen(zeiterfassungenResponse.data);
+export default function ZeiterfassungSystem() {
+  // State für Daten
+  const [mitarbeiter, setMitarbeiter] = useState([]);
+  const [umzugsprojekte, setUmzugsprojekte] = useState([]);
+  const [zeiterfassungen, setZeiterfassungen] = useState([]);
+  const [aktuellesProjekt, setAktuellesProjekt] = useState('');
+  const [formular, setFormular] = useState({
+    mitarbeiterId: '',
+    projektId: '',
+    datum: new Date().toISOString().split('T')[0],
+    startzeit: '',
+    endzeit: '',
+    pause: '30',
+    taetigkeit: '',
+    notizen: ''
+  });
+  const [bearbeitungId, setBearbeitungId] = useState(null);
+  const [aktiverMitarbeiter, setAktiverMitarbeiter] = useState('');
+  
+  // Lade Daten beim Komponenten-Mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // In einer echten Anwendung würde hier ein API-Aufruf stattfinden
+        // Laden der Mitarbeiter
+        const mitarbeiterResponse = await api.get('/mitarbeiter');
+        setMitarbeiter(mitarbeiterResponse.data);
+        
+        // Laden der Umzugsprojekte
+        const projekteResponse = await api.get('/umzuege?status=in_bearbeitung');
+        setUmzugsprojekte(projekteResponse.data);
+        
+        // Laden der Zeiterfassungen
+        if (aktuellesProjekt) {
+          const zeiterfassungenResponse = await api.get(`/zeiterfassungen?projektId=${aktuellesProjekt}`);
+          setZeiterfassungen(zeiterfassungenResponse.data);
+        }
+      } catch (error) {
+        console.error('Fehler beim Laden der Daten:', error);
+        
+        // Mockdaten für Demo
+        const mockMitarbeiter = [
+          { _id: '1', vorname: 'Max', nachname: 'Mustermann', rolle: 'Teamleiter' },
+          { _id: '2', vorname: 'Anna', nachname: 'Schmidt', rolle: 'Helfer' },
+          { _id: '3', vorname: 'Lukas', nachname: 'Meyer', rolle: 'Fahrer' },
+          { _id: '4', vorname: 'Julia', nachname: 'Weber', rolle: 'Helfer' }
+        ];
+        
+        const mockProjekte = [
+          { _id: '1', auftraggeber: { name: 'Familie Müller' }, startDatum: '2025-05-10', status: 'in_bearbeitung' },
+          { _id: '2', auftraggeber: { name: 'Firma Tech GmbH' }, startDatum: '2025-05-15', status: 'in_bearbeitung' },
+          { _id: '3', auftraggeber: { name: 'Dr. Schmidt' }, startDatum: '2025-05-20', status: 'in_bearbeitung' }
+        ];
+        
+        setMitarbeiter(mockMitarbeiter);
+        setUmzugsprojekte(mockProjekte);
+        
+        if (aktuellesProjekt) {
+          const mockZeiterfassungen = [
+            {
+              _id: '1',
+              mitarbeiterId: { _id: '1', vorname: 'Max', nachname: 'Mustermann' },
+              projektId: aktuellesProjekt,
+              datum: '2025-05-10',
+              startzeit: '08:00',
+              endzeit: '16:30',
+              pause: 30,
+              taetigkeit: 'Transport und Aufbau',
+              notizen: 'Alles nach Plan verlaufen',
+              arbeitsstunden: 8
+            },
+            {
+              _id: '2',
+              mitarbeiterId: { _id: '2', vorname: 'Anna', nachname: 'Schmidt' },
+              projektId: aktuellesProjekt,
+              datum: '2025-05-10',
+              startzeit: '08:00',
+              endzeit: '16:00',
+              pause: 30,
+              taetigkeit: 'Verpackung und Transport',
+              notizen: '',
+              arbeitsstunden: 7.5
+            }
+          ];
+          
+          setZeiterfassungen(mockZeiterfassungen);
+        }
       }
-    } catch (error) {
-      console.error('Fehler beim Laden der Daten:', error);
-      // Fallback zu Mock-Daten
-      setMitarbeiter([
-        { id: 1, name: 'Max Mustermann', position: 'Umzugshelfer' },
-        { id: 2, name: 'Anna Schmidt', position: 'Fahrer' },
-        { id: 3, name: 'Peter Müller', position: 'Umzugshelfer' },
-        { id: 4, name: 'Lisa Wagner', position: 'Teamleiter' }
-      ]);
+    };
+    
+    fetchData();
+  }, [aktuellesProjekt]);
+  
+  // Berechne Arbeitsstunden
+  const berechneArbeitsstunden = (start, end, pauseMinuten) => {
+    if (!start || !end) return 0;
+    
+    const [startHours, startMinutes] = start.split(':').map(Number);
+    const [endHours, endMinutes] = end.split(':').map(Number);
+    
+    const startZeit = startHours * 60 + startMinutes;
+    const endZeit = endHours * 60 + endMinutes;
+    
+    const arbeitszeitMinuten = endZeit - startZeit - pauseMinuten;
+    
+    return Math.max(0, arbeitszeitMinuten / 60);
+  };
+  
+  // Formular zurücksetzen
+  const resetForm = () => {
+    setFormular({
+      mitarbeiterId: '',
+      projektId: aktuellesProjekt,
+      datum: new Date().toISOString().split('T')[0],
+      startzeit: '',
+      endzeit: '',
+      pause: '30',
+      taetigkeit: '',
+      notizen: ''
+    });
+    setBearbeitungId(null);
+  };
+  
+  // Zeiterfassung laden zum Bearbeiten
+  const handleBearbeiten = (id) => {
+    const zeiterfassung = zeiterfassungen.find(z => z._id === id);
+    
+    if (zeiterfassung) {
+      setFormular({
+        mitarbeiterId: zeiterfassung.mitarbeiterId._id,
+        projektId: zeiterfassung.projektId,
+        datum: zeiterfassung.datum,
+        startzeit: zeiterfassung.startzeit,
+        endzeit: zeiterfassung.endzeit,
+        pause: zeiterfassung.pause.toString(),
+        taetigkeit: zeiterfassung.taetigkeit,
+        notizen: zeiterfassung.notizen || ''
+      });
       
-      setUmzugsprojekte([
-        { id: 1, kundenName: 'Familie Müller', datum: '2025-05-10', status: 'In Bearbeitung' },
-        { id: 2, kundenName: 'Herr Schmidt', datum: '2025-05-12', status: 'In Bearbeitung' },
-        { id: 3, kundenName: 'Frau Weber', datum: '2025-05-15', status: 'Geplant' },
-        { id: 4, kundenName: 'Familie Bauer', datum: '2025-05-08', status: 'Abgeschlossen' }
-      ]);
+      setBearbeitungId(id);
     }
   };
   
-  fetchData();
-}, [aktuellesProjekt?.id]);
-
-// Zeiterfassung speichern
-const handleZeiterfassungSpeichern = async () => {
-  if (!formular.mitarbeiterId || !formular.startZeit || !formular.endZeit || !aktuellesProjekt) {
-    alert('Bitte füllen Sie alle Pflichtfelder aus.');
-    return;
-  }
+  // Zeiterfassung speichern
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    const arbeitsstunden = berechneArbeitsstunden(
+      formular.startzeit,
+      formular.endzeit,
+      parseInt(formular.pause, 10)
+    );
+    
+    const zeiterfassungDaten = {
+      ...formular,
+      pause: parseInt(formular.pause, 10),
+      arbeitsstunden
+    };
+    
+    try {
+      if (bearbeitungId) {
+        // Update einer bestehenden Zeiterfassung
+        await api.put(`/zeiterfassungen/${bearbeitungId}`, zeiterfassungDaten);
+        
+        // Update im lokalen State
+        setZeiterfassungen(zeiterfassungen.map(z => 
+          z._id === bearbeitungId ? { ...z, ...zeiterfassungDaten } : z
+        ));
+      } else {
+        // Erstellen einer neuen Zeiterfassung
+        const response = await api.post('/zeiterfassungen', zeiterfassungDaten);
+        
+        // Hinzufügen zum lokalen State
+        setZeiterfassungen([...zeiterfassungen, response.data]);
+      }
+      
+      // Formular zurücksetzen
+      resetForm();
+    } catch (error) {
+      console.error('Fehler beim Speichern der Zeiterfassung:', error);
+      alert(`Fehler: ${error.response?.data?.message || 'Unbekannter Fehler'}`);
+    }
+  };
   
-  try {
-    const zeiterfassungData = {
-      mitarbeiterId: parseInt(formular.mitarbeiterId),
-      umzugsprojektId: aktuellesProjekt.id,
-      datum: aktuellesProjekt.datum,
-      startZeit: formular.startZeit,
-      endZeit: formular.endZeit,
-      pausen: parseInt(formular.pausen),
-      bemerkung: formular.bemerkung
-    };
+  // Zeiterfassung löschen
+  const handleLoeschen = async (id) => {
+    if (window.confirm('Möchten Sie diese Zeiterfassung wirklich löschen?')) {
+      try {
+        await api.delete(`/zeiterfassungen/${id}`);
+        
+        // Aus lokalem State entfernen
+        setZeiterfassungen(zeiterfassungen.filter(z => z._id !== id));
+      } catch (error) {
+        console.error('Fehler beim Löschen der Zeiterfassung:', error);
+        alert(`Fehler: ${error.response?.data?.message || 'Unbekannter Fehler'}`);
+      }
+    }
+  };
+  
+  // Mitarbeiterfilter anwenden
+  const handleMitarbeiterFilter = (mitarbeiterId) => {
+    setAktiverMitarbeiter(mitarbeiterId === aktiverMitarbeiter ? '' : mitarbeiterId);
+  };
+  
+  // Gefilterte Zeiterfassungen
+  const getFilteredZeiterfassungen = () => {
+    if (!aktiverMitarbeiter) {
+      return zeiterfassungen;
+    }
     
-    if (bearbeitungId) {
-      // Zeiterfassung aktualisieren
-      await zeiterfassungService.updateZeiterfassung(bearbeitungId, zeiterfassungData);
-      
-      // Optimistische UI-Aktualisierung
-      setZeiterfassungen(
-        zeiterfassungen.map(z => 
-          z.id === bearbeitungId 
-            ? { ...z, ...zeiterfassungData } 
-            : z
-        )
+    return zeiterfassungen.filter(z => z.mitarbeiterId._id === aktiverMitarbeiter);
+  };
+  
+  // Summe der Arbeitsstunden berechnen
+  const getGesamtArbeitsstunden = () => {
+    const filtered = getFilteredZeiterfassungen();
+    return filtered.reduce((sum, z) => sum + z.arbeitsstunden, 0);
+  };
+  
+  // Projekt-Dropdown-Optionen
+  const projektOptionen = umzugsprojekte.map(projekt => ({
+    id: projekt._id,
+    label: `${projekt.auftraggeber.name} (${new Date(projekt.startDatum).toLocaleDateString('de-DE')})`
+  }));
+  
+  // Mitarbeiter-Dropdown-Optionen
+  const mitarbeiterOptionen = mitarbeiter.map(ma => ({
+    id: ma._id,
+    label: `${ma.vorname} ${ma.nachname}`
+  }));
+  
+  // Render Funktion für Zeiterfassungstabelle
+  const renderZeiterfassungen = () => {
+    const filtered = getFilteredZeiterfassungen();
+    
+    if (filtered.length === 0) {
+      return (
+        <div className="text-center p-6 bg-gray-50 rounded-lg">
+          <Clock className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-700 mb-2">Keine Zeiterfassungen vorhanden</h3>
+          <p className="text-gray-500">
+            Füge neue Zeiterfassungen für dieses Projekt hinzu.
+          </p>
+        </div>
       );
-      setBearbeitungId(null);
-    } else {
-      // Neue Zeiterfassung hinzufügen
-      const response = await zeiterfassungService.addZeiterfassung(zeiterfassungData);
+    }
+    
+    return (
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Mitarbeiter
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Datum
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Zeit
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Tätigkeit
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Std.
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Aktionen
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {filtered.map((zeiterfassung) => (
+              <tr key={zeiterfassung._id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <User className="h-4 w-4 text-indigo-600" />
+                    </div>
+                    <div className="ml-3">
+                      <div className="text-sm font-medium text-gray-900">
+                        {zeiterfassung.mitarbeiterId.vorname} {zeiterfassung.mitarbeiterId.nachname}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {new Date(zeiterfassung.datum).toLocaleDateString('de-DE')}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {zeiterfassung.startzeit} - {zeiterfassung.endzeit} (Pause: {zeiterfassung.pause} Min.)
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-900">
+                  <div className="text-sm">{zeiterfassung.taetigkeit}</div>
+                  {zeiterfassung.notizen && (
+                    <div className="text-xs text-gray-500">{zeiterfassung.notizen}</div>
+                  )}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {zeiterfassung.arbeitsstunden.toFixed(1)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button
+                    onClick={() => handleBearbeiten(zeiterfassung._id)}
+                    className="text-indigo-600 hover:text-indigo-900 mr-3"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleLoeschen(zeiterfassung._id)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot className="bg-gray-50">
+            <tr>
+              <td colSpan="4" className="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                Gesamtstunden:
+              </td>
+              <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                {getGesamtArbeitsstunden().toFixed(1)}
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    );
+  };
+  
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-gray-800">Zeiterfassung</h1>
       
-      // Optimistische UI-Aktualisierung mit der zurückgegebenen ID
-      const neueZeiterfassung = {
-        id: response.data.id,
-        ...zeiterfassungData
-      };
+      {/* Projekt-Auswahl */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+          <div className="flex-grow max-w-md">
+            <label htmlFor="projektId" className="block text-sm font-medium text-gray-700 mb-1">
+              Projekt auswählen
+            </label>
+            <select
+              id="projektId"
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              value={aktuellesProjekt}
+              onChange={(e) => setAktuellesProjekt(e.target.value)}
+            >
+              <option value="">-- Projekt auswählen --</option>
+              {projektOptionen.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="mt-4 md:mt-0 space-y-2 md:space-y-0 md:space-x-2 flex flex-col md:flex-row">
+            {mitarbeiter.map((ma) => (
+              <button
+                key={ma._id}
+                className={`px-3 py-1.5 rounded text-sm flex items-center ${
+                  aktiverMitarbeiter === ma._id
+                    ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
+                    : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                }`}
+                onClick={() => handleMitarbeiterFilter(ma._id)}
+              >
+                <User className="h-4 w-4 mr-1" />
+                {ma.vorname}
+              </button>
+            ))}
+            {aktiverMitarbeiter && (
+              <button
+                className="px-3 py-1.5 rounded text-sm flex items-center bg-red-100 text-red-700 border border-red-300"
+                onClick={() => setAktiverMitarbeiter('')}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Filter löschen
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
       
-      setZeiterfassungen([...zeiterfassungen, neueZeiterfassung]);
-    }
-    
-    // Formular zurücksetzen
-    setFormular({
-      mitarbeiterId: '',
-      startZeit: '',
-      endZeit: '',
-      pausen: 30,
-      bemerkung: ''
-    });
-  } catch (error) {
-    console.error('Fehler beim Speichern der Zeiterfassung:', error);
-    alert('Fehler beim Speichern der Zeiterfassung');
-  }
-};
-
-// Zeiterfassung löschen
-const handleZeiterfassungLoeschen = async (id) => {
-  if (window.confirm('Möchten Sie diesen Eintrag wirklich löschen?')) {
-    try {
-      await zeiterfassungService.deleteZeiterfassung(id);
-      setZeiterfassungen(zeiterfassungen.filter(z => z.id !== id));
-    } catch (error) {
-      console.error('Fehler beim Löschen der Zeiterfassung:', error);
-      alert('Fehler beim Löschen der Zeiterfassung');
-    }
-  }
-};
-
-// Neuen Mitarbeiter hinzufügen
-const handleAddMitarbeiter = async (name, position) => {
-  try {
-    const mitarbeiterData = { name, position };
-    const response = await zeiterfassungService.addMitarbeiter(mitarbeiterData);
-    
-    const neuerMitarbeiter = {
-      id: response.data.id,
-      name,
-      position
-    };
-    
-    setMitarbeiter([...mitarbeiter, neuerMitarbeiter]);
-  } catch (error) {
-    console.error('Fehler beim Hinzufügen des Mitarbeiters:', error);
-    alert('Fehler beim Hinzufügen des Mitarbeiters');
-  }
-};
-
-// Mitarbeiter löschen
-const handleDeleteMitarbeiter = async (id) => {
-  if (window.confirm(`Möchten Sie den Mitarbeiter wirklich löschen?`)) {
-    try {
-      await zeiterfassungService.deleteMitarbeiter(id);
-      setMitarbeiter(mitarbeiter.filter(m => m.id !== id));
-      // Auch zugehörige Zeiterfassungen löschen
-      setZeiterfassungen(zeiterfassungen.filter(z => z.mitarbeiterId !== id));
-    } catch (error) {
-      console.error('Fehler beim Löschen des Mitarbeiters:', error);
-      alert('Fehler beim Löschen des Mitarbeiters');
-    }
-  }
-};
+      {aktuellesProjekt ? (
+        <>
+          {/* Zeiterfassungsformular */}
+          <div className="bg-white p-4 rounded-lg shadow">
+            <h2 className="text-lg font-medium mb-4">
+              {bearbeitungId ? 'Zeiterfassung bearbeiten' : 'Neue Zeiterfassung'}
+            </h2>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label htmlFor="mitarbeiterId" className="block text-sm font-medium text-gray-700 mb-1">
+                    Mitarbeiter
+                  </label>
+                  <select
+                    id="mitarbeiterId"
+                    name="mitarbeiterId"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    value={formular.mitarbeiterId}
+                    onChange={(e) => setFormular({ ...formular, mitarbeiterId: e.target.value })}
+                    required
+                  >
+                    <option value="">-- Auswählen --</option>
+                    {mitarbeiterOptionen.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label htmlFor="datum" className="block text-sm font-medium text-gray-700 mb-1">
+                    Datum
+                  </label>
+                  <input
+                    type="date"
+                    id="datum"
+                    name="datum"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    value={formular.datum}
+                    onChange={(e) => setFormular({ ...formular, datum: e.target.value })}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="startzeit" className="block text-sm font-medium text-gray-700 mb-1">
+                    Startzeit
+                  </label>
+                  <input
+                    type="time"
+                    id="startzeit"
+                    name="startzeit"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    value={formular.startzeit}
+                    onChange={(e) => setFormular({ ...formular, startzeit: e.target.value })}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="endzeit" className="block text-sm font-medium text-gray-700 mb-1">
+                    Endzeit
+                  </label>
+                  <input
+                    type="time"
+                    id="endzeit"
+                    name="endzeit"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    value={formular.endzeit}
+                    onChange={(e) => setFormular({ ...formular, endzeit: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="pause" className="block text-sm font-medium text-gray-700 mb-1">
+                    Pause (Minuten)
+                  </label>
+                  <input
+                    type="number"
+                    id="pause"
+                    name="pause"
+                    min="0"
+                    step="5"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    value={formular.pause}
+                    onChange={(e) => setFormular({ ...formular, pause: e.target.value })}
+                    required
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label htmlFor="taetigkeit" className="block text-sm font-medium text-gray-700 mb-1">
+                    Tätigkeit
+                  </label>
+                  <input
+                    type="text"
+                    id="taetigkeit"
+                    name="taetigkeit"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    value={formular.taetigkeit}
+                    onChange={(e) => setFormular({ ...formular, taetigkeit: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label htmlFor="notizen" className="block text-sm font-medium text-gray-700 mb-1">
+                  Notizen
+                </label>
+                <textarea
+                  id="notizen"
+                  name="notizen"
+                  rows="2"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  value={formular.notizen}
+                  onChange={(e) => setFormular({ ...formular, notizen: e.target.value })}
+                ></textarea>
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  {bearbeitungId ? 'Aktualisieren' : 'Speichern'}
+                </button>
+              </div>
+              
+              {(formular.startzeit && formular.endzeit) && (
+                <div className="text-right text-sm">
+                  <span className="font-medium">Berechnete Arbeitsstunden: </span>
+                  <span className="text-indigo-600 font-medium">
+                    {berechneArbeitsstunden(
+                      formular.startzeit,
+                      formular.endzeit,
+                      parseInt(formular.pause, 10)
+                    ).toFixed(1)}
+                  </span>
+                </div>
+              )}
+            </form>
+          </div>
+          
+          {/* Zeiterfassungsliste */}
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+              <h2 className="text-lg font-medium">Erfasste Zeiten</h2>
+              <div className="text-sm text-gray-500">
+                {getFilteredZeiterfassungen().length} Einträge
+              </div>
+            </div>
+            
+            {renderZeiterfassungen()}
+          </div>
+        </>
+      ) : (
+        <div className="bg-white p-8 rounded-lg shadow text-center">
+          <Briefcase className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-700 mb-2">Kein Projekt ausgewählt</h3>
+          <p className="text-gray-500 mb-4">
+            Bitte wählen Sie ein Projekt aus, um Zeiten zu erfassen.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}

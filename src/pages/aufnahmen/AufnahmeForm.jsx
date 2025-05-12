@@ -1,174 +1,287 @@
-// Import-Statements ändern
-import { aufnahmenService, mitarbeiterService } from '../../services/api';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import api from '../../services/api';
 
-// useEffect-Hook für das Laden der Daten ändern
-useEffect(() => {
-  if (id) {
-    const fetchAufnahme = async () => {
+export default function AufnahmeForm() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  
+  const [loading, setLoading] = useState(!!id);
+  const [formData, setFormData] = useState({
+    kundenName: '',
+    kontaktperson: '',
+    telefon: '',
+    email: '',
+    auszugsadresse: {
+      strasse: '',
+      hausnummer: '',
+      plz: '',
+      ort: '',
+      land: 'Deutschland',
+      etage: 0,
+      aufzug: false,
+      entfernung: 0
+    },
+    einzugsadresse: {
+      strasse: '',
+      hausnummer: '',
+      plz: '',
+      ort: '',
+      land: 'Deutschland',
+      etage: 0,
+      aufzug: false,
+      entfernung: 0
+    },
+    umzugstyp: 'privat',
+    umzugsvolumen: '',
+    datum: '',
+    uhrzeit: '',
+    angebotspreis: {
+      netto: '',
+      brutto: '',
+      mwst: 19
+    },
+    notizen: '',
+    besonderheiten: '',
+    bewertung: 3,
+    mitarbeiterId: ''
+  });
+
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [verfuegbareMitarbeiter, setVerfuegbareMitarbeiter] = useState([]);
+
+  // Simuliere API-Aufruf zum Laden der Daten bei Bearbeitung
+  useEffect(() => {
+    if (id) {
+      const fetchAufnahme = async () => {
+        try {
+          setLoading(true);
+          // In einer echten Anwendung würde hier ein API-Aufruf mit der ID stattfinden
+          const response = await api.get(`/aufnahmen/${id}`);
+          setFormData(response.data);
+          
+          // Dateien laden
+          const filesResponse = await api.get(`/uploads?bezugId=${id}&bezugModell=Aufnahme`);
+          setUploadedFiles(filesResponse.data || []);
+          
+          setLoading(false);
+        } catch (error) {
+          console.error('Fehler beim Laden der Aufnahme:', error);
+          setLoading(false);
+          
+          // Fallback zu Mockdaten für Demo
+          const mockAufnahme = {
+            kundenName: 'Musterfirma GmbH',
+            kontaktperson: 'Max Mustermann',
+            telefon: '0123-4567890',
+            email: 'info@musterfirma.de',
+            auszugsadresse: {
+              strasse: 'Musterstraße',
+              hausnummer: '123',
+              plz: '12345',
+              ort: 'Musterstadt',
+              land: 'Deutschland',
+              etage: 2,
+              aufzug: true,
+              entfernung: 10
+            },
+            einzugsadresse: {
+              strasse: 'Beispielweg',
+              hausnummer: '45',
+              plz: '54321',
+              ort: 'Beispielort',
+              land: 'Deutschland',
+              etage: 1,
+              aufzug: false,
+              entfernung: 20
+            },
+            umzugstyp: 'gewerbe',
+            umzugsvolumen: '75',
+            datum: '2025-05-15',
+            uhrzeit: '09:00',
+            angebotspreis: {
+              netto: 2500,
+              brutto: 2975,
+              mwst: 19
+            },
+            notizen: 'Beispielnotizen zur Aufnahme',
+            besonderheiten: 'Schwere Maschinen, Treppen ohne Aufzug',
+            bewertung: 4,
+            mitarbeiterId: '1'
+          };
+          setFormData(mockAufnahme);
+        }
+      };
+
+      fetchAufnahme();
+    }
+    
+    // Mitarbeiter laden
+    const fetchMitarbeiter = async () => {
       try {
-        setLoading(true);
-        const response = await aufnahmenService.getById(id);
-        
-        // Daten aus der API für das Formular vorbereiten
-        const aufnahmeData = {
-          kunde: response.data.kunde,
-          kontaktperson: response.data.kontaktperson,
-          telefon: response.data.telefon,
-          email: response.data.email,
-          adresse: response.data.adresse,
-          termin: new Date(response.data.termin).toISOString().split('T')[0],
-          uhrzeit: new Date(response.data.termin).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
-          status: response.data.status,
-          mitarbeiter_id: response.data.mitarbeiter_id,
-          etage: response.data.etage,
-          aufzug: response.data.aufzug,
-          zimmer: response.data.zimmer,
-          qm: response.data.qm,
-          umzugsgrund: response.data.umzugsgrund,
-          spezielle_gegenstände: response.data.spezielle_gegenstände,
-          notizen: response.data.notizen
-        };
-        
-        setFormData(aufnahmeData);
-        
-        // Auch Dateien laden, falls vorhanden
-        const filesResponse = await aufnahmenService.getFiles(id);
-        setUploadedFiles(filesResponse.data);
-        
-        setLoading(false);
+        const response = await api.get('/mitarbeiter');
+        setVerfuegbareMitarbeiter(response.data);
       } catch (error) {
-        console.error('Fehler beim Laden der Aufnahme:', error);
-        setLoading(false);
-        // Fallback zu Mock-Daten als temporäre Lösung
-        setFormData(mockAufnahme);
+        console.error('Fehler beim Laden der Mitarbeiter:', error);
+        
+        // Fallback zu Mockdaten für Demo
+        const mockMitarbeiter = [
+          { _id: '1', vorname: 'Max', nachname: 'Mustermann', rolle: 'Aufnahmeteam' },
+          { _id: '2', vorname: 'Anna', nachname: 'Schmidt', rolle: 'Aufnahmeteam' },
+          { _id: '3', vorname: 'Thomas', nachname: 'Müller', rolle: 'Aufnahmeteam' }
+        ];
+        setVerfuegbareMitarbeiter(mockMitarbeiter);
       }
     };
+    
+    fetchMitarbeiter();
+  }, [id]);
 
-    fetchAufnahme();
-  }
-  
-  // Mitarbeiter laden
-  const fetchMitarbeiter = async () => {
-    try {
-      const response = await mitarbeiterService.getAll();
-      setVerfuegbareMitarbeiter(response.data);
-    } catch (error) {
-      console.error('Fehler beim Laden der Mitarbeiter:', error);
-      // Fallback zu Mock-Daten
-      setVerfuegbareMitarbeiter(mockMitarbeiter);
+  // Behandelt Änderungen in Input-Feldern
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    
+    if (name.includes('.')) {
+      // Für verschachtelte Objekte wie auszugsadresse.strasse
+      const [parent, child] = name.split('.');
+      setFormData(prev => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: type === 'checkbox' ? checked : value
+        }
+      }));
+    } else {
+      // Für normale Felder
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      }));
     }
   };
-  
-  fetchMitarbeiter();
-}, [id]);
 
-// Datei-Upload-Handler
-const handleFileUpload = async (e) => {
-  const files = Array.from(e.target.files);
-  
-  try {
-    if (id) {
-      // Wenn wir eine bestehende Aufnahme bearbeiten, laden wir die Dateien hoch
-      await aufnahmenService.uploadFiles(id, files);
-      
-      // Dateien lokal hinzufügen für optimistische UI-Aktualisierung
-      const newFiles = files.map(file => ({
-        id: Date.now() + Math.random(),
-        name: file.name,
-        size: file.size,
-        type: file.type
-      }));
-      
-      setUploadedFiles(prev => [...prev, ...newFiles]);
-    } else {
-      // Wenn wir eine neue Aufnahme erstellen, speichern wir die Dateien temporär
-      const newFiles = files.map(file => ({
-        id: Date.now() + Math.random(),
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        file: file  // Das Originaldatei-Objekt für späteren Upload speichern
-      }));
-      
-      setUploadedFiles(prev => [...prev, ...newFiles]);
-    }
-  } catch (error) {
-    console.error('Fehler beim Hochladen der Dateien:', error);
-    alert('Fehler beim Hochladen der Dateien');
-  }
-};
-
-// Datei entfernen Handler
-const handleRemoveFile = async (fileId) => {
-  try {
-    if (id) {
-      // Bei bestehender Aufnahme auch vom Server löschen
-      const fileToRemove = uploadedFiles.find(file => file.id === fileId);
-      if (fileToRemove && fileToRemove.serverId) {
-        // serverId ist die ID der Datei auf dem Server
-        await fileService.deleteFile(fileToRemove.serverId);
-      }
-    }
+  // Datei-Upload
+  const handleFileUpload = (file) => {
+    // In einer echten Anwendung würde hier ein API-Aufruf zum Hochladen der Datei stattfinden
     
-    // Aus lokalem State entfernen
-    setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
-  } catch (error) {
-    console.error('Fehler beim Löschen der Datei:', error);
-  }
-};
-
-// Formular absenden mit API-Aufruf
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  try {
-    // Formular-Daten in API-Format transformieren
-    const apiData = {
-      kunde: formData.kunde,
-      kontaktperson: formData.kontaktperson,
-      telefon: formData.telefon,
-      email: formData.email,
-      adresse: formData.adresse,
-      // Termin-Datum und -Uhrzeit kombinieren
-      termin: new Date(`${formData.termin}T${formData.uhrzeit}`).toISOString(),
-      status: formData.status,
-      mitarbeiter_id: formData.mitarbeiter_id,
-      etage: formData.etage,
-      aufzug: formData.aufzug,
-      zimmer: parseInt(formData.zimmer) || 0,
-      qm: parseInt(formData.qm) || 0,
-      umzugsgrund: formData.umzugsgrund,
-      spezielle_gegenstände: formData.spezielle_gegenstände,
-      notizen: formData.notizen
+    // Simuliere erfolgreichen Upload für Demo
+    const mockUploadedFile = {
+      _id: Date.now().toString(),
+      name: file.name,
+      groesse: file.size,
+      typ: file.type,
+      datum: new Date().toISOString(),
+      pfad: URL.createObjectURL(file),
+      bezugId: id || 'temp',
+      bezugModell: 'Aufnahme'
     };
     
-    let aufnahmeId;
+    setUploadedFiles(prev => [...prev, mockUploadedFile]);
     
-    if (id) {
-      // Bestehende Aufnahme aktualisieren
-      await aufnahmenService.update(id, apiData);
-      aufnahmeId = id;
-    } else {
-      // Neue Aufnahme erstellen
-      const response = await aufnahmenService.create(apiData);
-      aufnahmeId = response.data.id;
+    return {
+      success: true,
+      file: mockUploadedFile
+    };
+  };
+
+  // Datei löschen
+  const handleFileDelete = (fileId) => {
+    // In einer echten Anwendung würde hier ein API-Aufruf zum Löschen der Datei stattfinden
+    setUploadedFiles(prev => prev.filter(file => file._id !== fileId));
+  };
+
+  // Formular absenden
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      let response;
       
-      // Wenn wir neue Dateien haben, hochladen
-      if (uploadedFiles.length > 0) {
-        const filesToUpload = uploadedFiles.filter(file => file.file).map(file => file.file);
-        if (filesToUpload.length > 0) {
-          await aufnahmenService.uploadFiles(aufnahmeId, filesToUpload);
+      if (id) {
+        // Aktualisieren einer bestehenden Aufnahme
+        const filesData = uploadedFiles.map(file => ({ fileId: file._id }));
+        response = await api.put(`/aufnahmen/${id}`, { ...formData, dateien: filesData });
+      } else {
+        // Erstellen einer neuen Aufnahme
+        response = await api.post('/aufnahmen', formData);
+        
+        // Wenn Dateien vorhanden sind, diese der neuen Aufnahme zuordnen
+        if (uploadedFiles.length > 0 && response.data.aufnahme) {
+          const aufnahmeId = response.data.aufnahme._id;
+          
+          for (const file of uploadedFiles) {
+            // In einer echten Anwendung würde hier ein API-Aufruf zum Aktualisieren der Datei-Referenzen stattfinden
+            await fileService.updateFileBezug(file._id, aufnahmeId, 'Aufnahme');
+          }
         }
       }
+      
+      setUploadedFiles([]);
+      
+      // Erfolgsmeldung
+      alert(`Aufnahme erfolgreich ${id ? 'aktualisiert' : 'erstellt'}`);
+      
+      // Zurück zur Aufnahmen-Übersicht navigieren
+      navigate('/aufnahmen');
+    } catch (error) {
+      console.error('Fehler beim Speichern der Aufnahme:', error);
+      alert(`Fehler: ${error.response?.data?.message || 'Unbekannter Fehler'}`);
     }
-    
-    // Erfolgsmeldung
-    alert(`Aufnahme erfolgreich ${id ? 'aktualisiert' : 'erstellt'}`);
-    
-    // Zurück zur Übersicht navigieren
-    navigate('/aufnahmen');
-  } catch (error) {
-    console.error('Fehler beim Speichern der Aufnahme:', error);
-    alert(`Fehler beim ${id ? 'Aktualisieren' : 'Erstellen'} der Aufnahme: ${error.message}`);
+  };
+
+  // Vorschau der Adressdaten
+  const renderAdressVorschau = () => {
+    return (
+      <div className="bg-gray-50 p-4 rounded-lg border mb-6">
+        <h3 className="text-lg font-semibold mb-4">Adressdaten Vorschau</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <h4 className="font-medium">Auszugsadresse:</h4>
+            <p>
+              {formData.auszugsadresse.strasse} {formData.auszugsadresse.hausnummer}<br />
+              {formData.auszugsadresse.plz} {formData.auszugsadresse.ort}<br />
+              {formData.auszugsadresse.land}
+            </p>
+            <p className="text-sm text-gray-600 mt-1">
+              Etage: {formData.auszugsadresse.etage} | 
+              Aufzug: {formData.auszugsadresse.aufzug ? 'Ja' : 'Nein'} | 
+              Entfernung zur Parkposition: {formData.auszugsadresse.entfernung} m
+            </p>
+          </div>
+          <div>
+            <h4 className="font-medium">Einzugsadresse:</h4>
+            <p>
+              {formData.einzugsadresse.strasse} {formData.einzugsadresse.hausnummer}<br />
+              {formData.einzugsadresse.plz} {formData.einzugsadresse.ort}<br />
+              {formData.einzugsadresse.land}
+            </p>
+            <p className="text-sm text-gray-600 mt-1">
+              Etage: {formData.einzugsadresse.etage} | 
+              Aufzug: {formData.einzugsadresse.aufzug ? 'Ja' : 'Nein'} | 
+              Entfernung zur Parkposition: {formData.einzugsadresse.entfernung} m
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Lade-Status prüfen
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
   }
-};
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold mb-6">
+        {id ? 'Aufnahme bearbeiten' : 'Neue Aufnahme erstellen'}
+      </h1>
+      
+      {/* Dein Formular-Inhalt hier */}
+    </div>
+  );
+}

@@ -1,198 +1,287 @@
-// Import-Statements ändern
-import { umzuegeService, mitarbeiterService, fahrzeugeService } from '../../services/api';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import api from '../../services/api';
 
-// useEffect-Hook für das Laden der Daten ändern
-useEffect(() => {
-  if (id) {
-    const fetchUmzug = async () => {
+export default function UmzugForm() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const isNeueModus = !id;
+  
+  const [loading, setLoading] = useState(!!id);
+  const [formData, setFormData] = useState({
+    kundennummer: '',
+    auftraggeber: {
+      name: '',
+      telefon: '',
+      email: ''
+    },
+    kontakte: [],
+    auszugsadresse: {
+      strasse: '',
+      hausnummer: '',
+      plz: '',
+      ort: '',
+      land: 'Deutschland',
+      etage: 0,
+      aufzug: false,
+      entfernung: 0
+    },
+    einzugsadresse: {
+      strasse: '',
+      hausnummer: '',
+      plz: '',
+      ort: '',
+      land: 'Deutschland',
+      etage: 0,
+      aufzug: false,
+      entfernung: 0
+    },
+    zwischenstopps: [],
+    startDatum: null,
+    endDatum: null,
+    status: 'angefragt',
+    preis: {
+      netto: '',
+      brutto: '',
+      mwst: 19,
+      bezahlt: false,
+      zahlungsart: 'rechnung'
+    },
+    aufnahmeId: '',
+    fahrzeuge: [],
+    mitarbeiter: [],
+    extraLeistungen: []
+  });
+  
+  const [verfuegbareMitarbeiter, setVerfuegbareMitarbeiter] = useState([]);
+  const [verfuegbareFahrzeuge, setVerfuegbareFahrzeuge] = useState([]);
+
+  // Simuliere API-Aufruf zum Laden der Daten bei Bearbeitung
+  useEffect(() => {
+    if (id) {
+      const fetchUmzug = async () => {
+        try {
+          setLoading(true);
+          // In einer echten Anwendung würde hier ein API-Aufruf mit der ID stattfinden
+          const response = await api.get(`/umzuege/${id}`);
+          setFormData(response.data);
+          setLoading(false);
+        } catch (error) {
+          console.error('Fehler beim Laden des Umzugs:', error);
+          setLoading(false);
+          
+          // Fallback zu Mockdaten für Demo
+          const mockUmzug = {
+            id: 1,
+            kundennummer: 'U-2025-001',
+            auftraggeber: {
+              name: 'Familie Becker',
+              telefon: '0123-4567890',
+              email: 'becker@beispiel.de'
+            },
+            kontakte: [
+              { name: 'Thomas Becker', telefon: '0123-4567890', email: 'thomas.becker@beispiel.de', isKunde: true }
+            ],
+            auszugsadresse: {
+              strasse: 'Rosenweg',
+              hausnummer: '8',
+              plz: '10115',
+              ort: 'Berlin',
+              land: 'Deutschland',
+              etage: 3,
+              aufzug: true,
+              entfernung: 10
+            },
+            einzugsadresse: {
+              strasse: 'Tulpenallee',
+              hausnummer: '23',
+              plz: '80333',
+              ort: 'München',
+              land: 'Deutschland',
+              etage: 2,
+              aufzug: false,
+              entfernung: 15
+            },
+            zwischenstopps: [
+              {
+                strasse: 'Lagerstraße',
+                hausnummer: '1',
+                plz: '70174',
+                ort: 'Stuttgart',
+                land: 'Deutschland',
+                etage: 0,
+                aufzug: true,
+                entfernung: 5
+              }
+            ],
+            startDatum: '2025-05-15T08:00:00',
+            endDatum: '2025-05-15T18:00:00',
+            status: 'geplant',
+            preis: {
+              netto: 1500,
+              brutto: 1785,
+              mwst: 19,
+              bezahlt: false,
+              zahlungsart: 'rechnung'
+            },
+            aufnahmeId: '',
+            fahrzeuge: [
+              { id: 1, typ: '7,5t LKW', kennzeichen: 'B-HU 1234' },
+              { id: 2, typ: 'Transporter', kennzeichen: 'B-HU 5678' }
+            ],
+            mitarbeiter: [
+              { id: 1, rolle: 'teamleiter' },
+              { id: 2, rolle: 'helfer' },
+              { id: 3, rolle: 'fahrer' },
+              { id: 4, rolle: 'helfer' }
+            ],
+            extraLeistungen: [
+              { beschreibung: 'Klaviertransport', preis: 250, menge: 1 },
+              { beschreibung: 'Verpackungsservice', preis: 350, menge: 1 }
+            ]
+          };
+          setFormData(mockUmzug);
+        }
+      };
+
+      fetchUmzug();
+    }
+    
+    // Mitarbeiter laden
+    const fetchMitarbeiter = async () => {
       try {
-        setLoading(true);
-        const response = await umzuegeService.getById(id);
-        
-        // Formatieren der API-Daten für das Formular
-        const umzugData = {
-          kunde: {
-            name: response.data.auftraggeber.name,
-            kontaktperson: response.data.auftraggeber.kontaktperson,
-            telefon: response.data.auftraggeber.telefon,
-            email: response.data.auftraggeber.email
-          },
-          typ: response.data.typ,
-          status: mapAPIStatus(response.data.status),
-          datum: new Date(response.data.startDatum).toISOString().split('T')[0],
-          uhrzeit_start: new Date(response.data.startDatum).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
-          uhrzeit_ende: response.data.endDatum ? new Date(response.data.endDatum).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '',
-          startadresse: `${response.data.auszugsadresse.strasse} ${response.data.auszugsadresse.hausnummer}, ${response.data.auszugsadresse.plz} ${response.data.auszugsadresse.ort}`,
-          zieladresse: `${response.data.einzugsadresse.strasse} ${response.data.einzugsadresse.hausnummer}, ${response.data.einzugsadresse.plz} ${response.data.einzugsadresse.ort}`,
-          umzugsvolumen: response.data.volumen || '',
-          etage_start: response.data.auszugsadresse.etage || '',
-          aufzug_start: response.data.auszugsadresse.aufzug || false,
-          etage_ziel: response.data.einzugsadresse.etage || '',
-          aufzug_ziel: response.data.einzugsadresse.aufzug || false,
-          mitarbeiter: response.data.mitarbeiter?.map(m => m.mitarbeiterId) || [],
-          fahrzeuge: response.data.fahrzeuge?.map(f => f.fahrzeugId) || [],
-          notizen: response.data.notizen || ''
-        };
-        
-        setFormData(umzugData);
-        setLoading(false);
+        const response = await api.get('/mitarbeiter');
+        setVerfuegbareMitarbeiter(response.data);
       } catch (error) {
-        console.error('Fehler beim Laden des Umzugs:', error);
-        setLoading(false);
-        // Fallback zu Mock-Daten als temporäre Lösung
-        setFormData(mockUmzug);
+        console.error('Fehler beim Laden der Mitarbeiter:', error);
+        
+        // Fallback zu Mockdaten für Demo
+        const mockMitarbeiter = [
+          { _id: '1', vorname: 'Max', nachname: 'Mustermann', rolle: 'Teamleiter' },
+          { _id: '2', vorname: 'Anna', nachname: 'Schmidt', rolle: 'Helfer' },
+          { _id: '3', vorname: 'Lukas', nachname: 'Meyer', rolle: 'Fahrer' },
+          { _id: '4', vorname: 'Julia', nachname: 'Weber', rolle: 'Helfer' },
+          { _id: '5', vorname: 'Felix', nachname: 'Schulz', rolle: 'Fahrer' },
+          { _id: '6', vorname: 'Laura', nachname: 'König', rolle: 'Helfer' }
+        ];
+        setVerfuegbareMitarbeiter(mockMitarbeiter);
       }
     };
-
-    fetchUmzug();
-  }
-  
-  // Mitarbeiter und Fahrzeuge laden
-  const fetchMitarbeiter = async () => {
-    try {
-      const response = await mitarbeiterService.getAll();
-      setVerfuegbareMitarbeiter(response.data);
-    } catch (error) {
-      console.error('Fehler beim Laden der Mitarbeiter:', error);
-      // Fallback zu Mock-Daten
-      setVerfuegbareMitarbeiter(mockMitarbeiter);
-    }
-  };
-  
-  const fetchFahrzeuge = async () => {
-    try {
-      const response = await fahrzeugeService.getAll();
-      setVerfuegbareFahrzeuge(response.data);
-    } catch (error) {
-      console.error('Fehler beim Laden der Fahrzeuge:', error);
-      // Fallback zu Mock-Daten
-      setVerfuegbareFahrzeuge(mockFahrzeuge);
-    }
-  };
-  
-  fetchMitarbeiter();
-  fetchFahrzeuge();
-}, [id]);
-
-// Formular absenden mit API-Aufruf
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  try {
-    // Adressdaten extrahieren und strukturiert aufbereiten
-    const startAdressTeile = parseAdresse(formData.startadresse);
-    const zielAdressTeile = parseAdresse(formData.zieladresse);
     
-    // Formular-Daten in API-Format transformieren
-    const apiData = {
-      auftraggeber: {
-        name: formData.kunde.name,
-        kontaktperson: formData.kunde.kontaktperson,
-        telefon: formData.kunde.telefon,
-        email: formData.kunde.email
-      },
-      typ: formData.typ,
-      status: mapFormStatus(formData.status),
-      
-      // Datum und Uhrzeit kombinieren
-      startDatum: new Date(`${formData.datum}T${formData.uhrzeit_start}`).toISOString(),
-      endDatum: formData.uhrzeit_ende ? 
-                new Date(`${formData.datum}T${formData.uhrzeit_ende}`).toISOString() : 
-                null,
-      
-      auszugsadresse: {
-        strasse: startAdressTeile.strasse || '',
-        hausnummer: startAdressTeile.hausnummer || '',
-        plz: startAdressTeile.plz || '',
-        ort: startAdressTeile.ort || '',
-        etage: formData.etage_start,
-        aufzug: formData.aufzug_start
-      },
-      einzugsadresse: {
-        strasse: zielAdressTeile.strasse || '',
-        hausnummer: zielAdressTeile.hausnummer || '',
-        plz: zielAdressTeile.plz || '',
-        ort: zielAdressTeile.ort || '',
-        etage: formData.etage_ziel,
-        aufzug: formData.aufzug_ziel
-      },
-      
-      volumen: parseInt(formData.umzugsvolumen) || 0,
-      
-      // Mitarbeiter und Fahrzeuge in das richtige Format bringen
-      mitarbeiter: formData.mitarbeiter.map(id => ({ mitarbeiterId: id })),
-      fahrzeuge: formData.fahrzeuge.map(id => ({ fahrzeugId: id })),
-      
-      notizen: formData.notizen
+    // Fahrzeuge laden
+    const fetchFahrzeuge = async () => {
+      try {
+        const response = await api.get('/fahrzeuge');
+        setVerfuegbareFahrzeuge(response.data);
+      } catch (error) {
+        console.error('Fehler beim Laden der Fahrzeuge:', error);
+        
+        // Fallback zu Mockdaten für Demo
+        const mockFahrzeuge = [
+          { _id: '1', kennzeichen: 'B-HU 1234', typ: '7,5t LKW' },
+          { _id: '2', kennzeichen: 'B-HU 5678', typ: 'Transporter' },
+          { _id: '3', kennzeichen: 'B-HU 9012', typ: '12t LKW' },
+          { _id: '4', kennzeichen: 'B-HU 3456', typ: 'Transporter' }
+        ];
+        setVerfuegbareFahrzeuge(mockFahrzeuge);
+      }
     };
     
-    // Je nach Modus entweder neuen Umzug erstellen oder bestehenden aktualisieren
-    if (isNeueModus) {
-      await umzuegeService.create(apiData);
-      alert('Umzug erfolgreich erstellt');
+    fetchMitarbeiter();
+    fetchFahrzeuge();
+  }, [id]);
+
+  // Behandelt Änderungen in Input-Feldern
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    
+    if (name.includes('.')) {
+      // Für verschachtelte Objekte wie kunde.name
+      const [parent, child] = name.split('.');
+      setFormData(prev => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: type === 'checkbox' ? checked : value
+        }
+      }));
     } else {
-      await umzuegeService.update(id, apiData);
-      alert('Umzug erfolgreich aktualisiert');
+      // Für normale Felder
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      }));
     }
+  };
+
+  // Behandelt Auswahl von Mitarbeitern
+  const handleMitarbeiterToggle = (mitarbeiterId) => {
+    setFormData(prev => {
+      const neueMitarbeiter = prev.mitarbeiter.includes(mitarbeiterId)
+        ? prev.mitarbeiter.filter(id => id !== mitarbeiterId)
+        : [...prev.mitarbeiter, mitarbeiterId];
+      
+      return {
+        ...prev,
+        mitarbeiter: neueMitarbeiter
+      };
+    });
+  };
+
+  // Behandelt Auswahl von Fahrzeugen
+  const handleFahrzeugToggle = (fahrzeugId) => {
+    setFormData(prev => {
+      const neueFahrzeuge = prev.fahrzeuge.includes(fahrzeugId)
+        ? prev.fahrzeuge.filter(id => id !== fahrzeugId)
+        : [...prev.fahrzeuge, fahrzeugId];
+      
+      return {
+        ...prev,
+        fahrzeuge: neueFahrzeuge
+      };
+    });
+  };
+
+  // Formular absenden
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    // In einer echten Anwendung würde hier ein API-Aufruf zum Speichern stattfinden
+    console.log('Formular abgesendet:', formData);
     
     // Zurück zur Übersicht navigieren
     navigate('/umzuege');
-  } catch (error) {
-    console.error('Fehler beim Speichern des Umzugs:', error);
-    alert(`Fehler beim ${isNeueModus ? 'Erstellen' : 'Aktualisieren'} des Umzugs: ${error.message}`);
-  }
-};
+  };
 
-// Hilfsfunktion zum Extrahieren von Adressteilen
-const parseAdresse = (adressString) => {
-  const teile = {};
-  
-  // Vereinfachte Adress-Extraktion (kann je nach Format verbessert werden)
-  try {
-    const match = adressString.match(/^([^,\d]+)\s*(\d+)?,?\s*(\d+)?\s*(.+)?$/);
-    
-    if (match) {
-      teile.strasse = match[1]?.trim() || '';
-      teile.hausnummer = match[2] || '';
-      teile.plz = match[3] || '';
-      teile.ort = match[4]?.trim() || '';
-    }
-  } catch (e) {
-    console.error('Fehler beim Parsen der Adresse:', e);
+  // Lade-Status prüfen
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
   }
-  
-  return teile;
-};
 
-// Hilfsfunktion zum Konvertieren des Frontend-Status in das API-Format
-const mapFormStatus = (formStatus) => {
-  switch (formStatus) {
-    case 'Geplant':
-      return 'geplant';
-    case 'In Vorbereitung':
-    case 'In Bearbeitung':
-      return 'in_bearbeitung';
-    case 'Abgeschlossen':
-      return 'abgeschlossen';
-    default:
-      return 'geplant';
-  }
-};
-
-// Hilfsfunktion zum Konvertieren des API-Status in das Frontend-Format
-const mapAPIStatus = (apiStatus) => {
-  switch (apiStatus) {
-    case 'angefragt':
-    case 'angebot':
-    case 'geplant':
-      return 'Geplant';
-    case 'in_bearbeitung':
-      return 'In Bearbeitung';
-    case 'abgeschlossen':
-      return 'Abgeschlossen';
-    case 'storniert':
-      return 'Storniert';
-    default:
-      return 'Geplant';
-  }
-};
+  return (
+    <div>
+      {/* Kopfzeile mit Navigation */}
+      <div className="flex items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">
+          {isNeueModus ? 'Neuen Umzug anlegen' : 'Umzug bearbeiten'}
+        </h1>
+      </div>
+      
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Form content would go here */}
+        <div className="flex justify-end space-x-3">
+          <button type="button" onClick={() => navigate('/umzuege')} className="px-4 py-2 border rounded">
+            Abbrechen
+          </button>
+          <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded">
+            Speichern
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
