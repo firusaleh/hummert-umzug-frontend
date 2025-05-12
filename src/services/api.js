@@ -1,7 +1,20 @@
 import axios from 'axios';
 
+// Konfiguriere die API-Basis-URL mit Fallback
+const API_URL = process.env.REACT_APP_API_URL || 'https://meine-app-backend.onrender.com/api';
+
+// Für Entwicklungszwecke kann hier zwischen lokaler und Produktionsumgebung unterschieden werden
+const getBaseURL = () => {
+  // Wenn Sie zwischen Environments wechseln wollen, können Sie das hier tun
+  if (process.env.NODE_ENV === 'development') {
+    return API_URL;
+  }
+  return API_URL;
+};
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api'
+  baseURL: getBaseURL(),
+  timeout: 10000 // 10 Sekunden Timeout für alle Anfragen
 });
 
 // Request-Interceptor für Token
@@ -14,34 +27,107 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error('Request-Interceptor-Fehler:', error);
     return Promise.reject(error);
   }
 );
 
-// Response-Interceptor für Token-Ablauf
+// Response-Interceptor für Token-Ablauf und Fehlerbehandlung
 api.interceptors.response.use(
   (response) => {
     return response;
   },
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Token abgelaufen, zur Anmeldeseite umleiten
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+    console.error('API-Fehler:', error);
+    
+    // Detaillierte Fehlerprotokollierung
+    if (error.response) {
+      console.error('Statuscode:', error.response.status);
+      console.error('Antwortdaten:', error.response.data);
+      console.error('Headers:', error.response.headers);
+      
+      // Token-Ablauf-Behandlung
+      if (error.response.status === 401) {
+        console.warn('Authentifizierungsfehler: Token möglicherweise abgelaufen');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // Nur umleiten, wenn nicht bereits auf Login-Seite (vermeidet Endlosschleife)
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
+      }
+    } else if (error.request) {
+      console.error('Keine Antwort vom Server erhalten:', error.request);
+    } else {
+      console.error('Fehler beim Einrichten der Anfrage:', error.message);
     }
+    
     return Promise.reject(error);
   }
 );
 
+// Hilfs-Funktion zur Fehlerbehandlung in Services
+const handleApiError = (error, customMessage = 'Ein Fehler ist aufgetreten') => {
+  if (error.response && error.response.data && error.response.data.message) {
+    return { success: false, message: error.response.data.message };
+  }
+  return { success: false, message: customMessage };
+};
+
 // Auth-Services
 export const authService = {
-  register: (userData) => api.post('/auth/register', userData),
-  login: (credentials) => api.post('/auth/login', credentials),
+  register: async (userData) => {
+    try {
+      const response = await api.post('/auth/register', userData);
+      return response;
+    } catch (error) {
+      console.error('Registrierungsfehler:', error);
+      throw error;
+    }
+  },
+  login: async (credentials) => {
+    try {
+      const response = await api.post('/auth/login', credentials);
+      return response;
+    } catch (error) {
+      console.error('Login-Fehler:', error);
+      throw error;
+    }
+  },
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
   },
-  checkAuth: () => api.get('/auth/check') // Endpunkt zum Prüfen der Token-Gültigkeit
+  checkAuth: async () => {
+    try {
+      return await api.get('/auth/check');
+    } catch (error) {
+      console.error('Auth-Check-Fehler:', error);
+      throw error;
+    }
+  },
+  // Korrigierte Version: Service zum Prüfen der API-Verfügbarkeit
+  checkApiHealth: async () => {
+    try {
+      // Versuche zuerst den dedizierten Health-Endpunkt
+      try {
+        return await api.get('/health');
+      } catch (healthError) {
+        // Falls /health nicht verfügbar ist, versuchen wir es mit einem anderen Endpunkt
+        try {
+          // Verwende den bereits bekannten Auth-Check-Endpunkt
+          return await api.get('/auth/check');
+        } catch (authError) {
+          // Letzter Fallback: Versuche den Root-Endpunkt der API
+          return await api.get('/');
+        }
+      }
+    } catch (error) {
+      console.error('API-Health-Check-Fehler, alle Fallbacks fehlgeschlagen:', error);
+      throw error;
+    }
+  }
 };
 
 // Benutzer-Services
@@ -57,7 +143,7 @@ export const umzuegeService = {
   create: (umzugData) => api.post('/umzuege', umzugData),
   update: (id, umzugData) => api.put(`/umzuege/${id}`, umzugData),
   delete: (id) => api.delete(`/umzuege/${id}`),
-  updateStatus: (id, status) => api.put(`/umzuege/${id}`, { status }),
+  updateStatus: (id, status) => api.put(`/umzuege/${id}/status`, { status }),
   getByMonat: (monat, jahr) => api.get(`/umzuege/monat/${monat}/${jahr}`)
 };
 
@@ -182,10 +268,17 @@ export const zeiterfassungService = {
 export const fileService = {
   uploadFile: (fileData) => {
     const formData = new FormData();
-    formData.append('file', fileData.file);
+    
+    if (fileData.file) {
+      formData.append('file', fileData.file);
+    }
     
     if (fileData.project) {
       formData.append('project', fileData.project);
+    }
+    
+    if (fileData.category) {
+      formData.append('category', fileData.category);
     }
     
     if (fileData.task) {
@@ -200,7 +293,8 @@ export const fileService = {
   },
   getFiles: (params) => api.get('/files', { params }),
   deleteFile: (id) => api.delete(`/files/${id}`),
-  downloadFile: (id) => api.get(`/files/download/${id}`, { responseType: 'blob' })
+  downloadFile: (id) => api.get(`/files/download/${id}`, { responseType: 'blob' }),
+  updateFile: (id, updateData) => api.put(`/files/${id}`, updateData)
 };
 
 export default api;
