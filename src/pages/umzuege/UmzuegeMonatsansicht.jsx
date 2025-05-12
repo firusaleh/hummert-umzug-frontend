@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // Import hinzugefügt
+import { useNavigate } from 'react-router-dom';
 import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Eye, Truck, User, Phone, MapPin, Filter, Search, Check, Clock, AlertTriangle, Home, CheckCircle, XCircle, FileText } from 'lucide-react';
+import api from '../../services/api'; // API-Service importieren
 
 export default function UmzuegeMonatsansicht() {
   // Navigation-Hook für Routing
-  const navigate = useNavigate(); // Hook hinzugefügt
+  const navigate = useNavigate();
   
   // Aktuelles Datum und Jahr
   const [aktuellesDatum, setAktuellesDatum] = useState(new Date());
@@ -20,171 +21,65 @@ export default function UmzuegeMonatsansicht() {
   const [statusFilter, setStatusFilter] = useState('Alle');
   const [kategorieFilter, setKategorieFilter] = useState('Alle');
   
-  // Demo-Daten für Umzüge
-  const [umzuege, setUmzuege] = useState([
-    {
-      id: 1,
-      kunde: 'Familie Müller',
-      telefon: '0123-4567890',
-      email: 'mueller@beispiel.de',
-      kategorie: 'Privatumzug',
-      von: 'Bahnhofstraße 12, München',
-      nach: 'Kirchweg 3, Augsburg',
-      datum: new Date(2025, 4, 10), // 10. Mai 2025
-      uhrzeit: '08:00 - 16:00',
-      mitarbeiter: ['Max', 'Anna', 'Peter'],
-      fahrzeuge: ['LKW-01'],
-      status: 'Geplant',
-      volumen: '35 m³',
-      preis: 1850,
-      notizen: 'Klavier im 3. Stock ohne Aufzug',
-      materialien: 'Standard-Umzugsset + Klavertransport-Set'
-    },
-    {
-      id: 2,
-      kunde: 'Herr Schmidt',
-      telefon: '0123-9876543',
-      email: 'schmidt@beispiel.de',
-      kategorie: 'Privatumzug',
-      von: 'Goethestraße 45, München',
-      nach: 'Breslauer Str. 67, München',
-      datum: new Date(2025, 4, 12), // 12. Mai 2025
-      uhrzeit: '09:00 - 14:00',
-      mitarbeiter: ['Thomas', 'Michael'],
-      fahrzeuge: ['LKW-02'],
-      status: 'Geplant',
-      volumen: '18 m³',
-      preis: 980,
-      notizen: 'Parkplatzreservierung bestätigt',
-      materialien: 'Standard-Umzugsset'
-    },
-    {
-      id: 3,
-      kunde: 'Frau Weber',
-      telefon: '0123-1234567',
-      email: 'weber@beispiel.de',
-      kategorie: 'Privatumzug',
-      von: 'Karlstraße 10, Freising',
-      nach: 'Amselweg 23, München',
-      datum: new Date(2025, 4, 15), // 15. Mai 2025
-      uhrzeit: '10:00 - 17:00',
-      mitarbeiter: ['Max', 'Paul'],
-      fahrzeuge: ['LKW-03'],
-      status: 'Geplant',
-      volumen: '42 m³',
-      preis: 2450,
-      notizen: 'Antiker Schrank erfordert besondere Sorgfalt',
-      materialien: 'Standard-Umzugsset + Zusatzkartons'
-    },
-    {
-      id: 4,
-      kunde: 'Tech Solutions GmbH',
-      telefon: '089-12345678',
-      email: 'kontakt@techsolutions.de',
-      kategorie: 'Firmenumzug',
-      von: 'Industriestraße 5, München',
-      nach: 'Businesspark 12, München',
-      datum: new Date(2025, 4, 20), // 20. Mai 2025
-      uhrzeit: '07:00 - 18:00',
-      mitarbeiter: ['Max', 'Anna', 'Peter', 'Thomas', 'Michael', 'Paul'],
-      fahrzeuge: ['LKW-01', 'LKW-02', 'LKW-03'],
-      status: 'Geplant',
-      volumen: '120 m³',
-      preis: 4850,
-      notizen: 'IT-Equipment erfordert besondere Vorsicht, Serverraum hat Priorität',
-      materialien: 'Büro-Umzugsset + IT-Spezialverpackungen'
-    },
-    {
-      id: 5,
-      kunde: 'Familie Bauer',
-      telefon: '0123-4567123',
-      email: 'bauer@beispiel.de',
-      kategorie: 'Privatumzug',
-      von: 'Lindenstraße 8, Dachau',
-      nach: 'Rosenweg 15, München',
-      datum: new Date(2025, 4, 25), // 25. Mai 2025
-      uhrzeit: '08:30 - 15:30',
-      mitarbeiter: ['Thomas', 'Paul'],
-      fahrzeuge: ['LKW-02'],
-      status: 'Geplant',
-      volumen: '28 m³',
-      preis: 1650,
-      notizen: 'Haustiere vorhanden: 2 Katzen',
-      materialien: 'Standard-Umzugsset'
-    },
-    {
-      id: 6,
-      kunde: 'Dr. Fischer',
-      telefon: '0123-5555123',
-      email: 'fischer@beispiel.de',
-      kategorie: 'Privatumzug',
-      von: 'Marktplatz 3, München',
-      nach: 'Bergstraße 42, Starnberg',
-      datum: new Date(2025, 3, 5), // 5. April 2025
-      uhrzeit: '09:00 - 16:00',
-      mitarbeiter: ['Max', 'Anna'],
-      fahrzeuge: ['LKW-01'],
-      status: 'Abgeschlossen',
-      volumen: '30 m³',
-      preis: 1780,
-      notizen: 'Kunde war sehr zufrieden',
-      materialien: 'Standard-Umzugsset'
-    },
-    {
-      id: 7,
-      kunde: 'Boutique Eleganz',
-      telefon: '089-9876543',
-      email: 'kontakt@boutique-eleganz.de',
-      kategorie: 'Gewerbeverlegung',
-      von: 'Einkaufsstraße 10, München',
-      nach: 'Schwanenplatz 5, München',
-      datum: new Date(2025, 3, 15), // 15. April 2025
-      uhrzeit: '08:00 - 14:00',
-      mitarbeiter: ['Peter', 'Thomas', 'Michael'],
-      fahrzeuge: ['LKW-03'],
-      status: 'Abgeschlossen',
-      volumen: '45 m³',
-      preis: 2200,
-      notizen: 'Kleiderstangen und Regale benötigten Spezialverpackung',
-      materialien: 'Gewerbe-Umzugsset + Kleiderstangenkartons'
-    },
-    {
-      id: 8,
-      kunde: 'Familie Huber',
-      telefon: '0123-7777123',
-      email: 'huber@beispiel.de',
-      kategorie: 'Privatumzug',
-      von: 'Dorfstraße 2, Landshut',
-      nach: 'Hauptstraße 56, Freising',
-      datum: new Date(2025, 5, 5), // 5. Juni 2025
-      uhrzeit: '08:00 - 17:00',
-      mitarbeiter: ['Max', 'Peter', 'Paul'],
-      fahrzeuge: ['LKW-01'],
-      status: 'Geplant',
-      volumen: '50 m³',
-      preis: 2680,
-      notizen: 'Haus mit Garten, einige Gartengeräte und Möbel',
-      materialien: 'Standard-Umzugsset + Großkartons'
-    },
-    {
-      id: 9,
-      kunde: 'Rechtsanwaltskanzlei Meyer',
-      telefon: '089-7654321',
-      email: 'kontakt@kanzlei-meyer.de',
-      kategorie: 'Firmenumzug',
-      von: 'Anwaltsplatz 1, München',
-      nach: 'Justizia-Allee 8, München',
-      datum: new Date(2025, 5, 10), // 10. Juni 2025
-      uhrzeit: '07:00 - 18:00',
-      mitarbeiter: ['Anna', 'Thomas', 'Michael', 'Paul'],
-      fahrzeuge: ['LKW-02', 'LKW-03'],
-      status: 'Geplant',
-      volumen: '80 m³',
-      preis: 3900,
-      notizen: 'Akten und sensible Dokumente müssen sicher transportiert werden',
-      materialien: 'Büro-Umzugsset + Aktenkartons'
+  // Umzüge aus API laden
+  const [umzuege, setUmzuege] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Daten aus API laden
+  useEffect(() => {
+    const fetchUmzuege = async () => {
+      try {
+        setLoading(true);
+        const response = await api.get('/umzuege');
+        
+        // API-Daten in das Format transformieren, das von der Komponente verwendet wird
+        const transformierteUmzuege = response.data.map(umzug => ({
+          id: umzug._id,
+          kunde: umzug.auftraggeber.name,
+          telefon: umzug.auftraggeber.telefon,
+          email: umzug.auftraggeber.email,
+          kategorie: umzug.typ || 'Privatumzug',
+          von: `${umzug.auszugsadresse.strasse} ${umzug.auszugsadresse.hausnummer}, ${umzug.auszugsadresse.plz} ${umzug.auszugsadresse.ort}`,
+          nach: `${umzug.einzugsadresse.strasse} ${umzug.einzugsadresse.hausnummer}, ${umzug.einzugsadresse.plz} ${umzug.einzugsadresse.ort}`,
+          datum: new Date(umzug.startDatum),
+          uhrzeit: `${new Date(umzug.startDatum).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} - ${umzug.endDatum ? new Date(umzug.endDatum).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : ''}`,
+          mitarbeiter: umzug.mitarbeiter?.map(m => m.mitarbeiterId?.vorname || 'Unbekannt') || [],
+          fahrzeuge: umzug.fahrzeuge?.map(f => f.kennzeichen || f.typ || 'Fahrzeug') || [],
+          status: mapAPIStatus(umzug.status),
+          volumen: `${umzug.volumen || 0} m³`,
+          preis: umzug.preis?.brutto || 0,
+          notizen: umzug.notizen || '',
+          materialien: 'Standard-Umzugsset'
+        }));
+        
+        setUmzuege(transformierteUmzuege);
+        setLoading(false);
+      } catch (error) {
+        console.error('Fehler beim Laden der Umzüge:', error);
+        setLoading(false);
+      }
+    };
+    
+    fetchUmzuege();
+  }, []);
+  
+  // API-Status auf Frontend-Status mappen
+  const mapAPIStatus = (apiStatus) => {
+    switch (apiStatus) {
+      case 'angefragt':
+      case 'angebot':
+      case 'geplant':
+        return 'Geplant';
+      case 'in_bearbeitung':
+        return 'In Bearbeitung';
+      case 'abgeschlossen':
+        return 'Abgeschlossen';
+      case 'storniert':
+        return 'Storniert';
+      default:
+        return 'Geplant';
     }
-  ]);
+  };
   
   // Erhalte alle Monate mit Umzügen für das ausgewählte Jahr
   const getMonatsUebersicht = () => {
@@ -284,13 +179,56 @@ export default function UmzuegeMonatsansicht() {
   };
   
   // Umzug löschen
-  const umzugLoeschen = (id) => {
+  const umzugLoeschen = async (id) => {
     if (window.confirm('Möchten Sie diesen Umzug wirklich löschen?')) {
-      setUmzuege(umzuege.filter(umzug => umzug.id !== id));
-      if (ausgewaehlterUmzug && ausgewaehlterUmzug.id === id) {
-        setAusgewaehlterUmzug(null);
-        setAnsicht('monatsdetails');
+      try {
+        await api.delete(`/umzuege/${id}`);
+        setUmzuege(umzuege.filter(umzug => umzug.id !== id));
+        if (ausgewaehlterUmzug && ausgewaehlterUmzug.id === id) {
+          setAusgewaehlterUmzug(null);
+          setAnsicht('monatsdetails');
+        }
+        // Erfolgsmeldung
+        alert('Umzug erfolgreich gelöscht');
+      } catch (error) {
+        console.error('Fehler beim Löschen des Umzugs:', error);
+        alert('Fehler beim Löschen des Umzugs');
       }
+    }
+  };
+  
+  // Status aktualisieren
+  const updateUmzugStatus = async (id, neuerStatus) => {
+    try {
+      // API-Status-Format konvertieren
+      let apiStatus;
+      switch (neuerStatus) {
+        case 'In Bearbeitung':
+          apiStatus = 'in_bearbeitung';
+          break;
+        case 'Abgeschlossen':
+          apiStatus = 'abgeschlossen';
+          break;
+        default:
+          apiStatus = 'geplant';
+      }
+      
+      await api.put(`/umzuege/${id}`, { status: apiStatus });
+      
+      // Lokalen Status aktualisieren
+      const aktualisierteUmzuege = umzuege.map(umzug => 
+        umzug.id === id 
+          ? { ...umzug, status: neuerStatus } 
+          : umzug
+      );
+      setUmzuege(aktualisierteUmzuege);
+      
+      if (ausgewaehlterUmzug && ausgewaehlterUmzug.id === id) {
+        setAusgewaehlterUmzug({...ausgewaehlterUmzug, status: neuerStatus});
+      }
+    } catch (error) {
+      console.error('Fehler beim Aktualisieren des Status:', error);
+      alert('Fehler beim Aktualisieren des Status');
     }
   };
   
@@ -313,6 +251,14 @@ export default function UmzuegeMonatsansicht() {
     const monatsUebersicht = getMonatsUebersicht();
     const maxUmzuege = Math.max(...monatsUebersicht);
     
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      );
+    }
+    
     return (
       <div>
         <div className="flex justify-between items-center mb-6">
@@ -334,7 +280,7 @@ export default function UmzuegeMonatsansicht() {
           
           <button 
             className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center"
-            onClick={() => navigate('/umzuege/neu')} // Geändert: Navigiert zur Formularseite
+            onClick={() => navigate('/umzuege/neu')}
           >
             <Plus className="w-4 h-4 mr-1" />
             Neuer Umzug
@@ -406,6 +352,14 @@ export default function UmzuegeMonatsansicht() {
   const renderMonatsdetails = () => {
     const gefiltert = getGefilterte();
     
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      );
+    }
+    
     return (
       <div>
         <div className="flex items-center mb-6">
@@ -466,7 +420,7 @@ export default function UmzuegeMonatsansicht() {
             
             <button 
               className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center ml-auto"
-              onClick={() => navigate('/umzuege/neu')} // Geändert: Navigiert zur Formularseite
+              onClick={() => navigate('/umzuege/neu')}
             >
               <Plus className="w-4 h-4 mr-1" />
               Neuer Umzug
@@ -712,7 +666,7 @@ export default function UmzuegeMonatsansicht() {
               <div className="space-y-2">
                 <button 
                   className="w-full px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center justify-center"
-                  onClick={() => navigate(`/umzuege/${ausgewaehlterUmzug.id}/bearbeiten`)} // Geändert: Navigiert zur Bearbeitungsseite
+                  onClick={() => navigate(`/umzuege/bearbeiten/${ausgewaehlterUmzug.id}`)}
                 >
                   <Edit className="w-4 h-4 mr-2" />
                   Umzug bearbeiten
@@ -732,16 +686,7 @@ export default function UmzuegeMonatsansicht() {
                 {ausgewaehlterUmzug.status === 'Geplant' && (
                   <button 
                     className="w-full px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center justify-center"
-                    onClick={() => {
-                      // Status auf "In Bearbeitung" setzen
-                      const aktualisierteUmzuege = umzuege.map(umzug => 
-                        umzug.id === ausgewaehlterUmzug.id 
-                          ? { ...umzug, status: 'In Bearbeitung' } 
-                          : umzug
-                      );
-                      setUmzuege(aktualisierteUmzuege);
-                      setAusgewaehlterUmzug({...ausgewaehlterUmzug, status: 'In Bearbeitung'});
-                    }}
+                    onClick={() => updateUmzugStatus(ausgewaehlterUmzug.id, 'In Bearbeitung')}
                   >
                     <Check className="w-4 h-4 mr-2" />
                     Umzug starten
@@ -751,16 +696,7 @@ export default function UmzuegeMonatsansicht() {
                 {ausgewaehlterUmzug.status === 'In Bearbeitung' && (
                   <button 
                     className="w-full px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center justify-center"
-                    onClick={() => {
-                      // Status auf "Abgeschlossen" setzen
-                      const aktualisierteUmzuege = umzuege.map(umzug => 
-                        umzug.id === ausgewaehlterUmzug.id 
-                          ? { ...umzug, status: 'Abgeschlossen' } 
-                          : umzug
-                      );
-                      setUmzuege(aktualisierteUmzuege);
-                      setAusgewaehlterUmzug({...ausgewaehlterUmzug, status: 'Abgeschlossen'});
-                    }}
+                    onClick={() => updateUmzugStatus(ausgewaehlterUmzug.id, 'Abgeschlossen')}
                   >
                     <CheckCircle className="w-4 h-4 mr-2" />
                     Umzug abschließen
