@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Eye, Truck, User, Phone, MapPin, Filter, Search, Check, Clock, AlertTriangle, Home, CheckCircle, XCircle, FileText } from 'lucide-react';
-import api from '../../services/api'; // API-Service importieren
+import api, { umzuegeService } from '../../services/api'; // API-Service importieren
 
 export default function UmzuegeMonatsansicht() {
   // Navigation-Hook für Routing
@@ -24,6 +24,7 @@ export default function UmzuegeMonatsansicht() {
   // Umzüge aus API laden
   const [umzuege, setUmzuege] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   // API-Status auf Frontend-Status mappen
   const mapAPIStatus = (apiStatus) => {
@@ -48,38 +49,192 @@ export default function UmzuegeMonatsansicht() {
     const fetchUmzuege = async () => {
       try {
         setLoading(true);
-        const response = await api.get('/umzuege');
+        setError(null);
+        
+        // API-Aufruf
+        const response = await umzuegeService.getAll();
+        console.log('API-Antwort:', response.data);
+        
+        // Mock-Daten für die Entwicklung, falls keine API-Daten vorhanden sind
+        let umzuegeDaten = response.data && response.data.length > 0 
+          ? response.data 
+          : generateMockUmzuege();
         
         // API-Daten in das Format transformieren, das von der Komponente verwendet wird
-        const transformierteUmzuege = response.data.map(umzug => ({
-          id: umzug._id,
-          kunde: umzug.auftraggeber.name,
-          telefon: umzug.auftraggeber.telefon,
-          email: umzug.auftraggeber.email,
-          kategorie: umzug.typ || 'Privatumzug',
-          von: `${umzug.auszugsadresse.strasse} ${umzug.auszugsadresse.hausnummer}, ${umzug.auszugsadresse.plz} ${umzug.auszugsadresse.ort}`,
-          nach: `${umzug.einzugsadresse.strasse} ${umzug.einzugsadresse.hausnummer}, ${umzug.einzugsadresse.plz} ${umzug.einzugsadresse.ort}`,
-          datum: new Date(umzug.startDatum),
-          uhrzeit: `${new Date(umzug.startDatum).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} - ${umzug.endDatum ? new Date(umzug.endDatum).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : ''}`,
-          mitarbeiter: umzug.mitarbeiter?.map(m => m.mitarbeiterId?.vorname || 'Unbekannt') || [],
-          fahrzeuge: umzug.fahrzeuge?.map(f => f.kennzeichen || f.typ || 'Fahrzeug') || [],
-          status: mapAPIStatus(umzug.status),
-          volumen: `${umzug.volumen || 0} m³`,
-          preis: umzug.preis?.brutto || 0,
-          notizen: umzug.notizen || '',
-          materialien: 'Standard-Umzugsset'
-        }));
+        const transformierteUmzuege = umzuegeDaten.map(umzug => transformUmzug(umzug));
         
         setUmzuege(transformierteUmzuege);
         setLoading(false);
       } catch (error) {
         console.error('Fehler beim Laden der Umzüge:', error);
+        setError('Fehler beim Laden der Umzüge. Bitte versuchen Sie es später erneut.');
+        
+        // Backup: Mock-Daten anzeigen, wenn API-Aufruf fehlschlägt
+        const mockUmzuege = generateMockUmzuege();
+        const transformierteUmzuege = mockUmzuege.map(umzug => transformUmzug(umzug));
+        setUmzuege(transformierteUmzuege);
+        
         setLoading(false);
       }
     };
     
     fetchUmzuege();
   }, []);
+  
+  // Hilfsfunktion zum Transformieren der Umzugsdaten
+  const transformUmzug = (umzug) => {
+    // Fallback-Werte für den Fall, dass Daten fehlen
+    const auftraggeber = umzug.auftraggeber || { name: 'Unbekannt', telefon: 'N/A', email: 'N/A' };
+    const auszugsadresse = umzug.auszugsadresse || { 
+      strasse: 'Unbekannt', hausnummer: '', plz: '', ort: '', etage: 0, aufzug: false
+    };
+    const einzugsadresse = umzug.einzugsadresse || { 
+      strasse: 'Unbekannt', hausnummer: '', plz: '', ort: '', etage: 0, aufzug: false
+    };
+    
+    return {
+      id: umzug._id || umzug.id || Date.now().toString(),
+      kunde: auftraggeber.name,
+      telefon: auftraggeber.telefon,
+      email: auftraggeber.email,
+      kategorie: umzug.typ || 'Privatumzug',
+      von: `${auszugsadresse.strasse} ${auszugsadresse.hausnummer}, ${auszugsadresse.plz} ${auszugsadresse.ort}`,
+      nach: `${einzugsadresse.strasse} ${einzugsadresse.hausnummer}, ${einzugsadresse.plz} ${einzugsadresse.ort}`,
+      datum: new Date(umzug.startDatum || umzug.datum || new Date()),
+      uhrzeit: umzug.startDatum 
+        ? `${new Date(umzug.startDatum).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} - ${umzug.endDatum ? new Date(umzug.endDatum).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : ''}`
+        : '08:00 - 16:00',
+      mitarbeiter: (umzug.mitarbeiter?.map(m => m.mitarbeiterId?.vorname || m.name || 'Unbekannt') || []),
+      fahrzeuge: (umzug.fahrzeuge?.map(f => f.kennzeichen || f.typ || 'Fahrzeug') || []),
+      status: mapAPIStatus(umzug.status),
+      volumen: `${umzug.volumen || 0} m³`,
+      preis: umzug.preis?.brutto || umzug.preis || 0,
+      notizen: umzug.notizen || '',
+      materialien: umzug.materialien || 'Standard-Umzugsset'
+    };
+  };
+  
+  // Mock-Daten für Entwicklung generieren
+  const generateMockUmzuege = () => {
+    return [
+      {
+        _id: '1',
+        typ: 'Privatumzug',
+        auftraggeber: {
+          name: 'Familie Müller',
+          telefon: '0123456789',
+          email: 'mueller@example.com'
+        },
+        auszugsadresse: {
+          strasse: 'Berliner Str.',
+          hausnummer: '123',
+          plz: '10115',
+          ort: 'Berlin',
+          etage: 2,
+          aufzug: true
+        },
+        einzugsadresse: {
+          strasse: 'Münchner Str.',
+          hausnummer: '45',
+          plz: '80331',
+          ort: 'München',
+          etage: 1,
+          aufzug: false
+        },
+        startDatum: new Date(2025, 4, 10, 8, 0),
+        endDatum: new Date(2025, 4, 10, 16, 0),
+        status: 'geplant',
+        volumen: 45,
+        preis: { brutto: 1200 },
+        mitarbeiter: [
+          { mitarbeiterId: { vorname: 'Max' } },
+          { mitarbeiterId: { vorname: 'Peter' } }
+        ],
+        fahrzeuge: [
+          { kennzeichen: 'B-UM-123' }
+        ],
+        notizen: 'Klavier muss transportiert werden'
+      },
+      {
+        _id: '2',
+        typ: 'Firmenumzug',
+        auftraggeber: {
+          name: 'Tech GmbH',
+          telefon: '0987654321',
+          email: 'kontakt@techgmbh.de'
+        },
+        auszugsadresse: {
+          strasse: 'Hamburger Allee',
+          hausnummer: '78',
+          plz: '20095',
+          ort: 'Hamburg',
+          etage: 3,
+          aufzug: true
+        },
+        einzugsadresse: {
+          strasse: 'Berliner Platz',
+          hausnummer: '12',
+          plz: '10117',
+          ort: 'Berlin',
+          etage: 5,
+          aufzug: true
+        },
+        startDatum: new Date(2025, 4, 15, 7, 0),
+        endDatum: new Date(2025, 4, 16, 18, 0),
+        status: 'geplant',
+        volumen: 120,
+        preis: { brutto: 3500 },
+        mitarbeiter: [
+          { mitarbeiterId: { vorname: 'Klaus' } },
+          { mitarbeiterId: { vorname: 'Thomas' } },
+          { mitarbeiterId: { vorname: 'Sarah' } }
+        ],
+        fahrzeuge: [
+          { kennzeichen: 'HH-UM-456' },
+          { kennzeichen: 'HH-UM-789' }
+        ],
+        notizen: '20 Arbeitsplätze, Server muss besonders gesichert werden'
+      },
+      {
+        _id: '3',
+        typ: 'Privatumzug',
+        auftraggeber: {
+          name: 'Familie Bauer',
+          telefon: '01234567890',
+          email: 'bauer@example.com'
+        },
+        auszugsadresse: {
+          strasse: 'Münchner Weg',
+          hausnummer: '33',
+          plz: '80331',
+          ort: 'München',
+          etage: 4,
+          aufzug: true
+        },
+        einzugsadresse: {
+          strasse: 'Stuttgarter Str.',
+          hausnummer: '67',
+          plz: '70173',
+          ort: 'Stuttgart',
+          etage: 2,
+          aufzug: true
+        },
+        startDatum: new Date(2025, 4, 25, 8, 0),
+        endDatum: new Date(2025, 4, 25, 16, 0),
+        status: 'geplant',
+        volumen: 60,
+        preis: { brutto: 1500 },
+        mitarbeiter: [
+          { mitarbeiterId: { vorname: 'Alex' } },
+          { mitarbeiterId: { vorname: 'Michael' } }
+        ],
+        fahrzeuge: [
+          { kennzeichen: 'M-UM-789' }
+        ],
+        notizen: 'Haustiere vorhanden'
+      }
+    ];
+  };
   
   // Erhalte alle Monate mit Umzügen für das ausgewählte Jahr
   const getMonatsUebersicht = () => {
@@ -182,7 +337,7 @@ export default function UmzuegeMonatsansicht() {
   const umzugLoeschen = async (id) => {
     if (window.confirm('Möchten Sie diesen Umzug wirklich löschen?')) {
       try {
-        await api.delete(`/umzuege/${id}`);
+        await umzuegeService.delete(id);
         setUmzuege(umzuege.filter(umzug => umzug.id !== id));
         if (ausgewaehlterUmzug && ausgewaehlterUmzug.id === id) {
           setAusgewaehlterUmzug(null);
@@ -209,11 +364,14 @@ export default function UmzuegeMonatsansicht() {
         case 'Abgeschlossen':
           apiStatus = 'abgeschlossen';
           break;
+        case 'Storniert':
+          apiStatus = 'storniert';
+          break;
         default:
           apiStatus = 'geplant';
       }
       
-      await api.put(`/umzuege/${id}`, { status: apiStatus });
+      await umzuegeService.updateStatus(id, apiStatus);
       
       // Lokalen Status aktualisieren
       const aktualisierteUmzuege = umzuege.map(umzug => 
@@ -226,6 +384,9 @@ export default function UmzuegeMonatsansicht() {
       if (ausgewaehlterUmzug && ausgewaehlterUmzug.id === id) {
         setAusgewaehlterUmzug({...ausgewaehlterUmzug, status: neuerStatus});
       }
+      
+      // Erfolgsmeldung
+      alert(`Status erfolgreich auf "${neuerStatus}" aktualisiert`);
     } catch (error) {
       console.error('Fehler beim Aktualisieren des Status:', error);
       alert('Fehler beim Aktualisieren des Status');
@@ -253,12 +414,27 @@ export default function UmzuegeMonatsansicht() {
   // Render Funktion für die Monatsübersicht
   const renderMonatsuebersicht = () => {
     const monatsUebersicht = getMonatsUebersicht();
-    const maxUmzuege = Math.max(...monatsUebersicht);
+    const maxUmzuege = Math.max(...monatsUebersicht, 1); // Mindestens 1, um Division durch 0 zu vermeiden
     
     if (loading) {
       return (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      );
+    }
+    
+    if (error) {
+      return (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <p className="font-bold">Fehler</p>
+          <p>{error}</p>
+          <button 
+            className="mt-2 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+            onClick={() => window.location.reload()}
+          >
+            Seite neu laden
+          </button>
         </div>
       );
     }
@@ -601,24 +777,32 @@ export default function UmzuegeMonatsansicht() {
                 <div>
                   <div className="text-sm text-gray-600 mb-2">Zugewiesene Mitarbeiter:</div>
                   <div className="space-y-2">
-                    {ausgewaehlterUmzug.mitarbeiter.map((mitarbeiter, index) => (
-                      <div key={index} className="flex items-center px-2 py-1 bg-gray-50 rounded">
-                        <User className="w-4 h-4 mr-2 text-blue-500" />
-                        {mitarbeiter}
-                      </div>
-                    ))}
+                    {ausgewaehlterUmzug.mitarbeiter.length > 0 ? (
+                      ausgewaehlterUmzug.mitarbeiter.map((mitarbeiter, index) => (
+                        <div key={index} className="flex items-center px-2 py-1 bg-gray-50 rounded">
+                          <User className="w-4 h-4 mr-2 text-blue-500" />
+                          {mitarbeiter}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-gray-500 italic">Keine Mitarbeiter zugewiesen</div>
+                    )}
                   </div>
                 </div>
                 
                 <div>
                   <div className="text-sm text-gray-600 mb-2">Zugewiesene Fahrzeuge:</div>
                   <div className="space-y-2">
-                    {ausgewaehlterUmzug.fahrzeuge.map((fahrzeug, index) => (
-                      <div key={index} className="flex items-center px-2 py-1 bg-gray-50 rounded">
-                        <Truck className="w-4 h-4 mr-2 text-green-500" />
-                        {fahrzeug}
-                      </div>
-                    ))}
+                    {ausgewaehlterUmzug.fahrzeuge.length > 0 ? (
+                      ausgewaehlterUmzug.fahrzeuge.map((fahrzeug, index) => (
+                        <div key={index} className="flex items-center px-2 py-1 bg-gray-50 rounded">
+                          <Truck className="w-4 h-4 mr-2 text-green-500" />
+                          {fahrzeug}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-gray-500 italic">Keine Fahrzeuge zugewiesen</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -670,7 +854,7 @@ export default function UmzuegeMonatsansicht() {
               <div className="space-y-2">
                 <button 
                   className="w-full px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center justify-center"
-                  onClick={() => navigate(`/umzuege/bearbeiten/${ausgewaehlterUmzug.id}`)}
+                  onClick={() => navigate(`/umzuege/${ausgewaehlterUmzug.id}/bearbeiten`)}
                 >
                   <Edit className="w-4 h-4 mr-2" />
                   Umzug bearbeiten
@@ -704,6 +888,16 @@ export default function UmzuegeMonatsansicht() {
                   >
                     <CheckCircle className="w-4 h-4 mr-2" />
                     Umzug abschließen
+                  </button>
+                )}
+                
+                {(ausgewaehlterUmzug.status === 'Geplant' || ausgewaehlterUmzug.status === 'In Bearbeitung') && (
+                  <button 
+                    className="w-full px-3 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 flex items-center justify-center"
+                    onClick={() => updateUmzugStatus(ausgewaehlterUmzug.id, 'Storniert')}
+                  >
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Umzug stornieren
                   </button>
                 )}
                 

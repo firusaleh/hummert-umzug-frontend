@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
 const Register = () => {
@@ -9,26 +9,63 @@ const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const { register, user, isApiAvailable, checkApiAvailability } = useAuth();
+  const navigate = useNavigate();
+
+  // Überprüfen, ob der Benutzer bereits eingeloggt ist
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+    
+    // API-Verfügbarkeit prüfen
+    const checkApiStatus = async () => {
+      await checkApiAvailability();
+    };
+    
+    checkApiStatus();
+  }, [user, navigate, checkApiAvailability]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    
+    // Client-seitige Validierung
+    if (!name || !email || !password || !confirmPassword) {
+      setError('Bitte alle Felder ausfüllen');
+      return;
+    }
     
     if (password !== confirmPassword) {
       setError('Passwörter stimmen nicht überein');
       return;
     }
     
+    if (password.length < 6) {
+      setError('Das Passwort muss mindestens 6 Zeichen lang sein');
+      return;
+    }
+    
     setLoading(true);
-    setError('');
 
     try {
+      // Prüfen, ob API verfügbar ist
+      if (!isApiAvailable) {
+        setError('Der Server ist derzeit nicht erreichbar. Bitte versuchen Sie es später erneut.');
+        setLoading(false);
+        return;
+      }
+      
       const result = await register({ name, email, password });
-      if (!result.success) {
-        setError(result.message);
+      if (result.success) {
+        // Bei erfolgreicher Registrierung zum Dashboard navigieren
+        navigate('/dashboard');
+      } else {
+        setError(result.message || 'Registrierung fehlgeschlagen');
       }
     } catch (err) {
-      setError('Ein Fehler ist aufgetreten');
+      console.error('Registrierungsfehler:', err);
+      setError('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.');
     } finally {
       setLoading(false);
     }
@@ -37,6 +74,18 @@ const Register = () => {
   return (
     <div style={{ maxWidth: '400px', margin: '0 auto', padding: '20px' }}>
       <h1>Registrieren</h1>
+      
+      {!isApiAvailable && (
+        <div style={{ 
+          backgroundColor: '#fff3cd', 
+          color: '#856404', 
+          padding: '10px', 
+          borderRadius: '4px',
+          marginBottom: '15px'
+        }}>
+          <strong>Warnung:</strong> Der Backend-Server scheint nicht erreichbar zu sein. Bitte überprüfen Sie Ihre Verbindung.
+        </div>
+      )}
       
       {error && (
         <div style={{ 
@@ -105,7 +154,11 @@ const Register = () => {
               borderRadius: '4px'
             }}
             required
+            minLength="6"
           />
+          <small style={{ color: '#6c757d', fontSize: '0.8rem' }}>
+            Mindestens 6 Zeichen
+          </small>
         </div>
         
         <div style={{ marginBottom: '15px' }}>
@@ -129,15 +182,16 @@ const Register = () => {
         
         <button 
           type="submit" 
-          disabled={loading}
+          disabled={loading || !isApiAvailable}
           style={{
             backgroundColor: '#3f51b5',
             color: 'white',
             padding: '10px 15px',
             border: 'none',
             borderRadius: '4px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.7 : 1
+            cursor: (loading || !isApiAvailable) ? 'not-allowed' : 'pointer',
+            opacity: (loading || !isApiAvailable) ? 0.7 : 1,
+            width: '100%'
           }}
         >
           {loading ? 'Registrieren...' : 'Registrieren'}

@@ -2,113 +2,33 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { authService } from '../../services/api';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isApiAvailable, setIsApiAvailable] = useState(true);
-  const { login, user } = useAuth();
+  const { login, user, isApiAvailable, checkApiAvailability } = useAuth();
   const navigate = useNavigate();
 
-  // Überprüfen, ob der Benutzer bereits eingeloggt ist
+  // Überprüfen, ob der Benutzer bereits eingeloggt ist und API verfügbar ist
   useEffect(() => {
+    // Wenn bereits eingeloggt, zum Dashboard navigieren
     if (user) {
       navigate('/dashboard');
     }
     
-    // Überprüfen Sie, ob die API erreichbar ist
+    // API-Verfügbarkeit prüfen
     const checkApiStatus = async () => {
-      try {
-        await fetch('http://localhost:5000/api/health', { method: 'GET' });
-        setIsApiAvailable(true);
-      } catch (error) {
-        console.error('API nicht erreichbar:', error);
-        setIsApiAvailable(false);
-      }
+      await checkApiAvailability();
     };
     
     checkApiStatus();
-  }, [user, navigate]);
-
-  // Handler für direkten API-Aufruf (falls der Context-Login nicht funktioniert)
-  const handleDirectLogin = async (credentials) => {
-    try {
-      console.log('Direkter API-Aufruf mit:', { email: credentials.email });
-      
-      // Prüfen Sie den API-Endpunkt
-      console.log('API-Endpunkt:', process.env.REACT_APP_API_URL || 'http://localhost:5000/api');
-      
-      const response = await authService.login(credentials);
-      console.log('API-Antwort:', response.data);
-      
-      // Token und Benutzerdaten speichern
-      if (response.data.token) {
-        // Speichern Sie nicht nur den Token, sondern auch den Zeitpunkt
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('tokenTimestamp', Date.now().toString());
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        
-        // Zur Dashboard-Seite weiterleiten
-        console.log('Login erfolgreich, Weiterleitung zum Dashboard');
-        navigate('/dashboard');
-        return { success: true };
-      } else {
-        return { 
-          success: false, 
-          message: response.data.message || 'Unbekannter Fehler beim Login'
-        };
-      }
-    } catch (error) {
-      console.error('API-Fehler:', error);
-      
-      // Detaillierte Fehlerdiagnose
-      if (error.response) {
-        // Der Server hat mit einem Fehlerstatuscode geantwortet
-        console.error('Status:', error.response.status);
-        console.error('Daten:', error.response.data);
-        console.error('Header:', error.response.headers);
-        
-        // Spezifische Fehlerbehandlung je nach Statuscode
-        if (error.response.status === 401) {
-          return {
-            success: false,
-            message: 'Ungültige Anmeldedaten. Bitte überprüfen Sie Ihre E-Mail und Ihr Passwort.'
-          };
-        } else if (error.response.status === 404) {
-          return {
-            success: false,
-            message: 'Der Login-Dienst ist nicht erreichbar. Bitte versuchen Sie es später erneut.'
-          };
-        } else {
-          return {
-            success: false,
-            message: error.response.data.message || `Server-Fehler: ${error.response.status}`
-          };
-        }
-      } else if (error.request) {
-        // Die Anfrage wurde gesendet, aber keine Antwort erhalten
-        console.error('Keine Antwort vom Server. Ist der Server online?');
-        return {
-          success: false,
-          message: 'Keine Antwort vom Server. Bitte überprüfen Sie Ihre Internetverbindung.'
-        };
-      } else {
-        // Ein Fehler ist beim Einrichten der Anfrage aufgetreten
-        console.error('Fehler beim Einrichten der Anfrage:', error.message);
-        return {
-          success: false,
-          message: `Fehler: ${error.message}`
-        };
-      }
-    }
-  };
+  }, [user, navigate, checkApiAvailability]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Formular abgesendet');
+    console.log('Login-Formular abgesendet');
     setLoading(true);
     setError('');
     
@@ -119,27 +39,27 @@ const Login = () => {
       return;
     }
     
-    const credentials = { email, password };
-    console.log('Login-Versuch mit:', { email, password: '***' });
-    
     try {
-      // Zuerst mit dem useAuth-Hook versuchen
-      console.log('Versuche Login über Context...');
-      let result = await login(credentials);
-      console.log('Context-Login-Ergebnis:', result);
-      
-      // Wenn der Context-Login fehlschlägt, direkten API-Aufruf versuchen
-      if (!result.success) {
-        console.log('Context-Login fehlgeschlagen, versuche direkte API...');
-        result = await handleDirectLogin(credentials);
-        console.log('Direkter Login-Ergebnis:', result);
+      // API-Verfügbarkeit erneut prüfen
+      if (!isApiAvailable) {
+        setError('Der Server ist derzeit nicht erreichbar. Bitte versuchen Sie es später erneut.');
+        setLoading(false);
+        return;
       }
       
-      if (!result.success) {
+      const credentials = { email, password };
+      console.log('Login-Versuch mit:', { email, password: '***' });
+      
+      // Login-Versuch
+      const result = await login(credentials);
+      console.log('Login-Ergebnis:', result);
+      
+      if (result.success) {
+        console.log('Login erfolgreich!');
+        navigate('/dashboard');
+      } else {
         console.error('Login fehlgeschlagen:', result.message);
         setError(result.message || 'Login fehlgeschlagen');
-      } else {
-        console.log('Login erfolgreich!');
       }
     } catch (err) {
       console.error('Login-Fehler:', err);
@@ -147,61 +67,6 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Einfacher Debug-Button zum Testen der API-Verbindung
-  const testBackendConnection = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/api/auth/check', { 
-        method: 'GET',
-        // Timeout für die Anfrage hinzufügen
-        signal: AbortSignal.timeout(5000) // 5 Sekunden Timeout
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        alert(`Backend-Verbindung: ${data.message || 'OK'}`);
-        setIsApiAvailable(true);
-      } else {
-        alert(`Backend nicht erreichbar: ${response.status} ${response.statusText}`);
-        setIsApiAvailable(false);
-      }
-    } catch (err) {
-      console.error('API-Test fehlgeschlagen:', err);
-      alert(`Backend nicht erreichbar: ${err.message}`);
-      setIsApiAvailable(false);
-    }
-  };
-
-  // Debug-Informationen zum Token anzeigen
-  const showTokenInfo = () => {
-    const token = localStorage.getItem('token');
-    const timestamp = localStorage.getItem('tokenTimestamp');
-    const user = localStorage.getItem('user');
-    
-    let message = 'Token-Information:\n';
-    
-    if (token) {
-      message += `Token: ${token.substr(0, 15)}...\n`;
-      
-      if (timestamp) {
-        const age = Math.round((Date.now() - parseInt(timestamp)) / 1000 / 60);
-        message += `Alter: ca. ${age} Minuten\n`;
-      }
-      
-      if (user) {
-        try {
-          const userData = JSON.parse(user);
-          message += `Benutzer: ${userData.name || userData.email}\n`;
-        } catch (e) {
-          message += `Benutzer: [Ungültiges JSON]\n`;
-        }
-      }
-    } else {
-      message += 'Kein Token vorhanden.\n';
-    }
-    
-    alert(message);
   };
 
   return (
@@ -273,15 +138,15 @@ const Login = () => {
         
         <button 
           type="submit" 
-          disabled={loading}
+          disabled={loading || !isApiAvailable}
           style={{
             backgroundColor: '#3f51b5',
             color: 'white',
             padding: '10px 15px',
             border: 'none',
             borderRadius: '4px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.7 : 1,
+            cursor: (loading || !isApiAvailable) ? 'not-allowed' : 'pointer',
+            opacity: (loading || !isApiAvailable) ? 0.7 : 1,
             width: '100%',
             marginBottom: '10px'
           }}
@@ -289,43 +154,25 @@ const Login = () => {
           {loading ? 'Anmelden...' : 'Anmelden'}
         </button>
 
-        {/* Debug-Buttons - nur in der Entwicklung anzeigen */}
+        {/* Debug-Button nur in der Entwicklung anzeigen */}
         {process.env.NODE_ENV === 'development' && (
-          <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
-            <button 
-              type="button"
-              onClick={testBackendConnection}
-              style={{
-                backgroundColor: '#f1f1f1',
-                color: '#333',
-                padding: '8px 12px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                flex: 1
-              }}
-            >
-              Backend-Verbindung testen
-            </button>
-            
-            <button 
-              type="button"
-              onClick={showTokenInfo}
-              style={{
-                backgroundColor: '#f1f1f1',
-                color: '#333',
-                padding: '8px 12px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                flex: 1
-              }}
-            >
-              Token-Info
-            </button>
-          </div>
+          <button 
+            type="button"
+            onClick={checkApiAvailability}
+            style={{
+              backgroundColor: '#f1f1f1',
+              color: '#333',
+              padding: '8px 12px',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              width: '100%',
+              marginTop: '10px'
+            }}
+          >
+            API-Verbindung prüfen
+          </button>
         )}
       </form>
       
