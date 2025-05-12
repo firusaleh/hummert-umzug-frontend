@@ -5,6 +5,9 @@ import { authService } from '../services/api';
 // AuthContext erstellen
 const AuthContext = createContext();
 
+// Zusätzlich als benannten Export anbieten (damit sowohl Default- als auch benannter Import funktionieren)
+export { AuthContext };
+
 // Custom Hook zum einfachen Zugriff auf den AuthContext
 export const useAuth = () => {
   return useContext(AuthContext);
