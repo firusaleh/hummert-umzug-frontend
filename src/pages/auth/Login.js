@@ -20,7 +20,11 @@ const Login = () => {
     
     // API-Verfügbarkeit prüfen
     const checkApiStatus = async () => {
-      await checkApiAvailability();
+      try {
+        await checkApiAvailability();
+      } catch (err) {
+        console.error("Fehler beim Prüfen der API-Verfügbarkeit:", err);
+      }
     };
     
     checkApiStatus();
@@ -54,12 +58,12 @@ const Login = () => {
       const result = await login(credentials);
       console.log('Login-Ergebnis:', result);
       
-      if (result.success) {
+      if (result && result.success) {
         console.log('Login erfolgreich!');
         navigate('/dashboard');
       } else {
-        console.error('Login fehlgeschlagen:', result.message);
-        setError(result.message || 'Login fehlgeschlagen');
+        console.error('Login fehlgeschlagen:', result?.message || 'Unbekannter Fehler');
+        setError(result?.message || 'Login fehlgeschlagen');
       }
     } catch (err) {
       console.error('Login-Fehler:', err);
@@ -158,7 +162,11 @@ const Login = () => {
         {process.env.NODE_ENV === 'development' && (
           <button 
             type="button"
-            onClick={checkApiAvailability}
+            onClick={() => {
+              checkApiAvailability().then(available => {
+                alert(available ? "API ist erreichbar" : "API ist nicht erreichbar");
+              });
+            }}
             style={{
               backgroundColor: '#f1f1f1',
               color: '#333',
@@ -181,6 +189,15 @@ const Login = () => {
           Noch kein Konto? Registrieren
         </Link>
       </div>
+
+      {/* Debugging-Hilfe */}
+      {process.env.NODE_ENV === 'development' && (
+        <div style={{ marginTop: '20px', fontSize: '12px', color: '#666' }}>
+          <h3>Debug-Info:</h3>
+          <div>API erreichbar: {isApiAvailable ? 'Ja' : 'Nein'}</div>
+          <div>Benutzer angemeldet: {user ? 'Ja' : 'Nein'}</div>
+        </div>
+      )}
     </div>
   );
 };
