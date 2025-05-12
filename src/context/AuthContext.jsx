@@ -1,89 +1,153 @@
-import React, { createContext, useState, useCallback } from 'react';
-import api from '../services/api';
+// src/context/AuthContext.js
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import { authService } from '../services/api';
 
+// AuthContext erstellen
+const AuthContext = createContext();
 
-// Auth-Kontext erstellen
-export const AuthContext = createContext();
-
+// Custom Hook zum einfachen Zugriff auf den AuthContext
+export const useAuth = () => {
+  return useContext(AuthContext);
+};
 
 export const AuthProvider = ({ children }) => {
- const [user, setUser] = useState(null);
- const [loading, setLoading] = useState(true);
-  // Benutzer authentifizieren
- const checkAuth = useCallback(async () => {
-   const token = localStorage.getItem('token');
-  
-   if (!token) {
-     setLoading(false);
-     return;
-   }
-  
-   try {
-     const response = await api.get('/auth/me');
-     setUser(response.data);
-   } catch (error) {
-     // Token ungültig oder abgelaufen
-     localStorage.removeItem('token');
-     setUser(null);
-   } finally {
-     setLoading(false);
-   }
- }, []);
-  // Benutzer anmelden
- const login = async (credentials) => {
-   setLoading(true);
-   try {
-     const response = await api.post('/auth/login', credentials);
-     const { token, user } = response.data;
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Beim Laden der Anwendung prüfen, ob der Benutzer bereits angemeldet ist
+  useEffect(() => {
+    const initAuth = async () => {
+      const token = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      
+      if (token && storedUser) {
+        try {
+          setUser(JSON.parse(storedUser));
+          
+          // Optional: Token-Gültigkeit überprüfen
+          try {
+            await authService.checkAuth();
+          } catch (error) {
+            console.error('Token ist nicht mehr gültig:', error);
+            // Token ist ungültig, ausloggen
+            logout();
+          }
+        } catch (error) {
+          console.error('Fehler beim Initialisieren der Authentifizierung:', error);
+          logout();
+        }
+      }
+      
+      setLoading(false);
+    };
     
-     localStorage.setItem('token', token);
-     setUser(user);
-     setLoading(false);
+    initAuth();
+  }, []);
+
+  // Login-Funktion
+  const login = async (credentials) => {
+    setError(null);
     
-     return { success: true };
-   } catch (error) {
-     setLoading(false);
-     return {
-       success: false,
-       message: error.response?.data?.message || 'Anmeldefehler'
-     };
-   }
- };
-  // Benutzer abmelden
- const logout = () => {
-   localStorage.removeItem('token');
-   setUser(null);
- };
-  // Benutzer registrieren
- const register = async (userData) => {
-   setLoading(true);
-   try {
-     const response = await api.post('/auth/register', userData);
-     const { token, user } = response.data;
+    try {
+      console.log('Login-Versuch:', { email: credentials.email, password: '***' });
+      
+      const response = await authService.login(credentials);
+      
+      console.log('Login-Antwort:', response);
+      
+      if (response.data && response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        
+        setUser(response.data.user);
+        return { success: true };
+      } else {
+        throw new Error('Token nicht in der Antwort enthalten');
+      }
+    } catch (error) {
+      console.error('Login fehlgeschlagen:', error);
+      
+      // Detaillierte Fehlerinformationen erfassen
+      let errorMessage = 'Login fehlgeschlagen';
+      
+      if (error.response) {
+        // Der Server hat mit einem Fehlerstatuscode geantwortet
+        console.error('Server-Fehler:', error.response.status, error.response.data);
+        errorMessage = error.response.data.message || `Server-Fehler: ${error.response.status}`;
+      } else if (error.request) {
+        // Die Anfrage wurde gesendet, aber keine Antwort erhalten
+        console.error('Keine Antwort vom Server');
+        errorMessage = 'Keine Antwort vom Server';
+      } else {
+        // Bei der Anfrageerstellung ist ein Fehler aufgetreten
+        console.error('Anfragefehler:', error.message);
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
+      return { success: false, message: errorMessage };
+    }
+  };
+
+  // Logout-Funktion
+  const logout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    setError(null);
+  };
+
+  // Registrierungs-Funktion
+  const register = async (userData) => {
+    setError(null);
     
-     localStorage.setItem('token', token);
-     setUser(user);
-     setLoading(false);
-    
-     return { success: true };
-   } catch (error) {
-     setLoading(false);
-     return {
-       success: false,
-       message: error.response?.data?.message || 'Registrierungsfehler'
-     };
-   }
- };
+    try {
+      const response = await authService.register(userData);
+      
+      if (response.data && response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        
+        setUser(response.data.user);
+        return { success: true };
+      } else {
+        throw new Error('Token nicht in der Antwort enthalten');
+      }
+    } catch (error) {
+      console.error('Registrierung fehlgeschlagen:', error);
+      
+      // Detaillierte Fehlerinformationen erfassen
+      let errorMessage = 'Registrierung fehlgeschlagen';
+      
+      if (error.response) {
+        errorMessage = error.response.data.message || `Server-Fehler: ${error.response.status}`;
+      } else if (error.request) {
+        errorMessage = 'Keine Antwort vom Server';
+      } else {
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
+      return { success: false, message: errorMessage };
+    }
+  };
+
+  // Bereitgestellter Wert für den Context
+  const value = {
+    user,
+    loading,
+    error,
+    login,
+    logout,
+    register
+  };
+
   return (
-   <AuthContext.Provider value={{
-     user,
-     loading,
-     checkAuth,
-     login,
-     logout,
-     register
-   }}>
-     {children}
-   </AuthContext.Provider>
- );
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
+
+export default AuthContext;
