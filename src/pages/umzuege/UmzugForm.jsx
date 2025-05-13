@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 
@@ -57,6 +57,58 @@ export default function UmzugForm() {
   const [verfuegbareFahrzeuge, setVerfuegbareFahrzeuge] = useState([]);
   const [showKontaktForm, setShowKontaktForm] = useState(false);
   const [neuerKontakt, setNeuerKontakt] = useState({ name: '', telefon: '', email: '', isKunde: false });
+
+  // Transformationsfunktion für Umzugsdaten - wichtig für das korrekte Format zum Speichern
+  const transformUmzugData = useCallback((data) => {
+    // Kopie erstellen, um das Original nicht zu verändern
+    const transformed = { ...data };
+    
+    // Datumsfelder korrekt formatieren
+    if (transformed.startDatum) {
+      try {
+        transformed.startDatum = new Date(transformed.startDatum).toISOString();
+      } catch (error) {
+        console.error('Fehler beim Formatieren des Startdatums:', error);
+      }
+    }
+    
+    if (transformed.endDatum) {
+      try {
+        transformed.endDatum = new Date(transformed.endDatum).toISOString();
+      } catch (error) {
+        console.error('Fehler beim Formatieren des Enddatums:', error);
+      }
+    }
+    
+    // Sicherstellen, dass numerische Werte auch wirklich als Zahlen gespeichert werden
+    if (transformed.preis) {
+      transformed.preis = {
+        ...transformed.preis,
+        netto: transformed.preis.netto ? parseFloat(transformed.preis.netto) : 0,
+        brutto: transformed.preis.brutto ? parseFloat(transformed.preis.brutto) : 0,
+        mwst: transformed.preis.mwst ? parseFloat(transformed.preis.mwst) : 19
+      };
+    }
+    
+    // Sicherstellen, dass auszugsadresse und einzugsadresse korrekt formatiert sind
+    if (transformed.auszugsadresse) {
+      transformed.auszugsadresse = {
+        ...transformed.auszugsadresse,
+        etage: parseInt(transformed.auszugsadresse.etage) || 0,
+        entfernung: parseInt(transformed.auszugsadresse.entfernung) || 0
+      };
+    }
+    
+    if (transformed.einzugsadresse) {
+      transformed.einzugsadresse = {
+        ...transformed.einzugsadresse,
+        etage: parseInt(transformed.einzugsadresse.etage) || 0,
+        entfernung: parseInt(transformed.einzugsadresse.entfernung) || 0
+      };
+    }
+    
+    return transformed;
+  }, []);
 
   // Simuliere API-Aufruf zum Laden der Daten bei Bearbeitung
   useEffect(() => {
@@ -301,43 +353,105 @@ export default function UmzugForm() {
     }));
   };
 
-  // Formular absenden
+  // Formular absenden - mit verbesserter Fehlerbehandlung und Datenformatierung
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Grundlegende Validierung vor dem Senden
+    const requiredFields = [
+      'auftraggeber.name', 
+      'auftraggeber.telefon',
+      'auszugsadresse.strasse',
+      'auszugsadresse.hausnummer',
+      'auszugsadresse.plz',
+      'auszugsadresse.ort',
+      'einzugsadresse.strasse',
+      'einzugsadresse.hausnummer',
+      'einzugsadresse.plz',
+      'einzugsadresse.ort',
+      'startDatum',
+      'endDatum'
+    ];
+
+    const missingFields = [];
+    
+    // Prüfe verschachtelte Felder
+    requiredFields.forEach(field => {
+      if (field.includes('.')) {
+        const [parent, child] = field.split('.');
+        if (!formData[parent] || !formData[parent][child]) {
+          missingFields.push(field);
+        }
+      } else if (!formData[field]) {
+        missingFields.push(field);
+      }
+    });
+
+    if (missingFields.length > 0) {
+      alert(`Folgende Pflichtfelder fehlen oder sind ungültig: ${missingFields.join(', ')}`);
+      return;
+    }
+    
     try {
+      // Daten transformieren für API
+      const transformedData = transformUmzugData(formData);
+      
+      console.log('Transformierte Daten zum Speichern:', transformedData);
+      
       if (isNeueModus) {
         // Neuen Umzug erstellen
         try {
-          const response = await api.post('/umzuege', formData);
+          const response = await api.post('/umzuege', transformedData);
           console.log('Umzug erfolgreich erstellt:', response.data);
+          // Nach Erfolg zur Übersicht navigieren
+          navigate('/umzuege');
         } catch (error) {
           console.error('Fehler beim Erstellen des Umzugs:', error);
-          // Hier können Sie eine Benachrichtigung anzeigen
-          alert('Der Umzug konnte nicht gespeichert werden. Bitte versuchen Sie es später erneut.');
-          // Trotzdem zur Übersicht navigieren für Demo-Zwecke
-          navigate('/umzuege');
-          return;
+          
+          // Detaillierte Fehlermeldung
+          let errorMessage = 'Der Umzug konnte nicht gespeichert werden.';
+          if (error.response && error.response.data) {
+            console.log('Server-Antwort:', error.response.data);
+            if (error.response.data.message) {
+              errorMessage += ` Grund: ${error.response.data.message}`;
+            }
+            if (error.response.data.errors) {
+              errorMessage += ` Validierungsfehler: ${JSON.stringify(error.response.data.errors)}`;
+            }
+          }
+          
+          alert(errorMessage);
+          return; // Navigation wird verhindert
         }
       } else {
         // Bestehenden Umzug aktualisieren
         try {
-          const response = await api.put(`/umzuege/${id}`, formData);
+          const response = await api.put(`/umzuege/${id}`, transformedData);
           console.log('Umzug erfolgreich aktualisiert:', response.data);
+          // Nach Erfolg zur Übersicht navigieren
+          navigate('/umzuege');
         } catch (error) {
           console.error('Fehler beim Aktualisieren des Umzugs:', error);
-          // Hier können Sie eine Benachrichtigung anzeigen
-          alert('Der Umzug konnte nicht aktualisiert werden. Bitte versuchen Sie es später erneut.');
-          // Trotzdem zur Übersicht navigieren für Demo-Zwecke
-          navigate('/umzuege');
-          return;
+          
+          // Detaillierte Fehlermeldung
+          let errorMessage = 'Der Umzug konnte nicht aktualisiert werden.';
+          if (error.response && error.response.data) {
+            console.log('Server-Antwort:', error.response.data);
+            if (error.response.data.message) {
+              errorMessage += ` Grund: ${error.response.data.message}`;
+            }
+            if (error.response.data.errors) {
+              errorMessage += ` Validierungsfehler: ${JSON.stringify(error.response.data.errors)}`;
+            }
+          }
+          
+          alert(errorMessage);
+          return; // Navigation wird verhindert
         }
       }
-      
-      // Zurück zur Übersicht navigieren
-      navigate('/umzuege');
     } catch (error) {
       console.error('Fehler beim Speichern des Umzugs:', error);
+      alert('Es ist ein unerwarteter Fehler aufgetreten. Bitte versuchen Sie es später erneut.');
     }
   };
 
