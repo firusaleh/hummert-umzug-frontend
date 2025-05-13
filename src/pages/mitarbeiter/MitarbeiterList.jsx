@@ -17,85 +17,7 @@ import {
   Trash2,
   UserPlus
 } from 'lucide-react';
-
-// Beispieldaten für Mitarbeiter
-const mockMitarbeiter = [
-  { 
-    id: 1, 
-    vorname: 'Max', 
-    nachname: 'Mustermann',
-    position: 'Teamleiter',
-    telefon: '+49 176 1234567',
-    email: 'max.mustermann@hummert.de',
-    eintrittsdatum: '01.03.2020',
-    aktivitaeten: {
-      umzuege: 128,
-      aufnahmen: 45
-    },
-    status: 'Aktiv',
-    verfuegbarkeit: 'Verfügbar'
-  },
-  { 
-    id: 2, 
-    vorname: 'Anna', 
-    nachname: 'Schmidt',
-    position: 'Packer',
-    telefon: '+49 176 2345678',
-    email: 'anna.schmidt@hummert.de',
-    eintrittsdatum: '15.07.2021',
-    aktivitaeten: {
-      umzuege: 87,
-      aufnahmen: 0
-    },
-    status: 'Aktiv',
-    verfuegbarkeit: 'Im Einsatz'
-  },
-  { 
-    id: 3, 
-    vorname: 'Lukas', 
-    nachname: 'Meyer',
-    position: 'Fahrer',
-    telefon: '+49 176 3456789',
-    email: 'lukas.meyer@hummert.de',
-    eintrittsdatum: '10.04.2019',
-    aktivitaeten: {
-      umzuege: 142,
-      aufnahmen: 0
-    },
-    status: 'Aktiv',
-    verfuegbarkeit: 'Urlaub'
-  },
-  { 
-    id: 4, 
-    vorname: 'Sarah', 
-    nachname: 'Müller',
-    position: 'Aufnahmespezialistin',
-    telefon: '+49 176 4567890',
-    email: 'sarah.mueller@hummert.de',
-    eintrittsdatum: '05.11.2021',
-    aktivitaeten: {
-      umzuege: 15,
-      aufnahmen: 124
-    },
-    status: 'Aktiv',
-    verfuegbarkeit: 'Verfügbar'
-  },
-  { 
-    id: 5, 
-    vorname: 'Markus', 
-    nachname: 'Wolf',
-    position: 'Aufnahme & Vertrieb',
-    telefon: '+49 176 5678901',
-    email: 'markus.wolf@hummert.de',
-    eintrittsdatum: '15.01.2018',
-    aktivitaeten: {
-      umzuege: 32,
-      aufnahmen: 210
-    },
-    status: 'Aktiv',
-    verfuegbarkeit: 'Verfügbar'
-  },
-];
+import { mitarbeiterService } from '../../services/api';
 
 const MitarbeiterList = () => {
   const [mitarbeiter, setMitarbeiter] = useState([]);
@@ -106,12 +28,28 @@ const MitarbeiterList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [dropdownOpen, setDropdownOpen] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Simuliere API-Aufruf
+  // Mitarbeiter vom Backend laden
   useEffect(() => {
-    const fetchMitarbeiter = () => {
-      setMitarbeiter(mockMitarbeiter);
-      setFilteredMitarbeiter(mockMitarbeiter);
+    const fetchMitarbeiter = async () => {
+      setLoading(true);
+      try {
+        const response = await mitarbeiterService.getAll();
+        console.log('Geladene Mitarbeiter:', response.data);
+        setMitarbeiter(response.data);
+        setFilteredMitarbeiter(response.data);
+      } catch (err) {
+        console.error('Fehler beim Laden der Mitarbeiter:', err);
+        setError('Die Mitarbeiter konnten nicht geladen werden.');
+        // Fallback: Wenn Backend nicht erreichbar ist, verwenden wir die lokalen Beispieldaten
+        // Diese Zeile würde in Produktion entfernt werden
+        // setMitarbeiter(mockMitarbeiter);
+        // setFilteredMitarbeiter(mockMitarbeiter);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchMitarbeiter();
@@ -126,8 +64,8 @@ const MitarbeiterList = () => {
       results = results.filter(
         (ma) =>
           `${ma.vorname} ${ma.nachname}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          ma.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          ma.position.toLowerCase().includes(searchTerm.toLowerCase())
+          ma.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          ma.position?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     
@@ -159,6 +97,22 @@ const MitarbeiterList = () => {
       setDropdownOpen(null);
     } else {
       setDropdownOpen(id);
+    }
+  };
+
+  // Löschfunktion für Mitarbeiter
+  const handleDeleteMitarbeiter = async (id) => {
+    if (window.confirm('Möchten Sie diesen Mitarbeiter wirklich löschen?')) {
+      try {
+        await mitarbeiterService.delete(id);
+        // Nach erfolgreicher Löschung aktualisierte Liste laden
+        const response = await mitarbeiterService.getAll();
+        setMitarbeiter(response.data);
+        setFilteredMitarbeiter(response.data);
+      } catch (error) {
+        console.error('Fehler beim Löschen des Mitarbeiters:', error);
+        alert('Der Mitarbeiter konnte nicht gelöscht werden.');
+      }
     }
   };
 
@@ -196,7 +150,7 @@ const MitarbeiterList = () => {
   };
 
   // Liste der verfügbaren Positionen aus den Daten extrahieren
-  const availablePositions = [...new Set(mitarbeiter.map(ma => ma.position))];
+  const availablePositions = [...new Set(mitarbeiter.filter(ma => ma.position).map(ma => ma.position))];
 
   return (
     <div className="space-y-6">
@@ -263,122 +217,148 @@ const MitarbeiterList = () => {
       
       {/* Mitarbeiterliste */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Mitarbeiter
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Position
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Kontakt
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Seit
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Aktivitäten
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Verfügbarkeit
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Aktionen
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {currentItems.map((ma) => (
-                <tr key={ma.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white mr-3">
-                        {ma.vorname[0]}{ma.nachname[0]}
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{ma.vorname} {ma.nachname}</div>
-                        <div className="text-sm text-gray-500">{ma.status}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{ma.position}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      <div className="flex items-center">
-                        <Phone size={14} className="mr-1 text-gray-400" />
-                        {ma.telefon}
-                      </div>
-                      <div className="flex items-center mt-1">
-                        <Mail size={14} className="mr-1 text-gray-400" />
-                        {ma.email}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500 flex items-center">
-                      <Calendar size={16} className="mr-2 text-gray-400" />
-                      {ma.eintrittsdatum}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      <div className="flex items-center">
-                        <TruckElectric size={14} className="mr-1 text-gray-400" />
-                        {ma.aktivitaeten.umzuege} Umzüge
-                      </div>
-                      <div className="flex items-center mt-1">
-                        <ClipboardList size={14} className="mr-1 text-gray-400" />
-                        {ma.aktivitaeten.aufnahmen} Aufnahmen
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <VerfuegbarkeitsBadge status={ma.verfuegbarkeit} />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="relative">
-                      <button
-                        onClick={() => toggleDropdown(ma.id)}
-                        className="text-gray-500 hover:text-gray-700"
-                      >
-                        <MoreHorizontal size={20} />
-                      </button>
-                      
-                      {dropdownOpen === ma.id && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10">
-                          <div className="py-1">
-                            <Link 
-                              to={`/mitarbeiter/${ma.id}`}
-                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            >
-                              Details anzeigen
-                            </Link>
-                            <Link 
-                              to={`/mitarbeiter/${ma.id}/bearbeiten`}
-                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            >
-                              <Edit size={14} className="inline mr-2" /> Bearbeiten
-                            </Link>
-                            <button 
-                              className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                            >
-                              <Trash2 size={14} className="inline mr-2" /> Löschen
-                            </button>
+        {error && (
+          <div className="bg-red-100 text-red-700 p-4 border-b border-red-200">
+            {error}
+          </div>
+        )}
+        
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            {currentItems.length > 0 ? (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Mitarbeiter
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Position
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Kontakt
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Seit
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Aktivitäten
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Verfügbarkeit
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Aktionen
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {currentItems.map((ma) => (
+                    <tr key={ma._id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white mr-3">
+                            {ma.vorname?.[0] || '?'}{ma.nachname?.[0] || '?'}
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{ma.vorname} {ma.nachname}</div>
+                            <div className="text-sm text-gray-500">{ma.status}</div>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{ma.position}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          <div className="flex items-center">
+                            <Phone size={14} className="mr-1 text-gray-400" />
+                            {ma.telefon || 'Nicht angegeben'}
+                          </div>
+                          <div className="flex items-center mt-1">
+                            <Mail size={14} className="mr-1 text-gray-400" />
+                            {ma.email || 'Nicht angegeben'}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500 flex items-center">
+                          <Calendar size={16} className="mr-2 text-gray-400" />
+                          {ma.eintrittsdatum ? new Date(ma.eintrittsdatum).toLocaleDateString('de-DE') : 'Nicht angegeben'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          <div className="flex items-center">
+                            <TruckElectric size={14} className="mr-1 text-gray-400" />
+                            {ma.aktivitaeten?.umzuege || 0} Umzüge
+                          </div>
+                          <div className="flex items-center mt-1">
+                            <ClipboardList size={14} className="mr-1 text-gray-400" />
+                            {ma.aktivitaeten?.aufnahmen || 0} Aufnahmen
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <VerfuegbarkeitsBadge status={ma.verfuegbarkeit || 'Nicht angegeben'} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="relative">
+                          <button
+                            onClick={() => toggleDropdown(ma._id)}
+                            className="text-gray-500 hover:text-gray-700"
+                          >
+                            <MoreHorizontal size={20} />
+                          </button>
+                          
+                          {dropdownOpen === ma._id && (
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10">
+                              <div className="py-1">
+                                <Link 
+                                  to={`/mitarbeiter/${ma._id}`}
+                                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                >
+                                  Details anzeigen
+                                </Link>
+                                <Link 
+                                  to={`/mitarbeiter/${ma._id}/bearbeiten`}
+                                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                >
+                                  <Edit size={14} className="inline mr-2" /> Bearbeiten
+                                </Link>
+                                <button 
+                                  className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                                  onClick={() => handleDeleteMitarbeiter(ma._id)}
+                                >
+                                  <Trash2 size={14} className="inline mr-2" /> Löschen
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="text-center py-10">
+                <Search size={48} className="mx-auto text-gray-300 mb-3" />
+                <p className="text-gray-500">Keine Mitarbeiter gefunden</p>
+                <Link 
+                  to="/mitarbeiter/neu"
+                  className="mt-3 text-blue-600 hover:text-blue-800 inline-block"
+                >
+                  Ersten Mitarbeiter anlegen
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Pagination */}
         {totalPages > 1 && (

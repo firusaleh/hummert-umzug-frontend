@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, Check, Plus, Edit, Trash2, Search, User, Users, Briefcase } from 'lucide-react';
-import api, { zeiterfassungService } from '../../services/api';
+import { zeiterfassungService } from '../../services/api';
 
 export default function ZeiterfassungSystem() {
   // State für Daten
@@ -20,10 +20,15 @@ export default function ZeiterfassungSystem() {
   });
   const [bearbeitungId, setBearbeitungId] = useState(null);
   const [aktiverMitarbeiter, setAktiverMitarbeiter] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   
   // Lade Daten beim Komponenten-Mount
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      
       try {
         // Laden der Mitarbeiter
         const mitarbeiterResponse = await zeiterfassungService.getMitarbeiter();
@@ -32,66 +37,38 @@ export default function ZeiterfassungSystem() {
         // Laden der Umzugsprojekte
         const projekteResponse = await zeiterfassungService.getUmzugsprojekte();
         setUmzugsprojekte(projekteResponse.data);
-        
-        // Laden der Zeiterfassungen
-        if (aktuellesProjekt) {
-          const zeiterfassungenResponse = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
-          setZeiterfassungen(zeiterfassungenResponse.data);
-        }
       } catch (error) {
-        console.error('Fehler beim Laden der Daten:', error);
-        
-        // Mockdaten für Demo
-        const mockMitarbeiter = [
-          { _id: '1', vorname: 'Max', nachname: 'Mustermann', rolle: 'Teamleiter' },
-          { _id: '2', vorname: 'Anna', nachname: 'Schmidt', rolle: 'Helfer' },
-          { _id: '3', vorname: 'Lukas', nachname: 'Meyer', rolle: 'Fahrer' },
-          { _id: '4', vorname: 'Julia', nachname: 'Weber', rolle: 'Helfer' }
-        ];
-        
-        const mockProjekte = [
-          { _id: '1', auftraggeber: { name: 'Familie Müller' }, startDatum: '2025-05-10', status: 'in_bearbeitung' },
-          { _id: '2', auftraggeber: { name: 'Firma Tech GmbH' }, startDatum: '2025-05-15', status: 'in_bearbeitung' },
-          { _id: '3', auftraggeber: { name: 'Dr. Schmidt' }, startDatum: '2025-05-20', status: 'in_bearbeitung' }
-        ];
-        
-        setMitarbeiter(mockMitarbeiter);
-        setUmzugsprojekte(mockProjekte);
-        
-        if (aktuellesProjekt) {
-          const mockZeiterfassungen = [
-            {
-              _id: '1',
-              mitarbeiterId: { _id: '1', vorname: 'Max', nachname: 'Mustermann' },
-              projektId: aktuellesProjekt,
-              datum: '2025-05-10',
-              startzeit: '08:00',
-              endzeit: '16:30',
-              pause: 30,
-              taetigkeit: 'Transport und Aufbau',
-              notizen: 'Alles nach Plan verlaufen',
-              arbeitsstunden: 8
-            },
-            {
-              _id: '2',
-              mitarbeiterId: { _id: '2', vorname: 'Anna', nachname: 'Schmidt' },
-              projektId: aktuellesProjekt,
-              datum: '2025-05-10',
-              startzeit: '08:00',
-              endzeit: '16:00',
-              pause: 30,
-              taetigkeit: 'Verpackung und Transport',
-              notizen: '',
-              arbeitsstunden: 7.5
-            }
-          ];
-          
-          setZeiterfassungen(mockZeiterfassungen);
-        }
+        console.error('Fehler beim Laden der Basisdaten:', error);
+        setError('Fehler beim Laden der Mitarbeiter und Projekte.');
+      } finally {
+        setLoading(false);
       }
     };
     
     fetchData();
+  }, []);
+  
+  // Lade Zeiterfassungen wenn ein Projekt ausgewählt wurde
+  useEffect(() => {
+    const fetchZeiterfassungen = async () => {
+      if (!aktuellesProjekt) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const zeiterfassungenResponse = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
+        setZeiterfassungen(zeiterfassungenResponse.data);
+      } catch (error) {
+        console.error('Fehler beim Laden der Zeiterfassungen:', error);
+        setError('Die Zeiterfassungen konnten nicht geladen werden.');
+        setZeiterfassungen([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchZeiterfassungen();
   }, [aktuellesProjekt]);
   
   // Berechne Arbeitsstunden
@@ -160,42 +137,53 @@ export default function ZeiterfassungSystem() {
       arbeitsstunden
     };
     
+    setLoading(true);
+    setError(null);
+    
     try {
       if (bearbeitungId) {
         // Update einer bestehenden Zeiterfassung
         await zeiterfassungService.updateZeiterfassung(bearbeitungId, zeiterfassungDaten);
         
-        // Update im lokalen State
-        setZeiterfassungen(zeiterfassungen.map(z => 
-          z._id === bearbeitungId ? { ...z, ...zeiterfassungDaten } : z
-        ));
+        // Lade aktualisierte Daten vom Server
+        const response = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
+        setZeiterfassungen(response.data);
       } else {
         // Erstellen einer neuen Zeiterfassung
-        const response = await zeiterfassungService.addZeiterfassung(zeiterfassungDaten);
+        await zeiterfassungService.addZeiterfassung(zeiterfassungDaten);
         
-        // Hinzufügen zum lokalen State
-        setZeiterfassungen([...zeiterfassungen, response.data]);
+        // Lade aktualisierte Daten vom Server
+        const response = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
+        setZeiterfassungen(response.data);
       }
       
       // Formular zurücksetzen
       resetForm();
     } catch (error) {
       console.error('Fehler beim Speichern der Zeiterfassung:', error);
-      alert(`Fehler: ${error.response?.data?.message || 'Unbekannter Fehler'}`);
+      setError(`Die Zeiterfassung konnte nicht gespeichert werden: ${error.response?.data?.message || 'Unbekannter Fehler'}`);
+    } finally {
+      setLoading(false);
     }
   };
   
   // Zeiterfassung löschen
   const handleLoeschen = async (id) => {
     if (window.confirm('Möchten Sie diese Zeiterfassung wirklich löschen?')) {
+      setLoading(true);
+      setError(null);
+      
       try {
         await zeiterfassungService.deleteZeiterfassung(id);
         
-        // Aus lokalem State entfernen
-        setZeiterfassungen(zeiterfassungen.filter(z => z._id !== id));
+        // Lade aktualisierte Daten vom Server
+        const response = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
+        setZeiterfassungen(response.data);
       } catch (error) {
         console.error('Fehler beim Löschen der Zeiterfassung:', error);
-        alert(`Fehler: ${error.response?.data?.message || 'Unbekannter Fehler'}`);
+        setError(`Die Zeiterfassung konnte nicht gelöscht werden: ${error.response?.data?.message || 'Unbekannter Fehler'}`);
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -223,7 +211,7 @@ export default function ZeiterfassungSystem() {
   // Projekt-Dropdown-Optionen
   const projektOptionen = umzugsprojekte.map(projekt => ({
     id: projekt._id,
-    label: `${projekt.auftraggeber.name} (${new Date(projekt.startDatum).toLocaleDateString('de-DE')})`
+    label: `${projekt.auftraggeber?.name || 'Unbekannter Kunde'} (${new Date(projekt.startDatum).toLocaleDateString('de-DE')})`
   }));
   
   // Mitarbeiter-Dropdown-Optionen
@@ -307,12 +295,14 @@ export default function ZeiterfassungSystem() {
                   <button
                     onClick={() => handleBearbeiten(zeiterfassung._id)}
                     className="text-indigo-600 hover:text-indigo-900 mr-3"
+                    disabled={loading}
                   >
                     <Edit className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleLoeschen(zeiterfassung._id)}
                     className="text-red-600 hover:text-red-900"
+                    disabled={loading}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -340,6 +330,13 @@ export default function ZeiterfassungSystem() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-800">Zeiterfassung</h1>
       
+      {/* Fehleranzeige, falls vorhanden */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <span className="block sm:inline">{error}</span>
+        </div>
+      )}
+      
       {/* Projekt-Auswahl */}
       <div className="bg-white p-4 rounded-lg shadow">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -352,6 +349,7 @@ export default function ZeiterfassungSystem() {
               className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               value={aktuellesProjekt}
               onChange={(e) => setAktuellesProjekt(e.target.value)}
+              disabled={loading}
             >
               <option value="">-- Projekt auswählen --</option>
               {projektOptionen.map((option) => (
@@ -372,6 +370,7 @@ export default function ZeiterfassungSystem() {
                     : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
                 }`}
                 onClick={() => handleMitarbeiterFilter(ma._id)}
+                disabled={loading}
               >
                 <User className="h-4 w-4 mr-1" />
                 {ma.vorname}
@@ -381,6 +380,7 @@ export default function ZeiterfassungSystem() {
               <button
                 className="px-3 py-1.5 rounded text-sm flex items-center bg-red-100 text-red-700 border border-red-300"
                 onClick={() => setAktiverMitarbeiter('')}
+                disabled={loading}
               >
                 <Trash2 className="h-4 w-4 mr-1" />
                 Filter löschen
@@ -389,6 +389,12 @@ export default function ZeiterfassungSystem() {
           </div>
         </div>
       </div>
+      
+      {loading && (
+        <div className="flex justify-center py-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+        </div>
+      )}
       
       {aktuellesProjekt ? (
         <>
@@ -411,6 +417,7 @@ export default function ZeiterfassungSystem() {
                     value={formular.mitarbeiterId}
                     onChange={(e) => setFormular({ ...formular, mitarbeiterId: e.target.value })}
                     required
+                    disabled={loading}
                   >
                     <option value="">-- Auswählen --</option>
                     {mitarbeiterOptionen.map((option) => (
@@ -433,6 +440,7 @@ export default function ZeiterfassungSystem() {
                     value={formular.datum}
                     onChange={(e) => setFormular({ ...formular, datum: e.target.value })}
                     required
+                    disabled={loading}
                   />
                 </div>
                 
@@ -448,6 +456,7 @@ export default function ZeiterfassungSystem() {
                     value={formular.startzeit}
                     onChange={(e) => setFormular({ ...formular, startzeit: e.target.value })}
                     required
+                    disabled={loading}
                   />
                 </div>
                 
@@ -463,6 +472,7 @@ export default function ZeiterfassungSystem() {
                     value={formular.endzeit}
                     onChange={(e) => setFormular({ ...formular, endzeit: e.target.value })}
                     required
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -482,6 +492,7 @@ export default function ZeiterfassungSystem() {
                     value={formular.pause}
                     onChange={(e) => setFormular({ ...formular, pause: e.target.value })}
                     required
+                    disabled={loading}
                   />
                 </div>
                 
@@ -497,6 +508,7 @@ export default function ZeiterfassungSystem() {
                     value={formular.taetigkeit}
                     onChange={(e) => setFormular({ ...formular, taetigkeit: e.target.value })}
                     required
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -512,6 +524,7 @@ export default function ZeiterfassungSystem() {
                   className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                   value={formular.notizen}
                   onChange={(e) => setFormular({ ...formular, notizen: e.target.value })}
+                  disabled={loading}
                 ></textarea>
               </div>
               
@@ -520,13 +533,16 @@ export default function ZeiterfassungSystem() {
                   type="button"
                   onClick={resetForm}
                   className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  disabled={loading}
                 >
                   Abbrechen
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center"
+                  disabled={loading}
                 >
+                  {loading && <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>}
                   {bearbeitungId ? 'Aktualisieren' : 'Speichern'}
                 </button>
               </div>
@@ -555,7 +571,13 @@ export default function ZeiterfassungSystem() {
               </div>
             </div>
             
-            {renderZeiterfassungen()}
+            {loading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+              </div>
+            ) : (
+              renderZeiterfassungen()
+            )}
           </div>
         </>
       ) : (

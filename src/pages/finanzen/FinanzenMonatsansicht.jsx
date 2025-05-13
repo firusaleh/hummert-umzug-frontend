@@ -11,129 +11,7 @@ import {
   Download,
   Calendar
 } from 'lucide-react';
-import api from '../../services/api';
-
-// Service für Finanzdaten (nur einmal deklarieren)
-const finanzenService = {
-  async getMonthlyData(year, month) {
-    // In echter Anwendung würde hier ein API-Aufruf stattfinden
-    // Simulierte Daten für Demo
-    return {
-      einnahmen: {
-        total: 24500,
-        categories: [
-          { name: 'Umzüge', amount: 18500 },
-          { name: 'Zusatzleistungen', amount: 4200 },
-          { name: 'Lagerung', amount: 1800 }
-        ]
-      },
-      ausgaben: {
-        total: 16800,
-        categories: [
-          { name: 'Personal', amount: 9800 },
-          { name: 'Fahrzeuge', amount: 3200 },
-          { name: 'Material', amount: 1400 },
-          { name: 'Miete', amount: 1800 },
-          { name: 'Sonstige', amount: 600 }
-        ]
-      },
-      transaktionen: [
-        {
-          id: 1,
-          datum: '2025-05-02',
-          beschreibung: 'Umzug Familie Müller',
-          betrag: 1450,
-          typ: 'einnahme',
-          kategorie: 'Umzüge',
-          status: 'abgeschlossen'
-        },
-        {
-          id: 2,
-          datum: '2025-05-05',
-          beschreibung: 'Tankkosten LKW-01',
-          betrag: -120,
-          typ: 'ausgabe',
-          kategorie: 'Fahrzeuge',
-          status: 'abgeschlossen'
-        },
-        {
-          id: 3,
-          datum: '2025-05-10',
-          beschreibung: 'Umzug Firma Tech GmbH',
-          betrag: 3800,
-          typ: 'einnahme',
-          kategorie: 'Umzüge',
-          status: 'ausstehend'
-        },
-        {
-          id: 4,
-          datum: '2025-05-12',
-          beschreibung: 'Gehälter Mai 2025',
-          betrag: -9800,
-          typ: 'ausgabe',
-          kategorie: 'Personal',
-          status: 'abgeschlossen'
-        },
-        {
-          id: 5,
-          datum: '2025-05-15',
-          beschreibung: 'Kartons und Verpackungsmaterial',
-          betrag: -450,
-          typ: 'ausgabe',
-          kategorie: 'Material',
-          status: 'abgeschlossen'
-        },
-        {
-          id: 6,
-          datum: '2025-05-18',
-          beschreibung: 'Umzug Dr. Schmidt',
-          betrag: 1250,
-          typ: 'einnahme',
-          kategorie: 'Umzüge',
-          status: 'ausstehend'
-        },
-        {
-          id: 7,
-          datum: '2025-05-22',
-          beschreibung: 'Miete Lagerraum',
-          betrag: -1800,
-          typ: 'ausgabe',
-          kategorie: 'Miete',
-          status: 'abgeschlossen'
-        },
-        {
-          id: 8,
-          datum: '2025-05-25',
-          beschreibung: 'Klaviertransport Sonderleistung',
-          betrag: 850,
-          typ: 'einnahme',
-          kategorie: 'Zusatzleistungen',
-          status: 'abgeschlossen'
-        }
-      ]
-    };
-  },
-  
-  async getYearlyOverview(year) {
-    // In echter Anwendung würde hier ein API-Aufruf stattfinden
-    // Simulierte Daten für Demo
-    const data = [];
-    
-    for (let month = 0; month < 12; month++) {
-      const einnahmen = Math.floor(Math.random() * 20000) + 10000;
-      const ausgaben = Math.floor(Math.random() * 15000) + 8000;
-      
-      data.push({
-        month,
-        einnahmen,
-        ausgaben,
-        gewinn: einnahmen - ausgaben
-      });
-    }
-    
-    return data;
-  }
-};
+import { finanzenService } from '../../services/api';
 
 export default function FinanzenMonatsansicht() {
   // State für Filter und Datumauswahl
@@ -146,27 +24,100 @@ export default function FinanzenMonatsansicht() {
   const [monthlyData, setMonthlyData] = useState(null);
   const [yearlyData, setYearlyData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   // Lädt Daten basierend auf ausgewähltem Datum und Ansicht
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
+      setError(null);
       
       try {
         if (ansicht === 'monat') {
-          const result = await finanzenService.getMonthlyData(
-            currentDate.getFullYear(),
-            currentDate.getMonth()
-          );
-          setMonthlyData(result);
-        } else {
-          const result = await finanzenService.getYearlyOverview(
+          // Der Monat ist 0-basiert (0 = Januar, 11 = Dezember)
+          const response = await finanzenService.getMonatsdetails(
+            currentDate.getMonth() + 1, // wir addieren 1, da die API 1-basierte Monate erwartet
             currentDate.getFullYear()
           );
-          setYearlyData(result);
+          setMonthlyData(response.data);
+        } else {
+          const response = await finanzenService.getMonatsuebersicht(
+            currentDate.getFullYear()
+          );
+          setYearlyData(response.data);
         }
       } catch (error) {
         console.error('Fehler beim Laden der Finanzdaten:', error);
+        setError('Die Finanzdaten konnten nicht geladen werden.');
+        
+        // Fallback: Simuliere API-Aufruf für Demo
+        if (ansicht === 'monat') {
+          // Beispieldaten für Monat
+          setMonthlyData({
+            einnahmen: {
+              total: 24500,
+              categories: [
+                { name: 'Umzüge', amount: 18500 },
+                { name: 'Zusatzleistungen', amount: 4200 },
+                { name: 'Lagerung', amount: 1800 }
+              ]
+            },
+            ausgaben: {
+              total: 16800,
+              categories: [
+                { name: 'Personal', amount: 9800 },
+                { name: 'Fahrzeuge', amount: 3200 },
+                { name: 'Material', amount: 1400 },
+                { name: 'Miete', amount: 1800 },
+                { name: 'Sonstige', amount: 600 }
+              ]
+            },
+            transaktionen: [
+              {
+                id: 1,
+                datum: '2025-05-02',
+                beschreibung: 'Umzug Familie Müller',
+                betrag: 1450,
+                typ: 'einnahme',
+                kategorie: 'Umzüge',
+                status: 'abgeschlossen'
+              },
+              {
+                id: 2,
+                datum: '2025-05-05',
+                beschreibung: 'Tankkosten LKW-01',
+                betrag: -120,
+                typ: 'ausgabe',
+                kategorie: 'Fahrzeuge',
+                status: 'abgeschlossen'
+              },
+              {
+                id: 3,
+                datum: '2025-05-10',
+                beschreibung: 'Umzug Firma Tech GmbH',
+                betrag: 3800,
+                typ: 'einnahme',
+                kategorie: 'Umzüge',
+                status: 'ausstehend'
+              }
+            ]
+          });
+        } else {
+          // Beispieldaten für Jahr
+          const data = [];
+          for (let month = 0; month < 12; month++) {
+            const einnahmen = Math.floor(Math.random() * 20000) + 10000;
+            const ausgaben = Math.floor(Math.random() * 15000) + 8000;
+            
+            data.push({
+              month,
+              einnahmen,
+              ausgaben,
+              gewinn: einnahmen - ausgaben
+            });
+          }
+          setYearlyData(data);
+        }
       } finally {
         setLoading(false);
       }
@@ -221,7 +172,7 @@ export default function FinanzenMonatsansicht() {
 
   // Gefilterte Transaktionen
   const getFilteredTransactions = () => {
-    if (!monthlyData) return [];
+    if (!monthlyData || !monthlyData.transaktionen) return [];
     
     return monthlyData.transaktionen.filter(transaction => {
       // Filter nach Status
@@ -255,6 +206,12 @@ export default function FinanzenMonatsansicht() {
       ausgaben,
       bilanz: einnahmen - ausgaben
     };
+  };
+
+  // Export-Funktion (Platzhalter)
+  const handleExport = () => {
+    alert('Exportfunktion wird implementiert...');
+    // Hier würde eine API-Anfrage zum Generieren einer Export-Datei stattfinden
   };
 
   // Rendert Monatsübersicht
@@ -366,7 +323,10 @@ export default function FinanzenMonatsansicht() {
           </div>
 
           <div className="ml-auto">
-            <button className="flex items-center bg-white border rounded-md px-3 py-1.5 hover:bg-gray-50">
+            <button 
+              className="flex items-center bg-white border rounded-md px-3 py-1.5 hover:bg-gray-50"
+              onClick={handleExport}
+            >
               <Download size={18} className="mr-2" />
               Exportieren
             </button>
@@ -613,6 +573,12 @@ export default function FinanzenMonatsansicht() {
           </button>
         </div>
       </div>
+      
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <span className="block sm:inline">{error}</span>
+        </div>
+      )}
       
       <div className="bg-white rounded-lg shadow p-4 flex justify-between items-center">
         <button onClick={prevMonth} className="p-1.5 rounded-full hover:bg-gray-100">
