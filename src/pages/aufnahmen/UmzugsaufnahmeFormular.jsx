@@ -40,24 +40,27 @@ export default function UmzugsaufnahmeFormular({ initialData = {}, onSave }) {
     bewertung: 3
   });
 
-  // Initialdaten laden, wenn vorhanden
+  // Initialdaten laden, wenn vorhanden - mit Sicherheitsabfrage
   useEffect(() => {
-    if (Object.keys(initialData).length > 0) {
+    // Stelle sicher, dass initialData ein Objekt ist
+    const safeInitialData = initialData || {};
+    
+    if (Object.keys(safeInitialData).length > 0) {
       setFormData({
         ...formData,
-        ...initialData,
+        ...safeInitialData,
         // Stelle sicher, dass verschachtelte Objekte korrekt übernommen werden
         auszugsadresse: {
           ...formData.auszugsadresse,
-          ...(initialData.auszugsadresse || {})
+          ...(safeInitialData.auszugsadresse || {})
         },
         einzugsadresse: {
           ...formData.einzugsadresse,
-          ...(initialData.einzugsadresse || {})
+          ...(safeInitialData.einzugsadresse || {})
         },
         angebotspreis: {
           ...formData.angebotspreis,
-          ...(initialData.angebotspreis || {})
+          ...(safeInitialData.angebotspreis || {})
         }
       });
     }

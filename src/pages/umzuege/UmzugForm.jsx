@@ -168,27 +168,36 @@ export default function UmzugForm() {
       }
     };
     
-    // Fahrzeuge laden
-    const fetchFahrzeuge = async () => {
-      try {
-        const response = await api.get('/fahrzeuge');
-        setVerfuegbareFahrzeuge(response.data);
-      } catch (error) {
-        console.error('Fehler beim Laden der Fahrzeuge:', error);
+    // Fahrzeuge laden - API-Aufruf auskommentiert und direkt die Mockdaten verwenden
+    // const fetchFahrzeuge = async () => {
+    //   try {
+    //     const response = await api.get('/fahrzeuge');
+    //     setVerfuegbareFahrzeuge(response.data);
+    //   } catch (error) {
+    //     console.error('Fehler beim Laden der Fahrzeuge:', error);
         
-        // Fallback zu Mockdaten für Demo
-        const mockFahrzeuge = [
-          { _id: '1', kennzeichen: 'B-HU 1234', typ: '7,5t LKW' },
-          { _id: '2', kennzeichen: 'B-HU 5678', typ: 'Transporter' },
-          { _id: '3', kennzeichen: 'B-HU 9012', typ: '12t LKW' },
-          { _id: '4', kennzeichen: 'B-HU 3456', typ: 'Transporter' }
-        ];
-        setVerfuegbareFahrzeuge(mockFahrzeuge);
-      }
-    };
+    //     // Fallback zu Mockdaten für Demo
+    //     const mockFahrzeuge = [
+    //       { _id: '1', kennzeichen: 'B-HU 1234', typ: '7,5t LKW' },
+    //       { _id: '2', kennzeichen: 'B-HU 5678', typ: 'Transporter' },
+    //       { _id: '3', kennzeichen: 'B-HU 9012', typ: '12t LKW' },
+    //       { _id: '4', kennzeichen: 'B-HU 3456', typ: 'Transporter' }
+    //     ];
+    //     setVerfuegbareFahrzeuge(mockFahrzeuge);
+    //   }
+    // };
+    
+    // Direkt die Mockdaten für Fahrzeuge setzen ohne API-Aufruf
+    const mockFahrzeuge = [
+      { _id: '1', kennzeichen: 'B-HU 1234', typ: '7,5t LKW' },
+      { _id: '2', kennzeichen: 'B-HU 5678', typ: 'Transporter' },
+      { _id: '3', kennzeichen: 'B-HU 9012', typ: '12t LKW' },
+      { _id: '4', kennzeichen: 'B-HU 3456', typ: 'Transporter' }
+    ];
+    setVerfuegbareFahrzeuge(mockFahrzeuge);
     
     fetchMitarbeiter();
-    fetchFahrzeuge();
+    // fetchFahrzeuge(); // API-Aufruf auskommentiert
   }, [id]);
 
   // Behandelt Änderungen in Input-Feldern
