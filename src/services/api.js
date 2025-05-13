@@ -1,7 +1,11 @@
 import axios from 'axios';
 
 // Konfiguriere die API-Basis-URL mit Fallback
+// Wir verwenden die korrekte URL zum Backend auf Render.com
 const API_URL = process.env.REACT_APP_API_URL || 'https://meine-app-backend.onrender.com/api';
+
+// Logging für API-URL um Probleme zu diagnostizieren
+console.log('API URL verwendet:', API_URL);
 
 // Für Entwicklungszwecke kann hier zwischen lokaler und Produktionsumgebung unterschieden werden
 const getBaseURL = () => {
@@ -24,6 +28,8 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Für Debug-Zwecke - besser verstehen, was gesendet wird
+    console.log(`${config.method.toUpperCase()} Request zu ${config.baseURL}${config.url}`, config.data || config.params);
     return config;
   },
   (error) => {
@@ -35,6 +41,8 @@ api.interceptors.request.use(
 // Response-Interceptor für Token-Ablauf und Fehlerbehandlung
 api.interceptors.response.use(
   (response) => {
+    // Erfolgreiche Response loggen
+    console.log('API-Antwort erfolgreich:', response.status, response.config.url);
     return response;
   },
   (error) => {
@@ -45,6 +53,7 @@ api.interceptors.response.use(
       console.error('Statuscode:', error.response.status);
       console.error('Antwortdaten:', error.response.data);
       console.error('Headers:', error.response.headers);
+      console.error('URL:', error.config.url);
       
       // Token-Ablauf-Behandlung
       if (error.response.status === 401) {
@@ -59,6 +68,8 @@ api.interceptors.response.use(
       }
     } else if (error.request) {
       console.error('Keine Antwort vom Server erhalten:', error.request);
+      console.error('Request URL:', error.config.url);
+      console.error('Request Methode:', error.config.method);
     } else {
       console.error('Fehler beim Einrichten der Anfrage:', error.message);
     }
@@ -98,6 +109,8 @@ export const authService = {
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    // Umleitung zur Login-Seite hinzugefügt
+    window.location.href = '/login';
   },
   checkAuth: async () => {
     try {
