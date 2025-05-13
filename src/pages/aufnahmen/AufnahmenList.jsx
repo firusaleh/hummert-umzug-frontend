@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Plus, Search, FileText, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, FileText, Edit, Trash2, ArrowLeft } from 'lucide-react';
 import UmzugsaufnahmeFormular from './UmzugsaufnahmeFormular';
 
 const AufnahmenList = () => {
   const [showForm, setShowForm] = useState(false);
   const [currentAufnahme, setCurrentAufnahme] = useState(null);
+  const [loading, setLoading] = useState(false);
   
   // Beispieldaten für vorhandene Aufnahmen (später durch API-Daten ersetzen)
   const [aufnahmen, setAufnahmen] = useState([
@@ -32,6 +33,40 @@ const AufnahmenList = () => {
   const handleCloseForm = () => {
     setShowForm(false);
     setCurrentAufnahme(null);
+  };
+  
+  const handleSaveAufnahme = async (data) => {
+    setLoading(true);
+    
+    try {
+      // Hier würde normalerweise ein API-Aufruf stattfinden
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simuliere API-Aufruf
+      
+      if (currentAufnahme) {
+        // Bestehende Aufnahme aktualisieren
+        setAufnahmen(aufnahmen.map(item => 
+          item.id === currentAufnahme.id ? { ...item, ...data, kunde: data.kundenName } : item
+        ));
+      } else {
+        // Neue Aufnahme erstellen
+        const newAufnahme = {
+          id: Date.now(),
+          kunde: data.kundenName,
+          adresse: `${data.auszugsadresse.strasse} ${data.auszugsadresse.hausnummer}, ${data.auszugsadresse.plz} ${data.auszugsadresse.ort}`,
+          datum: data.datum || new Date().toISOString().split('T')[0],
+          status: 'Ausstehend'
+        };
+        setAufnahmen([...aufnahmen, newAufnahme]);
+      }
+      
+      setShowForm(false);
+      setCurrentAufnahme(null);
+    } catch (error) {
+      console.error('Fehler beim Speichern:', error);
+      alert('Es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.');
+    } finally {
+      setLoading(false);
+    }
   };
   
   return (
@@ -138,21 +173,26 @@ const AufnahmenList = () => {
           <div className="flex items-center mb-6">
             <button 
               onClick={handleCloseForm}
-              className="mr-3 px-3 py-2 rounded-lg hover:bg-gray-100"
+              className="mr-3 px-3 py-2 rounded-lg hover:bg-gray-100 flex items-center"
             >
-              ← Zurück
+              <ArrowLeft size={16} className="mr-1" /> Zurück
             </button>
             <h1 className="text-2xl font-bold">
               {currentAufnahme ? `Aufnahme bearbeiten: ${currentAufnahme.kunde}` : 'Neue Aufnahme erstellen'}
             </h1>
           </div>
-          <UmzugsaufnahmeFormular 
-            initialData={currentAufnahme} 
-            onSave={(data) => {
-              // Hier Logik zum Speichern der Daten
-              setShowForm(false);
-            }} 
-          />
+          
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : (
+            <UmzugsaufnahmeFormular 
+              initialData={currentAufnahme} 
+              onSave={handleSaveAufnahme}
+              onCancel={handleCloseForm}
+            />
+          )}
         </div>
       )}
     </div>
