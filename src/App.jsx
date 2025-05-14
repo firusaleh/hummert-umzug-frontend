@@ -39,9 +39,12 @@ import Einstellungen from './pages/einstellungen/Einstellungen';
 // Zeiterfassung
 import ZeiterfassungSystem from './pages/zeiterfassung/ZeiterfassungSystem';
 
-// Finanzen
+// Finanzen-Pages
 import Finanzverwaltung from './pages/finanzen/Finanzverwaltung';
 import FinanzenMonatsansicht from './pages/finanzen/FinanzenMonatsansicht';
+import AngebotForm from './components/finanzen/AngebotForm';
+import RechnungForm from './components/finanzen/RechnungForm';
+import ProjektkostenForm from './components/finanzen/ProjektkostenForm';
 
 // 404 Seite
 import NotFound from './pages/NotFound';
@@ -240,6 +243,81 @@ const App = () => {
         <ProtectedRoute>
           <MainLayout>
             <FinanzenMonatsansicht />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+
+      {/* Angebote Routes */}
+      <Route path="/finanzen/angebote/neu" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <AngebotForm />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/finanzen/angebote/:id" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <AngebotForm />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/finanzen/angebote/:id/bearbeiten" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <AngebotForm />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      {/* Rechnungen Routes */}
+      <Route path="/finanzen/rechnungen/neu" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <RechnungForm />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/finanzen/rechnungen/:id" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <RechnungForm />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/finanzen/rechnungen/:id/bearbeiten" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <RechnungForm />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      {/* Projektkosten Routes */}
+      <Route path="/finanzen/projektkosten/neu" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <ProjektkostenForm />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/finanzen/projektkosten/:id" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <ProjektkostenForm />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/finanzen/projektkosten/:id/bearbeiten" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <ProjektkostenForm />
           </MainLayout>
         </ProtectedRoute>
       } />
