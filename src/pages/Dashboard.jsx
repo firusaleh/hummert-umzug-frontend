@@ -123,9 +123,9 @@ const Dashboard = () => {
           // Versuchen, die Monatsübersicht für das aktuelle Jahr zu laden
           const monthlyResponse = await finanzenService.getMonatsuebersicht(currentYear);
           
-          if (monthlyResponse?.data) {
-            const formattedData = monthlyResponse.data.map(month => ({
-              name: getMonthShortName(month.month - 1), // API gibt Monate 1-12 zurück, JS verwendet 0-11
+          if (monthlyResponse?.data?.monatsUebersichten) {
+            const formattedData = monthlyResponse.data.monatsUebersichten.map(month => ({
+              name: getMonthShortName(month.monat - 1), // API gibt Monate 1-12 zurück, JS verwendet 0-11
               umzuege: month.umzuege || 0,
               aufnahmen: month.aufnahmen || 0
             }));
