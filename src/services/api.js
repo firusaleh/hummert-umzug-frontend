@@ -151,7 +151,7 @@ export const userService = {
 
 // Umzugs-Services
 export const umzuegeService = {
-  getAll: () => api.get('/umzuege'),
+  getAll: (params) => api.get('/umzuege', { params }),
   getById: (id) => api.get(`/umzuege/${id}`),
   create: (umzugData) => api.post('/umzuege', umzugData),
   update: (id, umzugData) => api.put(`/umzuege/${id}`, umzugData),
@@ -166,7 +166,31 @@ export const mitarbeiterService = {
   getById: (id) => api.get(`/mitarbeiter/${id}`),
   create: (mitarbeiterData) => api.post('/mitarbeiter', mitarbeiterData),
   update: (id, mitarbeiterData) => api.put(`/mitarbeiter/${id}`, mitarbeiterData),
-  delete: (id) => api.delete(`/mitarbeiter/${id}`)
+  delete: (id) => api.delete(`/mitarbeiter/${id}`),
+  
+  // Methode zum Hochladen eines Profilbilds
+  uploadImage: (id, imageFormData) => {
+    return api.post(`/mitarbeiter/${id}/profilbild`, imageFormData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  },
+  
+  // Methode zum Aktualisieren des Mitarbeiterstatus
+  updateStatus: (id, status) => {
+    return api.put(`/mitarbeiter/${id}/status`, { status });
+  },
+  
+  // Methode zum Hinzufügen von Fähigkeiten
+  addSkill: (id, skill) => {
+    return api.post(`/mitarbeiter/${id}/faehigkeiten`, { faehigkeit: skill });
+  },
+  
+  // Methode zum Entfernen von Fähigkeiten
+  removeSkill: (id, skill) => {
+    return api.delete(`/mitarbeiter/${id}/faehigkeiten/${encodeURIComponent(skill)}`);
+  }
 };
 
 // Fahrzeug-Services

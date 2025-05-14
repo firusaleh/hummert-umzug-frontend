@@ -10,8 +10,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart as RechartsBarChart, Bar } from 'recharts';
-// Korrigierter Import-Pfad - nur ein Level nach oben
-import api from '../services/api';
+import api, { umzuegeService, mitarbeiterService, finanzenService } from '../services/api';
 
 // StatCard Komponente für die Statistikkarten
 const StatCard = ({ title, value, icon, change, changeType, loading }) => {
@@ -80,41 +79,105 @@ const Dashboard = () => {
       setError(null);
       
       try {
-        // In einer echten Anwendung würden hier API-Aufrufe stattfinden
-        // Da die API möglicherweise noch nicht eingerichtet ist, simulieren wir die Daten
-        setTimeout(() => {
-          setStats({
-            totalMoves: 428,
-            totalInspections: 215,
-            totalEmployees: 32,
-            totalRevenue: 650000
-          });
+        // Parallel API-Aufrufe für bessere Performance
+        const [
+          movesResponse, 
+          inspectionsResponse, 
+          employeesResponse, 
+          financeResponse, 
+          upcomingMovesResponse
+        ] = await Promise.allSettled([
+          umzuegeService.getAll(),
+          // Ersetze durch den richtigen Service für Aufnahmen wenn vorhanden, oder verwende einen Mock
+          Promise.resolve({ data: { total: 215 } }),
+          mitarbeiterService.getAll(),
+          finanzenService.getUebersicht(),
+          umzuegeService.getAll({ status: 'Geplant', limit: 5, sort: 'startDatum' })
+        ]);
+
+        // Stats setzen mit Fallback auf 0 wenn die API fehlschlägt
+        const totalMoves = movesResponse.status === 'fulfilled' ? 
+          (movesResponse.value?.data?.length || 0) : 0;
           
-          setMonthlyData([
-            { name: 'Jan', umzuege: 65, aufnahmen: 28 },
-            { name: 'Feb', umzuege: 59, aufnahmen: 48 },
-            { name: 'Mär', umzuege: 80, aufnahmen: 40 },
-            { name: 'Apr', umzuege: 81, aufnahmen: 37 },
-            { name: 'Mai', umzuege: 56, aufnahmen: 25 }
-          ]);
+        const totalInspections = inspectionsResponse.status === 'fulfilled' ? 
+          (inspectionsResponse.value?.data?.total || 0) : 0;
           
-          setCategoryData([
-            { name: 'Privat', umzuege: 400 },
-            { name: 'Gewerbe', umzuege: 300 },
-            { name: 'Senioren', umzuege: 200 },
-            { name: 'International', umzuege: 100 },
-            { name: 'Spezialtransport', umzuege: 150 }
-          ]);
+        const totalEmployees = employeesResponse.status === 'fulfilled' ? 
+          (employeesResponse.value?.data?.length || 0) : 0;
           
-          setUpcomingMoves([
-            { _id: 1, auftraggeber: { name: 'Familie Müller' }, startDatum: '2025-05-08', typ: 'Privat', auszugsadresse: { strasse: 'Ahornweg 12', plz: '80331', ort: 'München' } },
-            { _id: 2, auftraggeber: { name: 'Firma Tech GmbH' }, startDatum: '2025-05-15', typ: 'Gewerbe', auszugsadresse: { strasse: 'Industriestr. 45', plz: '10115', ort: 'Berlin' } },
-            { _id: 3, auftraggeber: { name: 'Dr. Weber' }, startDatum: '2025-05-12', typ: 'Senioren', auszugsadresse: { strasse: 'Lindenallee 8', plz: '20095', ort: 'Hamburg' } },
-            { _id: 4, auftraggeber: { name: 'Tech Solutions AG' }, startDatum: '2025-05-15', typ: 'Gewerbe', auszugsadresse: { strasse: 'Innovationspark 3', plz: '60313', ort: 'Frankfurt' } }
-          ]);
+        const totalRevenue = financeResponse.status === 'fulfilled' ? 
+          (financeResponse.value?.data?.umsatzGesamt || 0) : 0;
+
+        setStats({
+          totalMoves,
+          totalInspections,
+          totalEmployees,
+          totalRevenue
+        });
+
+        // Monatliche Statistik laden
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth() + 1; // Januar ist 1, nicht 0
+        
+        try {
+          // Versuchen, die Monatsübersicht für das aktuelle Jahr zu laden
+          const monthlyResponse = await finanzenService.getMonatsuebersicht(currentYear);
           
-          setLoading(false);
-        }, 1000);
+          if (monthlyResponse?.data) {
+            const formattedData = monthlyResponse.data.map(month => ({
+              name: getMonthShortName(month.month - 1), // API gibt Monate 1-12 zurück, JS verwendet 0-11
+              umzuege: month.umzuege || 0,
+              aufnahmen: month.aufnahmen || 0
+            }));
+            
+            setMonthlyData(formattedData);
+          }
+        } catch (monthlyError) {
+          console.error('Fehler beim Laden der monatlichen Daten:', monthlyError);
+          
+          // Fallback: Simulierte Daten für die letzten 5 Monate
+          const fallbackData = [];
+          for (let i = 4; i >= 0; i--) {
+            const monthIndex = (currentMonth - i + 12) % 12; // Zyklisch durch die Monate gehen
+            fallbackData.push({
+              name: getMonthShortName(monthIndex),
+              umzuege: Math.floor(Math.random() * 30) + 50, // Zufällige Werte zwischen 50-80
+              aufnahmen: Math.floor(Math.random() * 20) + 20 // Zufällige Werte zwischen 20-40
+            });
+          }
+          setMonthlyData(fallbackData);
+        }
+
+        // Kategoriendaten laden
+        try {
+          // Hier würde der echte API-Aufruf für Kategoriedaten stehen
+          // Für jetzt verwenden wir simulierte Daten
+          const categories = ['Privat', 'Gewerbe', 'Senioren', 'International', 'Spezialtransport'];
+          const categoryStats = categories.map(category => ({
+            name: category,
+            umzuege: Math.floor(Math.random() * 200) + 100 // Zufällige Werte zwischen 100-300
+          }));
+          
+          setCategoryData(categoryStats);
+        } catch (categoryError) {
+          console.error('Fehler beim Laden der Kategoriendaten:', categoryError);
+          setCategoryData([]);
+        }
+
+        // Bevorstehende Umzüge
+        if (upcomingMovesResponse.status === 'fulfilled') {
+          const moves = upcomingMovesResponse.value?.data || [];
+          // Sicherstellen, dass nur zukünftige Umzüge angezeigt werden
+          const today = new Date();
+          const filteredMoves = moves
+            .filter(move => new Date(move.startDatum) >= today)
+            .sort((a, b) => new Date(a.startDatum) - new Date(b.startDatum))
+            .slice(0, 5);
+            
+          setUpcomingMoves(filteredMoves);
+        }
+        
+        setLoading(false);
       } catch (err) {
         console.error('Fehler beim Laden der Dashboard-Daten:', err);
         setError('Die Dashboard-Daten konnten nicht geladen werden.');
@@ -124,6 +187,12 @@ const Dashboard = () => {
 
     fetchData();
   }, []);
+
+  // Hilfsfunktion: Gibt den Kurznamen eines Monats zurück
+  const getMonthShortName = (monthIndex) => {
+    const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+    return months[monthIndex];
+  };
 
   return (
     <div className="space-y-6">

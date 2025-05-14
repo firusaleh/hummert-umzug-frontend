@@ -13,25 +13,8 @@ import {
   Upload,
   ImagePlus
 } from 'lucide-react';
-
-// Beispieldaten für einen Mitarbeiter beim Bearbeiten
-const mockMitarbeiter = {
-  id: 1, 
-  vorname: 'Max', 
-  nachname: 'Mustermann',
-  position: 'Teamleiter',
-  telefon: '+49 176 1234567',
-  email: 'max.mustermann@hummert.de',
-  eintrittsdatum: '2020-03-01', // Format für Datumseingabefeld
-  strasse: 'Musterstraße 123',
-  plz: '10115',
-  ort: 'Berlin',
-  geburtstag: '1985-05-15', // Format für Datumseingabefeld
-  notizen: 'Sehr erfahrener Mitarbeiter, spricht Englisch und Französisch.',
-  status: 'Aktiv',
-  verfuegbarkeit: 'Verfügbar',
-  faehigkeiten: ['Umzugsplanung', 'Teamführung', 'Führerschein Klasse C']
-};
+import { mitarbeiterService } from '../../services/api';
+import { toast } from 'react-toastify';
 
 // Verfügbare Positionen
 const verfuegbarePositionen = [
@@ -84,16 +67,49 @@ const MitarbeiterForm = () => {
   });
   
   const [loading, setLoading] = useState(!!id);
+  const [saving, setSaving] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
   const [profileImagePreview, setProfileImagePreview] = useState('');
+  const [error, setError] = useState(null);
 
-  // Simuliere API-Aufruf zum Laden der Daten bei Bearbeitung
+  // Daten beim Bearbeiten laden
   useEffect(() => {
     if (id) {
-      const fetchMitarbeiter = () => {
-        // In einer echten Anwendung würde hier ein API-Aufruf mit der ID stattfinden
-        setFormData(mockMitarbeiter);
-        setLoading(false);
+      const fetchMitarbeiter = async () => {
+        setLoading(true);
+        try {
+          const response = await mitarbeiterService.getById(id);
+          if (response && response.data) {
+            // Daten aus der API in das Formular-State übertragen
+            const mitarbeiter = response.data;
+            setFormData({
+              vorname: mitarbeiter.vorname || '',
+              nachname: mitarbeiter.nachname || '',
+              position: mitarbeiter.position || '',
+              telefon: mitarbeiter.telefon || '',
+              email: mitarbeiter.email || mitarbeiter.userId?.email || '',
+              eintrittsdatum: mitarbeiter.einstellungsdatum || mitarbeiter.eintrittsdatum || '',
+              strasse: mitarbeiter.adresse?.strasse || '',
+              plz: mitarbeiter.adresse?.plz || '',
+              ort: mitarbeiter.adresse?.ort || '',
+              geburtstag: mitarbeiter.geburtstag || '',
+              notizen: mitarbeiter.notizen || '',
+              status: mitarbeiter.status || mitarbeiter.isActive ? 'Aktiv' : 'Inaktiv',
+              verfuegbarkeit: mitarbeiter.verfuegbarkeit || 'Verfügbar',
+              faehigkeiten: mitarbeiter.faehigkeiten || []
+            });
+            
+            // Wenn es ein Profilbild gibt, anzeigen
+            if (mitarbeiter.profilbild) {
+              setProfileImagePreview(mitarbeiter.profilbild);
+            }
+          }
+          setLoading(false);
+        } catch (err) {
+          console.error('Fehler beim Laden des Mitarbeiters:', err);
+          setError('Der Mitarbeiter konnte nicht geladen werden.');
+          setLoading(false);
+        }
       };
 
       fetchMitarbeiter();
@@ -137,15 +153,74 @@ const MitarbeiterForm = () => {
   };
 
   // Formular absenden
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setSaving(true);
+    setError(null);
     
-    // In einer echten Anwendung würde hier ein API-Aufruf zum Speichern stattfinden
-    console.log('Formular abgesendet:', formData);
-    console.log('Profilbild:', profileImage);
-    
-    // Zurück zur Übersicht navigieren
-    navigate('/mitarbeiter');
+    try {
+      // API-Daten vorbereiten
+      const mitarbeiterData = {
+        vorname: formData.vorname,
+        nachname: formData.nachname,
+        position: formData.position,
+        telefon: formData.telefon,
+        email: formData.email,
+        einstellungsdatum: formData.eintrittsdatum,
+        geburtstag: formData.geburtstag,
+        adresse: {
+          strasse: formData.strasse,
+          plz: formData.plz,
+          ort: formData.ort
+        },
+        notizen: formData.notizen,
+        isActive: formData.status === 'Aktiv',
+        status: formData.status,
+        verfuegbarkeit: formData.verfuegbarkeit,
+        faehigkeiten: formData.faehigkeiten
+      };
+      
+      let response;
+      
+      if (isNeueModus) {
+        // Neuen Mitarbeiter erstellen
+        response = await mitarbeiterService.create(mitarbeiterData);
+        
+        // Profilbild hochladen, wenn vorhanden
+        if (profileImage && response.data && response.data._id) {
+          const imageFormData = new FormData();
+          imageFormData.append('file', profileImage);
+          imageFormData.append('mitarbeiterId', response.data._id);
+          
+          await mitarbeiterService.uploadImage(response.data._id, imageFormData);
+        }
+        
+        toast.success('Mitarbeiter wurde erfolgreich angelegt!');
+      } else {
+        // Bestehenden Mitarbeiter aktualisieren
+        response = await mitarbeiterService.update(id, mitarbeiterData);
+        
+        // Profilbild hochladen, wenn vorhanden
+        if (profileImage) {
+          const imageFormData = new FormData();
+          imageFormData.append('file', profileImage);
+          imageFormData.append('mitarbeiterId', id);
+          
+          await mitarbeiterService.uploadImage(id, imageFormData);
+        }
+        
+        toast.success('Mitarbeiter wurde erfolgreich aktualisiert!');
+      }
+      
+      // Zurück zur Übersicht navigieren
+      navigate('/mitarbeiter');
+    } catch (err) {
+      console.error('Fehler beim Speichern des Mitarbeiters:', err);
+      setError(err.response?.data?.message || 'Der Mitarbeiter konnte nicht gespeichert werden.');
+      toast.error('Fehler beim Speichern des Mitarbeiters');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -167,6 +242,12 @@ const MitarbeiterForm = () => {
           {isNeueModus ? 'Neuen Mitarbeiter anlegen' : 'Mitarbeiter bearbeiten'}
         </h1>
       </div>
+      
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+          <p>{error}</p>
+        </div>
+      )}
       
       <form onSubmit={handleSubmit} className="space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -461,8 +542,10 @@ const MitarbeiterForm = () => {
           <button 
             type="submit"
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
+            disabled={saving}
           >
-            <Save size={16} className="mr-2" /> Speichern
+            <Save size={16} className="mr-2" /> 
+            {saving ? 'Wird gespeichert...' : 'Speichern'}
           </button>
         </div>
       </form>
