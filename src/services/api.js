@@ -263,7 +263,7 @@ export const zeitachseService = {
 export const finanzenService = {
   // Übersicht
   getUebersicht: () => api.get('/finanzen/uebersicht'),
-  getMonatsuebersicht: (jahr) => api.get(`/finanzen/monatsübersicht/${jahr}`),
+  getMonatsuebersicht: (jahr) => api.get(`/finanzen/monatsuebersicht/${jahr}`),
   getMonatsdetails: (monat, jahr) => api.get(`/finanzen/monat/${monat}/${jahr}`),
   
   // Angebote
