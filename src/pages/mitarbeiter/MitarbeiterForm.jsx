@@ -47,6 +47,7 @@ const MitarbeiterForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const isNeueModus = !id;
+  const isEditMode = !!id;
   
   // State für Formularfelder
   const [formData, setFormData] = useState({
@@ -152,7 +153,36 @@ const MitarbeiterForm = () => {
     }
   };
 
-  // Formular absenden
+  // Ausschnitt aus MitarbeiterForm.jsx - Anpassung für die onSubmit-Funktion
+  const onSubmit = async (values, { setSubmitting, resetForm }) => {
+    try {
+      // Füge die Benutzer-ID hinzu, die vom Backend erwartet wird
+      const mitarbeiterData = {
+        ...values,
+        userId: localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).id : null
+      };
+      if (isEditMode) {
+        await mitarbeiterService.update(id, mitarbeiterData);
+        toast.success('Mitarbeiter erfolgreich aktualisiert');
+      } else {
+        await mitarbeiterService.create(mitarbeiterData);
+        toast.success('Mitarbeiter erfolgreich erstellt');
+        resetForm();
+      }
+      navigate('/mitarbeiter');
+    } catch (error) {
+      console.error('Fehler beim Speichern des Mitarbeiters:', error);
+      toast.error(
+        error.response?.data?.message || 
+        error.response?.data?.errors?.[0]?.msg || 
+        'Fehler beim Speichern des Mitarbeiters'
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Formular absenden (bestehende Methode)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -177,7 +207,9 @@ const MitarbeiterForm = () => {
         isActive: formData.status === 'Aktiv',
         status: formData.status,
         verfuegbarkeit: formData.verfuegbarkeit,
-        faehigkeiten: formData.faehigkeiten
+        faehigkeiten: formData.faehigkeiten,
+        // Füge die Benutzer-ID hinzu, die vom Backend erwartet wird
+        userId: localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).id : null
       };
       
       let response;

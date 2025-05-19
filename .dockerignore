@@ -1,0 +1,17 @@
+node_modules
+build
+npm-debug.log
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.DS_Store
+coverage
+.nyc_output
+.git
+.gitignore
+README.md
+.eslintrc
+.prettierrc
+jest.config.js

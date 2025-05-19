@@ -1,7 +1,7 @@
+// src/services/api.js - Korrigierte Version
 import axios from 'axios';
 
 // Konfiguriere die API-Basis-URL mit Fallback
-// Wir verwenden die korrekte URL zum Backend auf Render.com
 const API_URL = process.env.REACT_APP_API_URL || 'https://meine-app-backend.onrender.com/api';
 
 // Logging für API-URL um Probleme zu diagnostizieren
@@ -9,27 +9,44 @@ console.log('API URL verwendet:', API_URL);
 
 // Für Entwicklungszwecke kann hier zwischen lokaler und Produktionsumgebung unterschieden werden
 const getBaseURL = () => {
-  // Wenn Sie zwischen Environments wechseln wollen, können Sie das hier tun
-  if (process.env.NODE_ENV === 'development') {
-    return API_URL;
+  // Im Browser, verwende relative URLs, wenn keine explizite URL konfiguriert ist
+  if (typeof window !== 'undefined' && !process.env.REACT_APP_API_URL) {
+    return '/api';
   }
   return API_URL;
 };
 
+// Axios-Instanz mit verbesserten Einstellungen
 const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: 10000 // 10 Sekunden Timeout für alle Anfragen
+  timeout: 15000, // 15 Sekunden Timeout für alle Anfragen
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  },
+  // Ermöglicht das Senden von Cookies
+  withCredentials: false
 });
 
-// Request-Interceptor für Token
+// Request-Interceptor für Token mit zusätzlicher Fehlerbehandlung
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    // Token aus localStorage oder Cookies holen
+    let token = localStorage.getItem('token');
+    
+    // Wenn Token existiert, zum Header hinzufügen
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
     // Für Debug-Zwecke - besser verstehen, was gesendet wird
-    console.log(`${config.method.toUpperCase()} Request zu ${config.baseURL}${config.url}`, config.data || config.params);
+    const requestData = config.data || config.params || {};
+    // Passwörter in Logs ausblenden
+    const safeData = { ...requestData };
+    if (safeData.password) safeData.password = '***';
+    if (safeData.newPassword) safeData.newPassword = '***';
+    
+    console.log(`${config.method.toUpperCase()} Request zu ${config.baseURL}${config.url}`, safeData);
     return config;
   },
   (error) => {
@@ -41,35 +58,49 @@ api.interceptors.request.use(
 // Response-Interceptor für Token-Ablauf und Fehlerbehandlung
 api.interceptors.response.use(
   (response) => {
-    // Erfolgreiche Response loggen
+    // Erfolgreiche Response loggen (ohne sensible Daten)
     console.log('API-Antwort erfolgreich:', response.status, response.config.url);
     return response;
   },
   (error) => {
-    console.error('API-Fehler:', error);
-    
-    // Detaillierte Fehlerprotokollierung
+    // Hier findet eine genauere Fehleranalyse statt
     if (error.response) {
-      console.error('Statuscode:', error.response.status);
-      console.error('Antwortdaten:', error.response.data);
-      console.error('Headers:', error.response.headers);
-      console.error('URL:', error.config.url);
+      const { status, data, config } = error.response;
+      
+      console.error(`API-Fehler ${status} bei ${config.method.toUpperCase()} ${config.url}:`, data);
       
       // Token-Ablauf-Behandlung
-      if (error.response.status === 401) {
-        console.warn('Authentifizierungsfehler: Token möglicherweise abgelaufen');
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+      if (status === 401) {
+        // Schauen, ob der Fehler 'Token ist ungültig oder abgelaufen' lautet
+        const isTokenExpired = 
+          data?.message?.includes('Token') && 
+          (data?.message?.includes('ungültig') || data?.message?.includes('abgelaufen'));
         
-        // Nur umleiten, wenn nicht bereits auf Login-Seite (vermeidet Endlosschleife)
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
+        console.warn('Authentifizierungsfehler: Token möglicherweise abgelaufen', isTokenExpired);
+        
+        if (isTokenExpired) {
+          // Token aus dem localStorage entfernen
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          
+          // Nur umleiten, wenn nicht bereits auf Login-Seite (vermeidet Endlosschleife)
+          if (!window.location.pathname.includes('/login')) {
+            // WICHTIG: Wir verwenden hier location.replace statt history.push, um Probleme zu vermeiden
+            window.location.replace('/login');
+            return new Promise(() => {}); // Verhindert weitere Fehlerbehandlung
+          }
         }
       }
+      
+      // Network/Connection errors
+      if ((status === 0 || status === 502 || status === 503 || status === 504)) {
+        console.error('Netzwerkfehler. Der Server ist möglicherweise nicht erreichbar.');
+      }
+      
     } else if (error.request) {
       console.error('Keine Antwort vom Server erhalten:', error.request);
-      console.error('Request URL:', error.config.url);
-      console.error('Request Methode:', error.config.method);
+      console.error('Request URL:', error.config?.url);
+      console.error('Request Methode:', error.config?.method);
     } else {
       console.error('Fehler beim Einrichten der Anfrage:', error.message);
     }
@@ -80,8 +111,14 @@ api.interceptors.response.use(
 
 // Hilfs-Funktion zur Fehlerbehandlung in Services
 const handleApiError = (error, customMessage = 'Ein Fehler ist aufgetreten') => {
-  if (error.response && error.response.data && error.response.data.message) {
-    return { success: false, message: error.response.data.message };
+  if (error.response && error.response.data) {
+    console.log('Server-Antwort:', error.response.data);
+    return { 
+      success: false, 
+      message: error.response.data.message || customMessage,
+      errors: error.response.data.errors || null,
+      status: error.response.status
+    };
   }
   return { success: false, message: customMessage };
 };
@@ -109,6 +146,7 @@ export const authService = {
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('tokenTimestamp');
     // Umleitung zur Login-Seite hinzugefügt
     window.location.href = '/login';
   },
@@ -123,17 +161,30 @@ export const authService = {
   // Korrigierte Version: Service zum Prüfen der API-Verfügbarkeit
   checkApiHealth: async () => {
     try {
-      // Versuche zuerst den dedizierten Health-Endpunkt
+      // Versuche mehrere Endpunkte in einer bestimmten Reihenfolge
       try {
-        return await api.get('/health');
+        // Versuch 1: Dedizierten Health-Endpunkt nutzen
+        const response = await api.get('/health');
+        return response;
       } catch (healthError) {
-        // Falls /health nicht verfügbar ist, versuchen wir es mit einem anderen Endpunkt
+        console.warn('Health-Endpunkt nicht erreichbar, versuche Auth-Check...', healthError);
+        
         try {
-          // Verwende den bereits bekannten Auth-Check-Endpunkt
-          return await api.get('/auth/check');
+          // Versuch 2: Auth-Check ohne Token
+          const response = await axios.get(`${getBaseURL()}/`, { 
+            timeout: 5000, 
+            validateStatus: (status) => status < 500 // Akzeptiere alle Nicht-500er Statuscodes
+          });
+          return response;
         } catch (authError) {
-          // Letzter Fallback: Versuche den Root-Endpunkt der API
-          return await api.get('/');
+          console.warn('Auth-Check fehlgeschlagen, versuche Root-Endpunkt...', authError);
+          
+          // Versuch 3: Root-Endpunkt der API
+          const response = await axios.get(getBaseURL(), { 
+            timeout: 5000,
+            validateStatus: (status) => status < 500 
+          });
+          return response;
         }
       }
     } catch (error) {
@@ -149,15 +200,64 @@ export const userService = {
   updateProfile: (userData) => api.put('/users/profile', userData)
 };
 
-// Umzugs-Services
+// Umzugs-Services mit verbesserter Fehlerbehandlung
 export const umzuegeService = {
-  getAll: (params) => api.get('/umzuege', { params }),
-  getById: (id) => api.get(`/umzuege/${id}`),
-  create: (umzugData) => api.post('/umzuege', umzugData),
-  update: (id, umzugData) => api.put(`/umzuege/${id}`, umzugData),
-  delete: (id) => api.delete(`/umzuege/${id}`),
-  updateStatus: (id, status) => api.put(`/umzuege/${id}/status`, { status }),
-  getByMonat: (monat, jahr) => api.get(`/umzuege/monat/${monat}/${jahr}`)
+  getAll: async (params) => {
+    try {
+      return await api.get('/umzuege', { params });
+    } catch (error) {
+      console.error('Fehler beim Abrufen der Umzüge:', error);
+      return { success: false, message: 'Fehler beim Laden der Umzüge', error };
+    }
+  },
+  getById: async (id) => {
+    try {
+      return await api.get(`/umzuege/${id}`);
+    } catch (error) {
+      console.error(`Fehler beim Abrufen des Umzugs mit ID ${id}:`, error);
+      return { success: false, message: 'Fehler beim Laden des Umzugs', error };
+    }
+  },
+  create: async (umzugData) => {
+    try {
+      return await api.post('/umzuege', umzugData);
+    } catch (error) {
+      console.error('Fehler beim Erstellen des Umzugs:', error);
+      return { success: false, message: 'Fehler beim Erstellen des Umzugs', error };
+    }
+  },
+  update: async (id, umzugData) => {
+    try {
+      return await api.put(`/umzuege/${id}`, umzugData);
+    } catch (error) {
+      console.error(`Fehler beim Aktualisieren des Umzugs mit ID ${id}:`, error);
+      return { success: false, message: 'Fehler beim Aktualisieren des Umzugs', error };
+    }
+  },
+  delete: async (id) => {
+    try {
+      return await api.delete(`/umzuege/${id}`);
+    } catch (error) {
+      console.error(`Fehler beim Löschen des Umzugs mit ID ${id}:`, error);
+      return { success: false, message: 'Fehler beim Löschen des Umzugs', error };
+    }
+  },
+  updateStatus: async (id, status) => {
+    try {
+      return await api.put(`/umzuege/${id}/status`, { status });
+    } catch (error) {
+      console.error(`Fehler beim Aktualisieren des Status für Umzug mit ID ${id}:`, error);
+      return { success: false, message: 'Fehler beim Aktualisieren des Status', error };
+    }
+  },
+  getByMonat: async (monat, jahr) => {
+    try {
+      return await api.get(`/umzuege/monat/${monat}/${jahr}`);
+    } catch (error) {
+      console.error(`Fehler beim Abrufen der Umzüge für ${monat}/${jahr}:`, error);
+      return { success: false, message: 'Fehler beim Laden der Umzüge nach Monat', error };
+    }
+  }
 };
 
 // Mitarbeiter-Services
@@ -263,7 +363,7 @@ export const zeitachseService = {
 export const finanzenService = {
   // Übersicht
   getUebersicht: () => api.get('/finanzen/uebersicht'),
-  getMonatsuebersicht: (jahr) => api.get(`/finanzen/monatsuebersicht/${jahr}`),
+  getMonatsuebersicht: (jahr) => api.get(`/finanzen/monatsübersicht/${jahr}`),
   getMonatsdetails: (monat, jahr) => api.get(`/finanzen/monat/${monat}/${jahr}`),
   
   // Angebote
@@ -301,37 +401,136 @@ export const zeiterfassungService = {
   deleteMitarbeiter: (id) => api.delete(`/zeiterfassung/mitarbeiter/${id}`)
 };
 
-// File-Services
+// File-Services mit verbesserter Fehlerbehandlung
 export const fileService = {
-  uploadFile: (fileData) => {
-    const formData = new FormData();
-    
-    if (fileData.file) {
-      formData.append('file', fileData.file);
-    }
-    
-    if (fileData.project) {
-      formData.append('project', fileData.project);
-    }
-    
-    if (fileData.category) {
-      formData.append('category', fileData.category);
-    }
-    
-    if (fileData.task) {
-      formData.append('task', fileData.task);
-    }
-    
-    return api.post('/files/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
+  uploadFile: async (fileData) => {
+    try {
+      const formData = new FormData();
+      
+      if (fileData.file) {
+        formData.append('file', fileData.file);
       }
-    });
+      
+      if (fileData.project) {
+        formData.append('project', fileData.project);
+      }
+      
+      if (fileData.category) {
+        formData.append('category', fileData.category);
+      }
+      
+      if (fileData.task) {
+        formData.append('task', fileData.task);
+      }
+      
+      // Weitere Metadaten hinzufügen, falls vorhanden
+      if (fileData.description) {
+        formData.append('description', fileData.description);
+      }
+      
+      if (fileData.tags) {
+        // Bei Arrays müssen wir sicherstellen, dass der Server diese verarbeiten kann
+        if (Array.isArray(fileData.tags)) {
+          fileData.tags.forEach(tag => formData.append('tags[]', tag));
+        } else {
+          formData.append('tags', fileData.tags);
+        }
+      }
+      
+      const response = await api.post('/files/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        // Upload-Fortschritt überwachen
+        onUploadProgress: progressEvent => {
+          if (fileData.onProgress && typeof fileData.onProgress === 'function') {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            fileData.onProgress(percentCompleted);
+          }
+        }
+      });
+      
+      return response;
+    } catch (error) {
+      console.error('Fehler beim Hochladen der Datei:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Fehler beim Hochladen der Datei',
+        error
+      };
+    }
   },
-  getFiles: (params) => api.get('/files', { params }),
-  deleteFile: (id) => api.delete(`/files/${id}`),
-  downloadFile: (id) => api.get(`/files/download/${id}`, { responseType: 'blob' }),
-  updateFile: (id, updateData) => api.put(`/files/${id}`, updateData)
+  getFiles: async (params) => {
+    try {
+      return await api.get('/files', { params });
+    } catch (error) {
+      console.error('Fehler beim Abrufen der Dateien:', error);
+      return {
+        success: false,
+        message: 'Fehler beim Laden der Dateien',
+        error
+      };
+    }
+  },
+  deleteFile: async (id) => {
+    try {
+      return await api.delete(`/files/${id}`);
+    } catch (error) {
+      console.error(`Fehler beim Löschen der Datei mit ID ${id}:`, error);
+      return {
+        success: false,
+        message: 'Fehler beim Löschen der Datei',
+        error
+      };
+    }
+  },
+  downloadFile: async (id) => {
+    try {
+      const response = await api.get(`/files/download/${id}`, { responseType: 'blob' });
+      
+      // Dateiname aus Header extrahieren oder generischen Namen verwenden
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'download';
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+      
+      // Blob-URL erstellen und Download starten
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      return { success: true, message: 'Download gestartet' };
+    } catch (error) {
+      console.error(`Fehler beim Herunterladen der Datei mit ID ${id}:`, error);
+      return {
+        success: false,
+        message: 'Fehler beim Herunterladen der Datei',
+        error
+      };
+    }
+  },
+  updateFile: async (id, updateData) => {
+    try {
+      return await api.put(`/files/${id}`, updateData);
+    } catch (error) {
+      console.error(`Fehler beim Aktualisieren der Datei mit ID ${id}:`, error);
+      return {
+        success: false,
+        message: 'Fehler beim Aktualisieren der Datei',
+        error
+      };
+    }
+  }
 };
 
 export default api;

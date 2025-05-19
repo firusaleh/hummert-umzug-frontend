@@ -1,4 +1,4 @@
-// src/context/AuthContext.js
+// src/context/AuthContext.jsx - Korrigierte Version
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { authService } from '../services/api';
 
@@ -21,14 +21,14 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isApiAvailable, setIsApiAvailable] = useState(false); // Standardmäßig als nicht verfügbar markieren
+  const [isApiAvailable, setIsApiAvailable] = useState(false); 
 
   // Funktion zum Prüfen der API-Verfügbarkeit als useCallback für Stabilität
   const checkApiAvailability = useCallback(async () => {
     try {
       console.log("Prüfe API-Verfügbarkeit...");
-      await authService.checkApiHealth();
-      console.log("API ist verfügbar!");
+      const response = await authService.checkApiHealth();
+      console.log("API ist verfügbar!", response);
       setIsApiAvailable(true);
       return true;
     } catch (error) {
@@ -45,6 +45,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('tokenTimestamp');
     setUser(null);
     setError(null);
+    // Die Weiterleitung zur Login-Seite erfolgt jetzt direkt hier
+    window.location.href = '/login';
   }, []);
 
   // Beim Laden der Anwendung prüfen, ob der Benutzer bereits angemeldet ist
@@ -53,58 +55,79 @@ export const AuthProvider = ({ children }) => {
       try {
         // Zuerst API-Verfügbarkeit prüfen
         const apiAvailable = await checkApiAvailability();
-        if (!apiAvailable) {
-          console.warn('API nicht erreichbar, Authentifizierung wird übersprungen');
-          setLoading(false);
-          return; // Weitere Initialisierung abbrechen, wenn API nicht verfügbar
-        }
-
+        
+        // Token und Benutzerdaten aus localStorage holen
         const token = localStorage.getItem('token');
         const storedUser = localStorage.getItem('user');
         
+        if (!apiAvailable) {
+          console.warn('API nicht erreichbar, Authentifizierung wird übersprungen');
+          // Wenn die API nicht verfügbar ist, aber ein Token und Benutzerdaten existieren,
+          // setzen wir den Benutzer trotzdem, aber markieren den Loading-Status als abgeschlossen
+          if (token && storedUser) {
+            try {
+              const userData = JSON.parse(storedUser);
+              setUser(userData);
+            } catch (parseError) {
+              console.error('Fehler beim Parsen der Benutzerdaten:', parseError);
+              localStorage.removeItem('user'); // Ungültige Daten entfernen
+            }
+          }
+          setLoading(false);
+          return;
+        }
+
+        // Wenn API verfügbar ist und Token existiert, Authentifizierung prüfen
         if (token && storedUser) {
           try {
             const userData = JSON.parse(storedUser);
-            setUser(userData);
             
             // Token-Gültigkeit überprüfen
             try {
               await authService.checkAuth();
               console.log('Token gültig, Benutzer bereits angemeldet');
-            } catch (error) {
-              console.warn('Token ist nicht mehr gültig:', error);
-              // Token ist ungültig, ausloggen
-              logout();
+              setUser(userData);
+            } catch (tokenError) {
+              console.warn('Token ist nicht mehr gültig:', tokenError);
+              // Token ist ungültig, ausloggen aber keine Weiterleitung
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              localStorage.removeItem('tokenTimestamp');
+              setUser(null);
             }
           } catch (parseError) {
             console.error('Fehler beim Parsen der Benutzerdaten:', parseError);
-            logout();
+            localStorage.removeItem('user'); // Ungültige Daten entfernen
           }
         }
       } catch (error) {
         console.error('Fehler beim Initialisieren der Authentifizierung:', error);
-        logout();
       } finally {
         setLoading(false);
       }
     };
     
     initAuth();
-  }, [checkApiAvailability, logout]);
+  }, [checkApiAvailability]);
 
   // Login-Funktion
   const login = async (credentials) => {
     setError(null);
-    
-    if (!isApiAvailable) {
-      console.error('Login nicht möglich: API nicht erreichbar');
-      return { 
-        success: false, 
-        message: 'Der Server ist derzeit nicht erreichbar. Bitte versuchen Sie es später erneut.'
-      };
-    }
+    setLoading(true);
     
     try {
+      // Prüfe API-Verfügbarkeit direkt vor dem Login-Versuch
+      const apiAvailable = await checkApiAvailability();
+      
+      if (!apiAvailable) {
+        console.error('Login nicht möglich: API nicht erreichbar');
+        setLoading(false);
+        return { 
+          success: false, 
+          message: 'Der Server ist derzeit nicht erreichbar. Bitte versuchen Sie es später erneut.'
+        };
+      }
+      
       console.log('Login-Versuch mit:', { email: credentials.email });
       
       const response = await authService.login(credentials);
@@ -117,6 +140,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('user', JSON.stringify(response.data.user));
         
         setUser(response.data.user);
+        setLoading(false);
         return { success: true };
       } else {
         console.error('Ungültiges Antwortformat:', response);
@@ -147,6 +171,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       setError(errorMessage);
+      setLoading(false);
       return { success: false, message: errorMessage };
     }
   };
@@ -154,16 +179,21 @@ export const AuthProvider = ({ children }) => {
   // Registrierungs-Funktion
   const register = async (userData) => {
     setError(null);
-    
-    if (!isApiAvailable) {
-      console.error('Registrierung nicht möglich: API nicht erreichbar');
-      return { 
-        success: false, 
-        message: 'Der Server ist derzeit nicht erreichbar. Bitte versuchen Sie es später erneut.'
-      };
-    }
+    setLoading(true);
     
     try {
+      // Prüfe API-Verfügbarkeit direkt vor dem Registrierungsversuch
+      const apiAvailable = await checkApiAvailability();
+      
+      if (!apiAvailable) {
+        console.error('Registrierung nicht möglich: API nicht erreichbar');
+        setLoading(false);
+        return { 
+          success: false, 
+          message: 'Der Server ist derzeit nicht erreichbar. Bitte versuchen Sie es später erneut.'
+        };
+      }
+      
       console.log('Registrierungsversuch mit:', { email: userData.email, name: userData.name });
       
       const response = await authService.register(userData);
@@ -174,6 +204,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('user', JSON.stringify(response.data.user));
         
         setUser(response.data.user);
+        setLoading(false);
         return { success: true };
       } else {
         throw new Error('Token nicht in der Antwort enthalten');
@@ -188,10 +219,16 @@ export const AuthProvider = ({ children }) => {
         errorMessage = error.response.data?.message || `Server-Fehler: ${error.response.status}`;
         
         // Spezifische Fehlerbehandlung für häufige Registrierungsfehler
-        if (error.response.status === 409) {
+        if (error.response.status === 409 || 
+            (error.response.status === 400 && error.response.data?.message?.includes('existiert bereits'))) {
           errorMessage = 'Diese E-Mail-Adresse wird bereits verwendet.';
         } else if (error.response.status === 400) {
-          errorMessage = 'Ungültige Eingabedaten. Bitte überprüfen Sie alle Felder.';
+          if (error.response.data?.errors) {
+            // Sammle alle Validierungsfehler
+            errorMessage = error.response.data.errors.map(err => err.msg || err.message).join(', ');
+          } else {
+            errorMessage = 'Ungültige Eingabedaten. Bitte überprüfen Sie alle Felder.';
+          }
         } else if (error.response.status === 500) {
           errorMessage = 'Serverfehler bei der Registrierung. Bitte versuchen Sie es später erneut.';
         }
@@ -202,6 +239,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       setError(errorMessage);
+      setLoading(false);
       return { success: false, message: errorMessage };
     }
   };
