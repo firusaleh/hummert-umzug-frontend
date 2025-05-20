@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Truck, User, Phone, MapPin, Search, Check, Clock, CheckCircle, XCircle, FileText } from 'lucide-react';
 import { umzuegeService } from '../../services/api'; // API-Service importieren
+import { extractApiData, ensureArray } from '../../utils/apiUtils';
+import { toast } from 'react-toastify';
 
 export default function UmzuegeMonatsansicht() {
   // Navigation-Hook für Routing
@@ -84,29 +86,35 @@ export default function UmzuegeMonatsansicht() {
         setLoading(true);
         setError(null);
         
-        // API-Aufruf
+        // API-Aufruf mit Standardisierter Fehlerbehandlung
         const response = await umzuegeService.getAll();
-        console.log('API-Antwort:', response.data);
+        const umzuegeData = extractApiData(response);
         
-        // Mock-Daten für die Entwicklung, falls keine API-Daten vorhanden sind
-        let umzuegeDaten = response.data && response.data.length > 0 
-          ? response.data 
-          : generateMockUmzuege();
+        if (!umzuegeData) {
+          throw new Error('Keine gültigen Umzugsdaten erhalten');
+        }
         
+        // API-Daten extrahieren und validieren
+        const umzuegeListe = ensureArray(umzuegeData.umzuege || umzuegeData);
+        
+        // Daten protokollieren (nur für Entwicklungszwecke)
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Geladene Umzüge:', umzuegeListe.length);
+        }
+        
+        // Keine Verwendung von Mock-Daten mehr - Nur noch echte API-Daten
         // API-Daten in das Format transformieren, das von der Komponente verwendet wird
-        const transformierteUmzuege = umzuegeDaten.map(umzug => transformUmzug(umzug));
+        const transformierteUmzuege = umzuegeListe.map(umzug => transformUmzug(umzug));
         
         setUmzuege(transformierteUmzuege);
         setLoading(false);
       } catch (error) {
         console.error('Fehler beim Laden der Umzüge:', error);
-        setError('Fehler beim Laden der Umzüge. Bitte versuchen Sie es später erneut.');
+        setError(`Fehler beim Laden der Umzüge: ${error.message || 'Unbekannter Fehler'}`);
+        toast.error('Die Umzugsdaten konnten nicht geladen werden.');
         
-        // Backup: Mock-Daten anzeigen, wenn API-Aufruf fehlschlägt
-        const mockUmzuege = generateMockUmzuege();
-        const transformierteUmzuege = mockUmzuege.map(umzug => transformUmzug(umzug));
-        setUmzuege(transformierteUmzuege);
-        
+        // Leere Liste setzen anstelle von Mock-Daten
+        setUmzuege([]);
         setLoading(false);
       }
     };
@@ -114,127 +122,7 @@ export default function UmzuegeMonatsansicht() {
     fetchUmzuege();
   }, []);
   
-  // Mock-Daten für Entwicklung generieren
-  const generateMockUmzuege = () => {
-    return [
-      {
-        _id: '1',
-        typ: 'Privatumzug',
-        auftraggeber: {
-          name: 'Familie Müller',
-          telefon: '0123456789',
-          email: 'mueller@example.com'
-        },
-        auszugsadresse: {
-          strasse: 'Berliner Str.',
-          hausnummer: '123',
-          plz: '10115',
-          ort: 'Berlin',
-          etage: 2,
-          aufzug: true
-        },
-        einzugsadresse: {
-          strasse: 'Münchner Str.',
-          hausnummer: '45',
-          plz: '80331',
-          ort: 'München',
-          etage: 1,
-          aufzug: false
-        },
-        startDatum: new Date(2025, 4, 10, 8, 0),
-        endDatum: new Date(2025, 4, 10, 16, 0),
-        status: 'geplant',
-        volumen: 45,
-        preis: { brutto: 1200 },
-        mitarbeiter: [
-          { mitarbeiterId: { vorname: 'Max' } },
-          { mitarbeiterId: { vorname: 'Peter' } }
-        ],
-        fahrzeuge: [
-          { kennzeichen: 'B-UM-123' }
-        ],
-        notizen: 'Klavier muss transportiert werden'
-      },
-      {
-        _id: '2',
-        typ: 'Firmenumzug',
-        auftraggeber: {
-          name: 'Tech GmbH',
-          telefon: '0987654321',
-          email: 'kontakt@techgmbh.de'
-        },
-        auszugsadresse: {
-          strasse: 'Hamburger Allee',
-          hausnummer: '78',
-          plz: '20095',
-          ort: 'Hamburg',
-          etage: 3,
-          aufzug: true
-        },
-        einzugsadresse: {
-          strasse: 'Berliner Platz',
-          hausnummer: '12',
-          plz: '10117',
-          ort: 'Berlin',
-          etage: 5,
-          aufzug: true
-        },
-        startDatum: new Date(2025, 4, 15, 7, 0),
-        endDatum: new Date(2025, 4, 16, 18, 0),
-        status: 'geplant',
-        volumen: 120,
-        preis: { brutto: 3500 },
-        mitarbeiter: [
-          { mitarbeiterId: { vorname: 'Klaus' } },
-          { mitarbeiterId: { vorname: 'Thomas' } },
-          { mitarbeiterId: { vorname: 'Sarah' } }
-        ],
-        fahrzeuge: [
-          { kennzeichen: 'HH-UM-456' },
-          { kennzeichen: 'HH-UM-789' }
-        ],
-        notizen: '20 Arbeitsplätze, Server muss besonders gesichert werden'
-      },
-      {
-        _id: '3',
-        typ: 'Privatumzug',
-        auftraggeber: {
-          name: 'Familie Bauer',
-          telefon: '01234567890',
-          email: 'bauer@example.com'
-        },
-        auszugsadresse: {
-          strasse: 'Münchner Weg',
-          hausnummer: '33',
-          plz: '80331',
-          ort: 'München',
-          etage: 4,
-          aufzug: true
-        },
-        einzugsadresse: {
-          strasse: 'Stuttgarter Str.',
-          hausnummer: '67',
-          plz: '70173',
-          ort: 'Stuttgart',
-          etage: 2,
-          aufzug: true
-        },
-        startDatum: new Date(2025, 4, 25, 8, 0),
-        endDatum: new Date(2025, 4, 25, 16, 0),
-        status: 'geplant',
-        volumen: 60,
-        preis: { brutto: 1500 },
-        mitarbeiter: [
-          { mitarbeiterId: { vorname: 'Alex' } },
-          { mitarbeiterId: { vorname: 'Michael' } }
-        ],
-        fahrzeuge: [
-          { kennzeichen: 'M-UM-789' }
-        ],
-        notizen: 'Haustiere vorhanden'
-      }
-    ];
-  };
+  // Mock-Daten wurden entfernt - es werden nur noch echte API-Daten verwendet
   
   // Erhalte alle Monate mit Umzügen für das ausgewählte Jahr
   const getMonatsUebersicht = () => {
@@ -333,26 +221,35 @@ export default function UmzuegeMonatsansicht() {
     setAktuellesJahr(aktuellesJahr + schritt);
   };
   
-  // Umzug löschen
+  // Umzug löschen mit verbesserter Fehlerbehandlung
   const umzugLoeschen = async (id) => {
     if (window.confirm('Möchten Sie diesen Umzug wirklich löschen?')) {
       try {
-        await umzuegeService.delete(id);
+        const response = await umzuegeService.delete(id);
+        const deleteData = extractApiData(response);
+        
+        if (!deleteData && !deleteData.success) {
+          throw new Error('Löschen fehlgeschlagen: Keine Bestätigung vom Server erhalten');
+        }
+        
+        // UI aktualisieren
         setUmzuege(umzuege.filter(umzug => umzug.id !== id));
+        
         if (ausgewaehlterUmzug && ausgewaehlterUmzug.id === id) {
           setAusgewaehlterUmzug(null);
           setAnsicht('monatsdetails');
         }
-        // Erfolgsmeldung
-        alert('Umzug erfolgreich gelöscht');
+        
+        // Erfolgsmeldung mit Toast statt Alert
+        toast.success('Umzug erfolgreich gelöscht');
       } catch (error) {
         console.error('Fehler beim Löschen des Umzugs:', error);
-        alert('Fehler beim Löschen des Umzugs');
+        toast.error(`Fehler beim Löschen des Umzugs: ${error.message || 'Unbekannter Fehler'}`);
       }
     }
   };
   
-  // Status aktualisieren
+  // Status aktualisieren mit verbesserter Fehlerbehandlung
   const updateUmzugStatus = async (id, neuerStatus) => {
     try {
       // API-Status-Format konvertieren
@@ -371,7 +268,13 @@ export default function UmzuegeMonatsansicht() {
           apiStatus = 'geplant';
       }
       
-      await umzuegeService.updateStatus(id, apiStatus);
+      // API-Aufruf zum Aktualisieren des Status
+      const response = await umzuegeService.updateStatus(id, { status: apiStatus });
+      const updatedData = extractApiData(response);
+      
+      if (!updatedData) {
+        throw new Error('Keine Antwortdaten vom Server erhalten');
+      }
       
       // Lokalen Status aktualisieren
       const aktualisierteUmzuege = umzuege.map(umzug => 
@@ -385,11 +288,11 @@ export default function UmzuegeMonatsansicht() {
         setAusgewaehlterUmzug({...ausgewaehlterUmzug, status: neuerStatus});
       }
       
-      // Erfolgsmeldung
-      alert(`Status erfolgreich auf "${neuerStatus}" aktualisiert`);
+      // Erfolgsmeldung mit Toast statt Alert
+      toast.success(`Status erfolgreich auf "${neuerStatus}" aktualisiert`);
     } catch (error) {
       console.error('Fehler beim Aktualisieren des Status:', error);
-      alert('Fehler beim Aktualisieren des Status');
+      toast.error(`Fehler beim Aktualisieren des Status: ${error.message || 'Unbekannter Fehler'}`);
     }
   };
   

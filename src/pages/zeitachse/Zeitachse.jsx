@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, List, Grid } from 'lucide-react';
-import api, { fileService } from '../../services/api';
+import api, { umzuegeService, aufnahmenService } from '../../services/api';
+import { extractApiData, ensureArray } from '../../utils/apiUtils';
+import { toast } from 'react-toastify';
 
 export default function Zeitachse() {
   // State für Datum und Ansicht
@@ -66,90 +68,128 @@ export default function Zeitachse() {
     }
   };
   
+  // Hilfsfunktion zum Ermitteln des Datumsbereichs basierend auf Ansicht
+  const getDateRangeForView = (date, view) => {
+    const currentDate = new Date(date);
+    let startDate, endDate;
+    
+    if (view === 'day') {
+      startDate = new Date(currentDate);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(currentDate);
+      endDate.setHours(23, 59, 59, 999);
+    } else if (view === 'week') {
+      // Erste Tag der Woche (Montag) ermitteln
+      const day = currentDate.getDay();
+      const diff = currentDate.getDate() - day + (day === 0 ? -6 : 1);
+      startDate = new Date(currentDate);
+      startDate.setDate(diff);
+      startDate.setHours(0, 0, 0, 0);
+      
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      // Monatsansicht
+      startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1, 0, 0, 0, 0);
+      endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59, 999);
+    }
+    
+    return { startDate, endDate };
+  };
+
   // Lade Events vom Server
   useEffect(() => {
     const fetchEvents = async () => {
       setLoading(true);
+      setEvents([]); // Zurücksetzen der vorherigen Events
+      
       try {
-        // In einer echten Anwendung würde hier ein API-Aufruf stattfinden
-        // const response = await api.get('/events', {
-        //   params: {
-        //     startDate: getStartDate(),
-        //     endDate: getEndDate(),
-        //     view: currentView
-        //   }
-        // });
-        // setEvents(response.data);
+        // Datumsbereich für aktuelle Ansicht ermitteln
+        const { startDate, endDate } = getDateRangeForView(currentDate, currentView);
         
-        // Simuliere Daten für Demo
-        const mockEvents = [
-          {
-            id: 1,
-            title: 'Umzug Familie Müller',
-            start: new Date(2025, 4, 10, 8, 0),
-            end: new Date(2025, 4, 10, 16, 0),
-            type: 'umzug',
-            status: 'geplant',
-            location: 'Berlin → München',
-            color: '#4f46e5'
-          },
-          {
-            id: 2,
-            title: 'Umzugsaufnahme Schmidt',
-            start: new Date(2025, 4, 12, 14, 0),
-            end: new Date(2025, 4, 12, 15, 30),
-            type: 'aufnahme',
-            status: 'angefragt',
-            location: 'Frankfurt',
-            color: '#0891b2'
-          },
-          {
-            id: 3,
-            title: 'Firmenumzug Tech GmbH',
-            start: new Date(2025, 4, 15, 7, 0),
-            end: new Date(2025, 4, 16, 18, 0),
-            type: 'umzug',
-            status: 'geplant',
-            location: 'Hamburg → Berlin',
-            color: '#4f46e5'
-          },
-          {
-            id: 4,
-            title: 'Inventaraufnahme Weber',
-            start: new Date(2025, 4, 18, 10, 0),
-            end: new Date(2025, 4, 18, 11, 30),
-            type: 'aufnahme',
-            status: 'geplant',
-            location: 'München',
-            color: '#0891b2'
-          },
-          {
-            id: 5,
-            title: 'Teammeeting',
-            start: new Date(2025, 4, 20, 9, 0),
-            end: new Date(2025, 4, 20, 10, 0),
-            type: 'meeting',
-            status: 'geplant',
-            location: 'Büro',
-            color: '#a855f7'
-          },
-          {
-            id: 6,
-            title: 'Umzug Familie Bauer',
-            start: new Date(2025, 4, 25, 8, 0),
-            end: new Date(2025, 4, 25, 16, 0),
-            type: 'umzug',
-            status: 'geplant',
-            location: 'München → Stuttgart',
-            color: '#4f46e5'
-          }
-        ];
+        // Formatierte Datumsstrings für API-Abfragen
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
         
-        setEvents(mockEvents);
+        // Umzüge und Aufnahmen parallel laden
+        const [umzuegeResponse, aufnahmenResponse] = await Promise.allSettled([
+          umzuegeService.getAll({ 
+            startDatum: startDateStr,
+            endDatum: endDateStr
+          }),
+          aufnahmenService.getAll({
+            startDatum: startDateStr,
+            endDatum: endDateStr
+          })
+        ]);
+        
+        let combinedEvents = [];
+        
+        // Umzüge verarbeiten und in Events umwandeln
+        if (umzuegeResponse.status === 'fulfilled') {
+          const umzuegeData = extractApiData(umzuegeResponse.value);
+          const umzuege = ensureArray(umzuegeData.umzuege || umzuegeData);
+          
+          const umzuegeEvents = umzuege
+            .filter(umzug => umzug && umzug.startDatum) // Nur gültige Umzüge mit Datum
+            .map(umzug => ({
+              id: umzug._id,
+              title: `Umzug ${umzug.auftraggeber?.name || umzug.bezeichnung || 'Unbenannt'}`,
+              start: new Date(umzug.startDatum),
+              end: new Date(umzug.endDatum || new Date(umzug.startDatum).setHours(umzug.startDatum.getHours() + 8)),
+              type: 'umzug',
+              status: umzug.status || 'geplant',
+              location: umzug.auszugsadresse && umzug.einzugsadresse ? 
+                `${umzug.auszugsadresse.ort || ''} → ${umzug.einzugsadresse.ort || ''}` : 
+                umzug.auszugsadresse?.ort || '',
+              color: '#4f46e5',
+              originalData: umzug
+            }));
+          
+          combinedEvents = [...combinedEvents, ...umzuegeEvents];
+        }
+        
+        // Aufnahmen verarbeiten und in Events umwandeln
+        if (aufnahmenResponse.status === 'fulfilled') {
+          const aufnahmenData = extractApiData(aufnahmenResponse.value);
+          const aufnahmen = ensureArray(aufnahmenData.aufnahmen || aufnahmenData);
+          
+          const aufnahmenEvents = aufnahmen
+            .filter(aufnahme => aufnahme && aufnahme.datum) // Nur gültige Aufnahmen mit Datum
+            .map(aufnahme => {
+              const startDate = new Date(aufnahme.datum);
+              const endDate = new Date(startDate);
+              endDate.setHours(startDate.getHours() + 1); // Aufnahme dauert ca. 1 Stunde
+              
+              return {
+                id: aufnahme._id,
+                title: `Aufnahme ${aufnahme.kundenName || 'Unbenannt'}`,
+                start: startDate,
+                end: endDate,
+                type: 'aufnahme',
+                status: aufnahme.status || 'geplant',
+                location: aufnahme.auszugsadresse?.ort || '',
+                color: '#0891b2',
+                originalData: aufnahme
+              };
+            });
+          
+          combinedEvents = [...combinedEvents, ...aufnahmenEvents];
+        }
+        
+        // Team-Meetings (falls in der Zukunft implementiert) können hier hinzugefügt werden
+        
+        // Events setzen und Ladezustand aktualisieren
+        setEvents(combinedEvents);
         setLoading(false);
       } catch (error) {
         console.error('Fehler beim Laden der Events:', error);
+        toast.error('Fehler beim Laden der Events: ' + (error.message || 'Unbekannter Fehler'));
         setLoading(false);
+        
+        // Falls keine Daten geladen werden konnten, leere Events-Liste anzeigen
+        setEvents([]);
       }
     };
     
