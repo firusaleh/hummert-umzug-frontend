@@ -10,8 +10,9 @@ import {
   Calendar
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart as RechartsBarChart, Bar } from 'recharts';
-import { umzuegeService, mitarbeiterService, finanzenService } from '../services/api';
-import { extractApiData, ensureArray } from '../utils/apiUtils';
+import { umzuegeService, mitarbeiterService, finanzenService, aufnahmenService } from '../services/api';
+import { extractApiData, ensureArray, toNumber } from '../utils/apiUtils';
+import { toast } from 'react-toastify';
 
 // StatCard Komponente für die Statistikkarten
 const StatCard = ({ title, value, icon, change, changeType, loading }) => {
@@ -89,11 +90,10 @@ const Dashboard = () => {
           upcomingMovesResponse
         ] = await Promise.allSettled([
           umzuegeService.getAll(),
-          // Ersetze durch den richtigen Service für Aufnahmen wenn vorhanden, oder verwende einen Mock
-          Promise.resolve({ data: { total: 215 } }),
+          aufnahmenService.getAll(),
           mitarbeiterService.getAll(),
           finanzenService.getFinanzuebersicht(),
-          umzuegeService.getAll({ status: 'Geplant', limit: 5, sort: 'startDatum' })
+          umzuegeService.getAll({ status: 'geplant', limit: 5, sort: 'startDatum' })
         ]);
 
         // Stats setzen mit Fallback auf 0 wenn die API fehlschlägt und Nutzung der standardisierten Hilfsfunktionen
@@ -141,33 +141,130 @@ const Dashboard = () => {
         } catch (monthlyError) {
           // Fehler beim Laden der monatlichen Daten - verwende Fallback-Daten
           
-          // Fallback: Simulierte Daten für die letzten 5 Monate
-          const fallbackData = [];
-          for (let i = 4; i >= 0; i--) {
-            const monthIndex = (currentMonth - i + 12) % 12; // Zyklisch durch die Monate gehen
-            fallbackData.push({
-              name: getMonthShortName(monthIndex),
-              umzuege: Math.floor(Math.random() * 30) + 50, // Zufällige Werte zwischen 50-80
-              aufnahmen: Math.floor(Math.random() * 20) + 20 // Zufällige Werte zwischen 20-40
-            });
+          // Statt Fallback-Daten, API-Daten für letzten Monat verwenden
+          try {
+            // Load umzuege and aufnahmen for the last 5 months
+            const monthlyStatsPromises = [];
+            
+            for (let i = 4; i >= 0; i--) {
+              const monthIndex = (currentMonth - i + 12) % 12; // Zyklisch durch die Monate
+              const monthNum = monthIndex + 1; // 1-based month number for API
+              const year = monthIndex > currentMonth ? currentYear - 1 : currentYear;
+              
+              // Simulate month range using startDatum and endDatum filters
+              const startDate = new Date(year, monthIndex, 1);
+              const endDate = new Date(year, monthIndex + 1, 0); // Last day of month
+              
+              const startDateStr = startDate.toISOString().split('T')[0];
+              const endDateStr = endDate.toISOString().split('T')[0];
+              
+              // Get umzuege stats for this month
+              monthlyStatsPromises.push(
+                Promise.allSettled([
+                  umzuegeService.getAll({
+                    startDatum: startDateStr,
+                    endDatum: endDateStr
+                  }),
+                  aufnahmenService.getAll({
+                    startDatum: startDateStr,
+                    endDatum: endDateStr
+                  })
+                ])
+              );
+            }
+            
+            // Wait for all month data to load
+            const monthlyStatsResults = await Promise.all(monthlyStatsPromises);
+            
+            // Process the data for each month
+            const realMonthlyData = [];
+            for (let i = 0; i < 5; i++) {
+              const monthIndex = (currentMonth - (4-i) + 12) % 12;
+              const [umzuegeResult, aufnahmenResult] = monthlyStatsResults[i];
+              
+              const umzuegeData = umzuegeResult.status === 'fulfilled' ? 
+                extractApiData(umzuegeResult.value) : null;
+              const aufnahmenData = aufnahmenResult.status === 'fulfilled' ? 
+                extractApiData(aufnahmenResult.value) : null;
+              
+              const umzuegeCount = umzuegeData ? 
+                ensureArray(umzuegeData.umzuege || umzuegeData).length : 0;
+              const aufnahmenCount = aufnahmenData ? 
+                ensureArray(aufnahmenData.aufnahmen || aufnahmenData).length : 0;
+              
+              realMonthlyData.push({
+                name: getMonthShortName(monthIndex),
+                umzuege: umzuegeCount,
+                aufnahmen: aufnahmenCount
+              });
+            }
+            
+            setMonthlyData(realMonthlyData);
+          } catch (error) {
+            console.error('Fehler beim Laden der Monatsdaten:', error);
+            
+            // Use empty data as fallback
+            const emptyData = [];
+            for (let i = 4; i >= 0; i--) {
+              const monthIndex = (currentMonth - i + 12) % 12;
+              emptyData.push({
+                name: getMonthShortName(monthIndex),
+                umzuege: 0,
+                aufnahmen: 0
+              });
+            }
+            setMonthlyData(emptyData);
+            toast.error('Monatsdaten konnten nicht geladen werden.');
           }
-          setMonthlyData(fallbackData);
         }
 
         // Kategoriendaten laden
         try {
-          // Hier würde der echte API-Aufruf für Kategoriedaten stehen
-          // Für jetzt verwenden wir simulierte Daten
-          const categories = ['Privat', 'Gewerbe', 'Senioren', 'International', 'Spezialtransport'];
-          const categoryStats = categories.map(category => ({
-            name: category,
-            umzuege: Math.floor(Math.random() * 200) + 100 // Zufällige Werte zwischen 100-300
-          }));
+          // Lade alle Umzüge, um sie nach Kategorien zu gruppieren
+          const allUmzuegeResponse = await umzuegeService.getAll();
+          const allUmzuegeData = extractApiData(allUmzuegeResponse);
+          const umzuege = ensureArray(allUmzuegeData.umzuege || allUmzuegeData);
+          
+          // Gruppieren der Umzüge nach Typ (Kategorie)
+          const categoryMap = {};
+          
+          umzuege.forEach(umzug => {
+            const category = umzug.typ || 'Sonstige';
+            if (!categoryMap[category]) {
+              categoryMap[category] = 0;
+            }
+            categoryMap[category]++;
+          });
+          
+          // Kategorien in ein Array für das Chart umwandeln
+          let categoryStats = Object.entries(categoryMap)
+            .map(([name, count]) => ({
+              name: name.charAt(0).toUpperCase() + name.slice(1), // Capitalize
+              umzuege: count
+            }))
+            .sort((a, b) => b.umzuege - a.umzuege); // Sort by count descending
+            
+          // Wenn keine Umzüge nach Kategorien gefunden wurden, verwende Standardkategorien
+          if (categoryStats.length === 0) {
+            categoryStats = [
+              { name: 'Privat', umzuege: 0 },
+              { name: 'Gewerbe', umzuege: 0 },
+              { name: 'Senioren', umzuege: 0 },
+              { name: 'International', umzuege: 0 },
+              { name: 'Spezialtransport', umzuege: 0 }
+            ];
+          } else {
+            // Get top 5 categories only if we have data
+            categoryStats = categoryStats.slice(0, 5);
+          }
           
           setCategoryData(categoryStats);
         } catch (categoryError) {
-          // Fehler beim Laden der Kategoriendaten
+          console.error('Fehler beim Laden der Kategoriedaten:', categoryError);
+          
+          // Fallback auf leeres Array
           setCategoryData([]);
+          toast.error('Kategoriedaten konnten nicht geladen werden.');
         }
 
         // Bevorstehende Umzüge mit standardisierter Fehlerbehandlung
@@ -227,32 +324,24 @@ const Dashboard = () => {
           title="Umzüge gesamt" 
           value={stats.totalMoves} 
           icon={<TruckElectric size={20} />} 
-          change="12" 
-          changeType="increase"
           loading={loading}
         />
         <StatCard 
           title="Aufnahmen gesamt" 
           value={stats.totalInspections} 
           icon={<ClipboardList size={20} />} 
-          change="8" 
-          changeType="increase"
           loading={loading} 
         />
         <StatCard 
           title="Mitarbeiter" 
           value={stats.totalEmployees} 
           icon={<Users size={20} />} 
-          change="5" 
-          changeType="increase"
           loading={loading} 
         />
         <StatCard 
           title="Umsatz (€)" 
-          value={stats.totalRevenue.toLocaleString()} 
+          value={typeof stats.totalRevenue === 'number' ? stats.totalRevenue.toLocaleString() : '0'} 
           icon={<BarChart size={20} />} 
-          change="3" 
-          changeType="decrease"
           loading={loading} 
         />
       </div>
