@@ -53,18 +53,82 @@ const AngebotForm = () => {
       setIsLoading(true);
       try {
         // In der realen Implementierung würden wir die API aufrufen
-        // für Beispielzwecke nehmen wir Dummy-Daten
-        const kundenResponse = await fetch('/api/clients');
-        const kundenData = await kundenResponse.json();
-        setKunden(kundenData.clients || []);
+        try {
+          // Verwende einen sichereren Ansatz mit Fehlerbehandlung
+          const kundenResponse = await fetch('/api/clients');
+          if (!kundenResponse.ok) {
+            throw new Error(`HTTP error! status: ${kundenResponse.status}`);
+          }
+          
+          // Sichere JSON-Parsing mit try-catch
+          let kundenData;
+          try {
+            kundenData = await kundenResponse.json();
+          } catch (parseError) {
+            console.error('JSON Parsing Fehler:', parseError);
+            kundenData = { clients: [] };
+            toast.error('Fehler beim Verarbeiten der Kundendaten');
+          }
+          
+          setKunden(Array.isArray(kundenData.clients) ? kundenData.clients : []);
+        } catch (clientError) {
+          console.error('Fehler beim Laden der Kunden:', clientError);
+          setKunden([]);
+        }
 
-        const umzuegeResponse = await umzuegeService.getAll();
-        setUmzuege(umzuegeResponse.data.umzuege || []);
+        // Lade Umzüge mit dem Service
+        try {
+          const umzuegeResponse = await umzuegeService.getAll();
+          // Prüfe, ob die Antwort die erwartete Struktur hat
+          const umzuegeListe = umzuegeResponse?.data?.umzuege || 
+                              (Array.isArray(umzuegeResponse?.data) ? umzuegeResponse.data : []);
+          setUmzuege(umzuegeListe);
+        } catch (umzuegeError) {
+          console.error('Fehler beim Laden der Umzüge:', umzuegeError);
+          setUmzuege([]);
+        }
 
         // Wenn im Bearbeitungsmodus, lade vorhandene Angebotsdaten
         if (isEditMode) {
-          const angebotResponse = await finanzenService.getAngebotById(id);
-          setAngebot(angebotResponse.data.angebot);
+          try {
+            const angebotResponse = await finanzenService.getAngebotById(id);
+            if (angebotResponse?.data) {
+              // Stelle sicher, dass wir die richtige Datenstruktur haben
+              const angebotDaten = angebotResponse.data.angebot || angebotResponse.data;
+              
+              // Validiere die Daten
+              if (angebotDaten && typeof angebotDaten === 'object') {
+                // Stelle sicher, dass positionsliste ein Array ist
+                if (angebotDaten.positionsliste && !Array.isArray(angebotDaten.positionsliste)) {
+                  angebotDaten.positionsliste = [];
+                }
+                
+                // Stelle sicher, dass numerische Werte korrekt sind
+                if (angebotDaten.mehrwertsteuer && typeof angebotDaten.mehrwertsteuer !== 'number') {
+                  angebotDaten.mehrwertsteuer = parseFloat(angebotDaten.mehrwertsteuer) || 19;
+                }
+                
+                // Stelle sicher, dass menge und einzelpreis in jeder Position korrekte Zahlen sind
+                if (Array.isArray(angebotDaten.positionsliste)) {
+                  angebotDaten.positionsliste = angebotDaten.positionsliste.map(pos => ({
+                    ...pos,
+                    menge: typeof pos.menge === 'number' ? pos.menge : parseFloat(pos.menge) || 1,
+                    einzelpreis: typeof pos.einzelpreis === 'number' ? pos.einzelpreis : parseFloat(pos.einzelpreis) || 0
+                  }));
+                }
+                
+                setAngebot(angebotDaten);
+              } else {
+                console.error('Ungültiges Angebotsdatenformat:', angebotDaten);
+                toast.error('Angebot konnte nicht geladen werden: Ungültiges Format');
+                setAngebot(initialValues);
+              }
+            }
+          } catch (angebotError) {
+            console.error('Fehler beim Laden des Angebots:', angebotError);
+            toast.error('Angebot konnte nicht geladen werden');
+            setAngebot(initialValues);
+          }
         }
       } catch (error) {
         console.error('Fehler beim Laden der Daten:', error);
@@ -79,33 +143,83 @@ const AngebotForm = () => {
 
   // Berechnung des Gesamtpreises für eine Position
   const calculateGesamtpreis = (menge, einzelpreis) => {
-    return (menge * einzelpreis).toFixed(2);
+    // Stelle sicher, dass wir mit Zahlen arbeiten
+    const numMenge = parseFloat(menge) || 0;
+    const numEinzelpreis = parseFloat(einzelpreis) || 0;
+    return (numMenge * numEinzelpreis).toFixed(2);
   };
 
   // Berechnung des Gesamtbetrags für alle Positionen
   const calculateGesamtbetrag = (positionsliste, mehrwertsteuer) => {
+    // Sicherstellen, dass positionsliste ein Array ist
+    if (!Array.isArray(positionsliste)) {
+      console.warn('Positionsliste ist kein Array:', positionsliste);
+      return '0.00';
+    }
+    
+    // Mehrwertsteuer als Zahl parsen
+    const mwstRate = parseFloat(mehrwertsteuer) || 0;
+    
+    // Berechnung des Nettobetrags mit Fehlerbehandlung für jede Position
     const nettobetrag = positionsliste.reduce((sum, pos) => {
-      return sum + (pos.menge * pos.einzelpreis);
+      // Sicherstellen, dass pos ein Objekt ist
+      if (!pos || typeof pos !== 'object') return sum;
+      
+      // Werte als Zahlen parsen
+      const menge = parseFloat(pos.menge) || 0;
+      const einzelpreis = parseFloat(pos.einzelpreis) || 0;
+      
+      return sum + (menge * einzelpreis);
     }, 0);
     
-    const mwst = nettobetrag * (mehrwertsteuer / 100);
+    const mwst = nettobetrag * (mwstRate / 100);
     return (nettobetrag + mwst).toFixed(2);
   };
 
   // Formular absenden
   const handleSubmit = async (values, { setSubmitting }) => {
     try {
+      // Daten vor dem Absenden validieren und normalisieren
+      const sanitizedValues = {
+        ...values,
+        // Sicherstellen, dass die Mehrwertsteuer eine Zahl ist
+        mehrwertsteuer: parseFloat(values.mehrwertsteuer) || 0,
+        // Validiere die Positionsliste
+        positionsliste: Array.isArray(values.positionsliste) 
+          ? values.positionsliste.map(pos => ({
+              ...pos,
+              // Sicherstellen, dass numerische Werte korrekt sind
+              menge: parseFloat(pos.menge) || 0,
+              einzelpreis: parseFloat(pos.einzelpreis) || 0,
+              // Berechne gesamtpreis neu, um sicherzustellen, dass er korrekt ist
+              gesamtpreis: calculateGesamtpreis(pos.menge, pos.einzelpreis)
+            }))
+          : []
+      };
+      
+      // Sicherstellen, dass alle erforderlichen Felder vorhanden sind
+      if (!sanitizedValues.kunde) {
+        throw new Error('Kunde muss ausgewählt werden');
+      }
+      
+      if (sanitizedValues.positionsliste.length === 0) {
+        throw new Error('Mindestens eine Position muss hinzugefügt werden');
+      }
+      
+      // Senden der Daten an die API
       if (isEditMode) {
-        await finanzenService.updateAngebot(id, values);
+        await finanzenService.updateAngebot(id, sanitizedValues);
         toast.success('Angebot erfolgreich aktualisiert');
       } else {
-        await finanzenService.createAngebot(values);
+        await finanzenService.createAngebot(sanitizedValues);
         toast.success('Angebot erfolgreich erstellt');
       }
+      
+      // Zur Angebotsübersicht navigieren
       navigate('/finanzen/angebote');
     } catch (error) {
       console.error('Fehler beim Speichern des Angebots:', error);
-      toast.error('Fehler beim Speichern des Angebots');
+      toast.error(error.message || 'Fehler beim Speichern des Angebots');
     } finally {
       setSubmitting(false);
     }
@@ -264,10 +378,16 @@ const AngebotForm = () => {
                                   name={`positionsliste.${index}.menge`}
                                   className="block w-24 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                   onChange={(e) => {
+                                    // Sichere Konvertierung in eine Zahl
                                     const value = e.target.value;
-                                    setFieldValue(`positionsliste.${index}.menge`, value);
-                                    // Berechne Gesamtpreis
-                                    const gesamtpreis = calculateGesamtpreis(value, values.positionsliste[index].einzelpreis);
+                                    const numValue = parseFloat(value) || 0;
+                                    
+                                    // Update des Feldes mit dem validierten Wert
+                                    setFieldValue(`positionsliste.${index}.menge`, numValue);
+                                    
+                                    // Berechne Gesamtpreis mit sicheren Werten
+                                    const einzelpreis = parseFloat(values.positionsliste[index].einzelpreis) || 0;
+                                    const gesamtpreis = calculateGesamtpreis(numValue, einzelpreis);
                                     setFieldValue(`positionsliste.${index}.gesamtpreis`, gesamtpreis);
                                   }}
                                 />
@@ -293,10 +413,16 @@ const AngebotForm = () => {
                                   name={`positionsliste.${index}.einzelpreis`}
                                   className="block w-32 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                   onChange={(e) => {
+                                    // Sichere Konvertierung in eine Zahl
                                     const value = e.target.value;
-                                    setFieldValue(`positionsliste.${index}.einzelpreis`, value);
-                                    // Berechne Gesamtpreis
-                                    const gesamtpreis = calculateGesamtpreis(values.positionsliste[index].menge, value);
+                                    const numValue = parseFloat(value) || 0;
+                                    
+                                    // Update des Feldes mit dem validierten Wert
+                                    setFieldValue(`positionsliste.${index}.einzelpreis`, numValue);
+                                    
+                                    // Berechne Gesamtpreis mit sicheren Werten
+                                    const menge = parseFloat(values.positionsliste[index].menge) || 0;
+                                    const gesamtpreis = calculateGesamtpreis(menge, numValue);
                                     setFieldValue(`positionsliste.${index}.gesamtpreis`, gesamtpreis);
                                   }}
                                 />
@@ -342,15 +468,50 @@ const AngebotForm = () => {
                 <div className="text-right">
                   <p className="text-sm text-gray-500">Nettobetrag</p>
                   <p className="text-lg font-medium text-gray-900">
-                    {values.positionsliste.reduce((sum, pos) => sum + (pos.menge * pos.einzelpreis), 0).toFixed(2)} €
+                    {(() => {
+                      try {
+                        // Sicherstellen, dass positionsliste ein Array ist und alle Werte Zahlen sind
+                        if (!Array.isArray(values.positionsliste)) return '0.00';
+                        
+                        const nettobetrag = values.positionsliste.reduce((sum, pos) => {
+                          const menge = parseFloat(pos.menge) || 0;
+                          const einzelpreis = parseFloat(pos.einzelpreis) || 0;
+                          return sum + (menge * einzelpreis);
+                        }, 0);
+                        
+                        return nettobetrag.toFixed(2);
+                      } catch (e) {
+                        console.error('Fehler bei der Berechnung des Nettobetrags:', e);
+                        return '0.00';
+                      }
+                    })()} €
                   </p>
                 </div>
               </div>
               <div className="flex justify-end mt-2">
                 <div className="text-right">
-                  <p className="text-sm text-gray-500">Mehrwertsteuer ({values.mehrwertsteuer}%)</p>
+                  <p className="text-sm text-gray-500">Mehrwertsteuer ({parseFloat(values.mehrwertsteuer) || 0}%)</p>
                   <p className="text-lg font-medium text-gray-900">
-                    {(values.positionsliste.reduce((sum, pos) => sum + (pos.menge * pos.einzelpreis), 0) * (values.mehrwertsteuer / 100)).toFixed(2)} €
+                    {(() => {
+                      try {
+                        // Sicherstellen, dass positionsliste ein Array ist und alle Werte Zahlen sind
+                        if (!Array.isArray(values.positionsliste)) return '0.00';
+                        
+                        const nettobetrag = values.positionsliste.reduce((sum, pos) => {
+                          const menge = parseFloat(pos.menge) || 0;
+                          const einzelpreis = parseFloat(pos.einzelpreis) || 0;
+                          return sum + (menge * einzelpreis);
+                        }, 0);
+                        
+                        const mwstRate = parseFloat(values.mehrwertsteuer) || 0;
+                        const mwst = nettobetrag * (mwstRate / 100);
+                        
+                        return mwst.toFixed(2);
+                      } catch (e) {
+                        console.error('Fehler bei der Berechnung der Mehrwertsteuer:', e);
+                        return '0.00';
+                      }
+                    })()} €
                   </p>
                 </div>
               </div>
