@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Eye, Truck, User, Phone, MapPin, Filter, Search, Check, Clock, AlertTriangle, Home, CheckCircle, XCircle, FileText } from 'lucide-react';
-import api, { umzuegeService } from '../../services/api'; // API-Service importieren
+import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Truck, User, Phone, MapPin, Search, Check, Clock, CheckCircle, XCircle, FileText } from 'lucide-react';
+import { umzuegeService } from '../../services/api'; // API-Service importieren
 
 export default function UmzuegeMonatsansicht() {
   // Navigation-Hook für Routing
   const navigate = useNavigate();
   
   // Aktuelles Datum und Jahr
-  const [aktuellesDatum, setAktuellesDatum] = useState(new Date());
+  const [/* aktuellesDatum */, /* setAktuellesDatum */] = useState(new Date());
   const [aktuellesJahr, setAktuellesJahr] = useState(new Date().getFullYear());
   
   // State für die verschiedenen Ansichten
@@ -46,6 +46,39 @@ export default function UmzuegeMonatsansicht() {
   
   // Daten aus API laden
   useEffect(() => {
+    // Hilfsfunktion zum Transformieren der Umzugsdaten
+    const transformUmzug = (umzug) => {
+      // Fallback-Werte für den Fall, dass Daten fehlen
+      const auftraggeber = umzug.auftraggeber || { name: 'Unbekannt', telefon: 'N/A', email: 'N/A' };
+      const auszugsadresse = umzug.auszugsadresse || { 
+        strasse: 'Unbekannt', hausnummer: '', plz: '', ort: '', etage: 0, aufzug: false
+      };
+      const einzugsadresse = umzug.einzugsadresse || { 
+        strasse: 'Unbekannt', hausnummer: '', plz: '', ort: '', etage: 0, aufzug: false
+      };
+      
+      return {
+        id: umzug._id || umzug.id || Date.now().toString(),
+        kunde: auftraggeber.name,
+        telefon: auftraggeber.telefon,
+        email: auftraggeber.email,
+        kategorie: umzug.typ || 'Privatumzug',
+        von: `${auszugsadresse.strasse} ${auszugsadresse.hausnummer}, ${auszugsadresse.plz} ${auszugsadresse.ort}`,
+        nach: `${einzugsadresse.strasse} ${einzugsadresse.hausnummer}, ${einzugsadresse.plz} ${einzugsadresse.ort}`,
+        datum: new Date(umzug.startDatum || umzug.datum || new Date()),
+        uhrzeit: umzug.startDatum 
+          ? `${new Date(umzug.startDatum).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} - ${umzug.endDatum ? new Date(umzug.endDatum).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : ''}`
+          : '08:00 - 16:00',
+        mitarbeiter: (umzug.mitarbeiter?.map(m => m.mitarbeiterId?.vorname || m.name || 'Unbekannt') || []),
+        fahrzeuge: (umzug.fahrzeuge?.map(f => f.kennzeichen || f.typ || 'Fahrzeug') || []),
+        status: mapAPIStatus(umzug.status),
+        volumen: `${umzug.volumen || 0} m³`,
+        preis: umzug.preis?.brutto || umzug.preis || 0,
+        notizen: umzug.notizen || '',
+        materialien: umzug.materialien || 'Standard-Umzugsset'
+      };
+    };
+    
     const fetchUmzuege = async () => {
       try {
         setLoading(true);
@@ -80,39 +113,6 @@ export default function UmzuegeMonatsansicht() {
     
     fetchUmzuege();
   }, []);
-  
-  // Hilfsfunktion zum Transformieren der Umzugsdaten
-  const transformUmzug = (umzug) => {
-    // Fallback-Werte für den Fall, dass Daten fehlen
-    const auftraggeber = umzug.auftraggeber || { name: 'Unbekannt', telefon: 'N/A', email: 'N/A' };
-    const auszugsadresse = umzug.auszugsadresse || { 
-      strasse: 'Unbekannt', hausnummer: '', plz: '', ort: '', etage: 0, aufzug: false
-    };
-    const einzugsadresse = umzug.einzugsadresse || { 
-      strasse: 'Unbekannt', hausnummer: '', plz: '', ort: '', etage: 0, aufzug: false
-    };
-    
-    return {
-      id: umzug._id || umzug.id || Date.now().toString(),
-      kunde: auftraggeber.name,
-      telefon: auftraggeber.telefon,
-      email: auftraggeber.email,
-      kategorie: umzug.typ || 'Privatumzug',
-      von: `${auszugsadresse.strasse} ${auszugsadresse.hausnummer}, ${auszugsadresse.plz} ${auszugsadresse.ort}`,
-      nach: `${einzugsadresse.strasse} ${einzugsadresse.hausnummer}, ${einzugsadresse.plz} ${einzugsadresse.ort}`,
-      datum: new Date(umzug.startDatum || umzug.datum || new Date()),
-      uhrzeit: umzug.startDatum 
-        ? `${new Date(umzug.startDatum).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} - ${umzug.endDatum ? new Date(umzug.endDatum).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : ''}`
-        : '08:00 - 16:00',
-      mitarbeiter: (umzug.mitarbeiter?.map(m => m.mitarbeiterId?.vorname || m.name || 'Unbekannt') || []),
-      fahrzeuge: (umzug.fahrzeuge?.map(f => f.kennzeichen || f.typ || 'Fahrzeug') || []),
-      status: mapAPIStatus(umzug.status),
-      volumen: `${umzug.volumen || 0} m³`,
-      preis: umzug.preis?.brutto || umzug.preis || 0,
-      notizen: umzug.notizen || '',
-      materialien: umzug.materialien || 'Standard-Umzugsset'
-    };
-  };
   
   // Mock-Daten für Entwicklung generieren
   const generateMockUmzuege = () => {

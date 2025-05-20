@@ -1,9 +1,26 @@
 // components/admin/RateLimitDashboard.jsx
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { 
+  Card, 
+  CardContent, 
+  Typography, 
+  Button, 
+  Alert, 
+  AlertTitle,
+  Grid,
+  Box,
+  Chip,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Container,
+  CircularProgress
+} from '@mui/material';
 import { 
   BarChart, 
   Bar, 
@@ -25,7 +42,7 @@ import {
   Ban,
   CheckCircle
 } from 'lucide-react';
-import api from '@/services/api';
+import api from '../../services/api';
 
 const RateLimitDashboard = () => {
   const [statistics, setStatistics] = useState(null);
@@ -93,17 +110,17 @@ const RateLimitDashboard = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <RefreshCw className="animate-spin h-8 w-8 text-blue-500" />
-      </div>
+      <Box display="flex" alignItems="center" justifyContent="center" p={8}>
+        <CircularProgress />
+      </Box>
     );
   }
 
   if (error) {
     return (
-      <Alert variant="destructive">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>{error}</AlertDescription>
+      <Alert severity="error">
+        <AlertTitle>Fehler</AlertTitle>
+        {error}
       </Alert>
     );
   }
@@ -117,215 +134,302 @@ const RateLimitDashboard = () => {
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Rate Limit Überwachung</h2>
-        <Button onClick={fetchRateLimitData} size="sm">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Aktualisieren
-        </Button>
-      </div>
+    <Container maxWidth="lg">
+      <Box py={3}>
+        {/* Header */}
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h4" fontWeight="bold">Rate Limit Überwachung</Typography>
+          <Button 
+            onClick={fetchRateLimitData} 
+            size="small" 
+            variant="contained"
+            startIcon={<RefreshCw size={16} />}
+          >
+            Aktualisieren
+          </Button>
+        </Box>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="flex items-center justify-between p-6">
-            <div>
-              <p className="text-sm text-gray-600">Gesamte Verstöße</p>
-              <p className="text-2xl font-bold">{statistics?.totalViolations || 0}</p>
-            </div>
-            <AlertTriangle className="h-10 w-10 text-yellow-500" />
-          </CardContent>
-        </Card>
+        {/* Overview Cards */}
+        <Grid container spacing={3} mb={4}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Box display="flex" alignItems="center" justifyContent="space-between">
+                  <Box>
+                    <Typography color="textSecondary" gutterBottom>
+                      Gesamte Verstöße
+                    </Typography>
+                    <Typography variant="h4">
+                      {statistics?.totalViolations || 0}
+                    </Typography>
+                  </Box>
+                  <AlertTriangle size={40} color="#f59e0b" />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
 
-        <Card>
-          <CardContent className="flex items-center justify-between p-6">
-            <div>
-              <p className="text-sm text-gray-600">Aktive Limits</p>
-              <p className="text-2xl font-bold">{Object.keys(config || {}).length}</p>
-            </div>
-            <Shield className="h-10 w-10 text-blue-500" />
-          </CardContent>
-        </Card>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Box display="flex" alignItems="center" justifyContent="space-between">
+                  <Box>
+                    <Typography color="textSecondary" gutterBottom>
+                      Aktive Limits
+                    </Typography>
+                    <Typography variant="h4">
+                      {Object.keys(config || {}).length}
+                    </Typography>
+                  </Box>
+                  <Shield size={40} color="#3b82f6" />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
 
-        <Card>
-          <CardContent className="flex items-center justify-between p-6">
-            <div>
-              <p className="text-sm text-gray-600">Top-Verletzer</p>
-              <p className="text-2xl font-bold">{statistics?.topOffenders?.length || 0}</p>
-            </div>
-            <Users className="h-10 w-10 text-red-500" />
-          </CardContent>
-        </Card>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Box display="flex" alignItems="center" justifyContent="space-between">
+                  <Box>
+                    <Typography color="textSecondary" gutterBottom>
+                      Top-Verletzer
+                    </Typography>
+                    <Typography variant="h4">
+                      {statistics?.topOffenders?.length || 0}
+                    </Typography>
+                  </Box>
+                  <Users size={40} color="#ef4444" />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
 
-        <Card>
-          <CardContent className="flex items-center justify-between p-6">
-            <div>
-              <p className="text-sm text-gray-600">Whitelist</p>
-              <p className="text-2xl font-bold">{whitelist?.length || 0}</p>
-            </div>
-            <CheckCircle className="h-10 w-10 text-green-500" />
-          </CardContent>
-        </Card>
-      </div>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Box display="flex" alignItems="center" justifyContent="space-between">
+                  <Box>
+                    <Typography color="textSecondary" gutterBottom>
+                      Whitelist
+                    </Typography>
+                    <Typography variant="h4">
+                      {whitelist?.length || 0}
+                    </Typography>
+                  </Box>
+                  <CheckCircle size={40} color="#10b981" />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Violations by Type */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Verstöße nach Typ</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={violationsByType}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="type" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" fill="#8884d8" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Charts */}
+        <Grid container spacing={3}>
+          {/* Violations by Type */}
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Verstöße nach Typ
+                </Typography>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={violationsByType}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="type" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </Grid>
 
-        {/* Distribution Pie Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Verteilung der Verstöße</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={violationsByType}
-                  dataKey="count"
-                  nameKey="type"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  fill="#8884d8"
-                  label
-                >
-                  {violationsByType.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Distribution Pie Chart */}
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Verteilung der Verstöße
+                </Typography>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={violationsByType}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(entry) => `${entry.type}: ${entry.count}`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="count"
+                    >
+                      {violationsByType.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
 
-      {/* Top Offenders Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Top-Verletzer</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Kennung</th>
-                  <th className="text-left p-2">Typ</th>
-                  <th className="text-left p-2">Verstöße</th>
-                  <th className="text-left p-2">Aktionen</th>
-                </tr>
-              </thead>
-              <tbody>
-                {violations.map((violator, index) => (
-                  <tr key={index} className="border-b hover:bg-gray-50">
-                    <td className="p-2">
-                      <code className="text-sm bg-gray-100 px-2 py-1 rounded">
-                        {violator.identifier}
-                      </code>
-                    </td>
-                    <td className="p-2">
-                      <Badge variant={violator.type === 'auth' ? 'destructive' : 'secondary'}>
-                        {violator.type}
-                      </Badge>
-                    </td>
-                    <td className="p-2">{violator.count}</td>
-                    <td className="p-2">
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => clearRateLimit(violator.identifier)}
-                        >
-                          <RefreshCw className="h-3 w-3 mr-1" />
-                          Reset
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => addToWhitelist(violator.identifier.replace('ip:', ''))}
-                          disabled={violator.identifier.startsWith('user:')}
-                        >
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Whitelist
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Top Offenders Table */}
+        {statistics?.topOffenders && statistics.topOffenders.length > 0 && (
+          <Box mt={4}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Top Verletzer
+                </Typography>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>IP-Adresse</TableCell>
+                        <TableCell align="right">Verstöße</TableCell>
+                        <TableCell align="right">Aktionen</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {statistics.topOffenders.map((offender) => (
+                        <TableRow key={offender.ip}>
+                          <TableCell>{offender.ip}</TableCell>
+                          <TableCell align="right">{offender.violationCount}</TableCell>
+                          <TableCell align="right">
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="primary"
+                              onClick={() => addToWhitelist(offender.ip)}
+                            >
+                              Whitelist
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="secondary"
+                              onClick={() => clearRateLimit(offender.ip)}
+                              sx={{ ml: 1 }}
+                            >
+                              Limit zurücksetzen
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          </Box>
+        )}
 
-      {/* Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Rate Limit Konfiguration</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {Object.entries(config || {}).map(([key, value]) => (
-              <div key={key} className="border rounded p-4">
-                <h4 className="font-semibold capitalize">{key}</h4>
-                <p className="text-sm text-gray-600">Fenster: {value.window}</p>
-                <p className="text-sm text-gray-600">Limit: {value.limit}</p>
-                <p className="text-sm text-gray-600">Strategie: {value.strategy}</p>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+        {/* Recent Violations */}
+        {violations && violations.length > 0 && (
+          <Box mt={4}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Kürzliche Verstöße
+                </Typography>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Zeitstempel</TableCell>
+                        <TableCell>IP-Adresse</TableCell>
+                        <TableCell>Endpunkt</TableCell>
+                        <TableCell>Typ</TableCell>
+                        <TableCell align="right">Aktionen</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {violations.slice(0, 10).map((violation, index) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            {new Date(violation.timestamp).toLocaleString('de-DE')}
+                          </TableCell>
+                          <TableCell>{violation.ip}</TableCell>
+                          <TableCell>{violation.endpoint}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={violation.type}
+                              size="small"
+                              color={violation.type === 'global' ? 'error' : 'warning'}
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <IconButton
+                              size="small"
+                              onClick={() => addToWhitelist(violation.ip)}
+                              title="Zur Whitelist hinzufügen"
+                            >
+                              <CheckCircle size={16} />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          </Box>
+        )}
 
-      {/* Whitelist */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Whitelist</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {whitelist.map((item, index) => (
-              <div key={index} className="flex justify-between items-center p-2 border rounded">
-                <div>
-                  <code className="text-sm bg-gray-100 px-2 py-1 rounded">{item.ip}</code>
-                  <span className="text-sm text-gray-600 ml-2">
-                    TTL: {Math.floor(item.ttl / 3600)}h
-                  </span>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => removeFromWhitelist(item.ip)}
-                >
-                  <Ban className="h-3 w-3 mr-1" />
-                  Entfernen
-                </Button>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        {/* Whitelist */}
+        {whitelist && whitelist.length > 0 && (
+          <Box mt={4}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Whitelist
+                </Typography>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>IP-Adresse</TableCell>
+                        <TableCell>Hinzugefügt am</TableCell>
+                        <TableCell>Läuft ab</TableCell>
+                        <TableCell align="right">Aktionen</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {whitelist.map((entry) => (
+                        <TableRow key={entry.ip}>
+                          <TableCell>{entry.ip}</TableCell>
+                          <TableCell>
+                            {new Date(entry.addedAt).toLocaleString('de-DE')}
+                          </TableCell>
+                          <TableCell>
+                            {entry.expiresAt ? new Date(entry.expiresAt).toLocaleString('de-DE') : 'Nie'}
+                          </TableCell>
+                          <TableCell align="right">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => removeFromWhitelist(entry.ip)}
+                              title="Von Whitelist entfernen"
+                            >
+                              <Ban size={16} />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          </Box>
+        )}
+      </Box>
+    </Container>
   );
 };
 

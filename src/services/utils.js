@@ -1,150 +1,189 @@
-// src/services/utils.js
+import { format, formatDistance } from 'date-fns';
+import { de } from 'date-fns/locale';
+import DOMPurify from 'dompurify';
 
 // Date utilities
 export const dateUtils = {
-  // Format date to German format (DD.MM.YYYY)
+  // Format date to German format (dd.MM.yyyy)
   formatDate: (date) => {
     if (!date) return '';
-    const d = new Date(date);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}.${month}.${year}`;
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return '';
+      return format(d, 'dd.MM.yyyy', { locale: de });
+    } catch (error) {
+      return '';
+    }
   },
   
-  // Format date to ISO format for API
+  // Convert to ISO string
   toISOString: (date) => {
-    if (!date) return null;
-    return new Date(date).toISOString();
+    if (!date) return '';
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return '';
+      return d.toISOString();
+    } catch (error) {
+      return '';
+    }
   },
   
-  // Parse German date format to Date object
+  // Parse German date format (dd.MM.yyyy) to Date object
   parseGermanDate: (dateString) => {
     if (!dateString) return null;
-    const [day, month, year] = dateString.split('.');
-    return new Date(`${year}-${month}-${day}`);
+    try {
+      const [day, month, year] = dateString.split('.');
+      return new Date(year, month - 1, day);
+    } catch (error) {
+      return null;
+    }
   },
   
-  // Format datetime to German format
+  // Format date and time
   formatDateTime: (date) => {
     if (!date) return '';
-    const d = new Date(date);
-    const formattedDate = dateUtils.formatDate(date);
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    return `${formattedDate} ${hours}:${minutes}`;
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return '';
+      return format(d, 'dd.MM.yyyy HH:mm', { locale: de });
+    } catch (error) {
+      return '';
+    }
   },
   
-  // Get relative time (e.g., "vor 5 Minuten")
+  // Get relative time (e.g., "vor 2 Stunden")
   getRelativeTime: (date) => {
     if (!date) return '';
-    
-    const now = new Date();
-    const past = new Date(date);
-    const diffInSeconds = Math.floor((now - past) / 1000);
-    
-    if (diffInSeconds < 60) {
-      return 'gerade eben';
+    try {
+      return formatDistance(new Date(date), new Date(), { 
+        addSuffix: true, 
+        locale: de 
+      });
+    } catch (error) {
+      return '';
     }
-    
-    const diffInMinutes = Math.floor(diffInSeconds / 60);
-    if (diffInMinutes < 60) {
-      return `vor ${diffInMinutes} ${diffInMinutes === 1 ? 'Minute' : 'Minuten'}`;
-    }
-    
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) {
-      return `vor ${diffInHours} ${diffInHours === 1 ? 'Stunde' : 'Stunden'}`;
-    }
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 30) {
-      return `vor ${diffInDays} ${diffInDays === 1 ? 'Tag' : 'Tagen'}`;
-    }
-    
-    const diffInMonths = Math.floor(diffInDays / 30);
-    if (diffInMonths < 12) {
-      return `vor ${diffInMonths} ${diffInMonths === 1 ? 'Monat' : 'Monaten'}`;
-    }
-    
-    const diffInYears = Math.floor(diffInMonths / 12);
-    return `vor ${diffInYears} ${diffInYears === 1 ? 'Jahr' : 'Jahren'}`;
-  },
-  
-  // Get days between two dates
-  getDaysBetween: (date1, date2) => {
-    const d1 = new Date(date1);
-    const d2 = new Date(date2);
-    const diffTime = Math.abs(d2 - d1);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  },
-  
-  // Check if date is in past
-  isPast: (date) => {
-    return new Date(date) < new Date();
   },
   
   // Check if date is today
   isToday: (date) => {
-    const today = new Date();
-    const d = new Date(date);
-    return d.toDateString() === today.toDateString();
+    if (!date) return false;
+    try {
+      const d = new Date(date);
+      const today = new Date();
+      return d.toDateString() === today.toDateString();
+    } catch (error) {
+      return false;
+    }
+  },
+  
+  // Check if date is in the past
+  isPast: (date) => {
+    if (!date) return false;
+    try {
+      return new Date(date) < new Date();
+    } catch (error) {
+      return false;
+    }
+  },
+  
+  // Check if date is in the future
+  isFuture: (date) => {
+    if (!date) return false;
+    try {
+      return new Date(date) > new Date();
+    } catch (error) {
+      return false;
+    }
+  },
+  
+  // Add days to date
+  addDays: (date, days) => {
+    if (!date) return null;
+    try {
+      const d = new Date(date);
+      d.setDate(d.getDate() + days);
+      return d;
+    } catch (error) {
+      return null;
+    }
+  },
+  
+  // Get month name in German
+  getMonthName: (date) => {
+    if (!date) return '';
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return '';
+      return format(d, 'MMMM', { locale: de });
+    } catch (error) {
+      return '';
+    }
   },
 };
 
 // Number utilities
 export const numberUtils = {
   // Format number as currency (EUR)
-  formatCurrency: (amount, decimals = 2) => {
-    if (amount === null || amount === undefined) return '';
+  formatCurrency: (amount) => {
+    if (amount === null || amount === undefined) return '0,00 €';
     return new Intl.NumberFormat('de-DE', {
       style: 'currency',
-      currency: 'EUR',
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
+      currency: 'EUR'
     }).format(amount);
   },
   
-  // Format number with thousands separator
-  formatNumber: (number, decimals = 0) => {
-    if (number === null || number === undefined) return '';
+  // Format number with German decimal separator
+  formatNumber: (number, decimals = 2) => {
+    if (number === null || number === undefined) return '0';
     return new Intl.NumberFormat('de-DE', {
       minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
+      maximumFractionDigits: decimals
     }).format(number);
   },
   
-  // Parse German number format
-  parseGermanNumber: (numberString) => {
-    if (!numberString) return 0;
-    return parseFloat(numberString.replace(/\./g, '').replace(',', '.'));
+  // Parse German number format to float
+  parseGermanNumber: (str) => {
+    if (!str) return 0;
+    const cleaned = str.toString()
+      .replace(/\./g, '')  // Remove thousand separators
+      .replace(',', '.')   // Replace decimal comma with dot
+      .replace(/[^0-9.-]/g, ''); // Remove other characters
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? 0 : parsed;
   },
   
   // Format percentage
-  formatPercentage: (value, decimals = 1) => {
-    if (value === null || value === undefined) return '';
-    return `${value.toFixed(decimals)}%`;
+  formatPercentage: (value, decimals = 0) => {
+    if (value === null || value === undefined) return '0%';
+    return `${numberUtils.formatNumber(value, decimals)}%`;
   },
   
   // Format file size
   formatFileSize: (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    if (!bytes) return '0 B';
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
+  },
+  
+  // Calculate percentage
+  calculatePercentage: (partial, total) => {
+    if (!total || total === 0) return 0;
+    return (partial / total) * 100;
+  },
+  
+  // Round to specified decimals
+  round: (number, decimals = 2) => {
+    return Math.round(number * Math.pow(10, decimals)) / Math.pow(10, decimals);
   },
 };
 
 // String utilities
 export const stringUtils = {
   // Truncate string with ellipsis
-  truncate: (str, maxLength = 50, suffix = '...') => {
-    if (!str || str.length <= maxLength) return str;
-    return str.substring(0, maxLength - suffix.length) + suffix;
+  truncate: (str, length = 50) => {
+    if (!str) return '';
+    return str.length > length ? str.substring(0, length) + '...' : str;
   },
   
   // Capitalize first letter
@@ -153,54 +192,89 @@ export const stringUtils = {
     return str.charAt(0).toUpperCase() + str.slice(1);
   },
   
-  // Convert to slug
+  // Convert to URL-friendly slug
   toSlug: (str) => {
     if (!str) return '';
     return str
       .toLowerCase()
-      .trim()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/[\s_-]+/g, '-')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+      .replace(/[äöüß]/g, match => ({
+        'ä': 'ae',
+        'ö': 'oe',
+        'ü': 'ue',
+        'ß': 'ss'
+      }[match]))
+      .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
   },
   
-  // Remove HTML tags
-  stripHtml: (html) => {
-    if (!html) return '';
-    const div = document.createElement('div');
-    div.innerHTML = html;
-    return div.textContent || div.innerText || '';
+  // Strip HTML tags
+  stripHtml: (str) => {
+    if (!str) return '';
+    return str.replace(/<[^>]*>/g, '');
   },
   
   // Format phone number
   formatPhone: (phone) => {
     if (!phone) return '';
-    return phone.replace(/(\d{2,5})(\d{3,4})(\d{4,})/, '$1 $2 $3');
+    // Remove all non-digit characters
+    const cleaned = phone.replace(/\D/g, '');
+    
+    // Format German phone numbers
+    if (cleaned.startsWith('49')) {
+      // International format
+      return `+${cleaned.slice(0, 2)} ${cleaned.slice(2, 4)} ${cleaned.slice(4)}`;
+    } else if (cleaned.startsWith('0')) {
+      // National format
+      return `${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
+    }
+    
+    return phone;
   },
   
-  // Validate email
+  // Sanitize HTML to prevent XSS
+  sanitize: (html) => {
+    if (!html) return '';
+    return DOMPurify.sanitize(html);
+  },
+  
+  // Check if string is valid email
   isValidEmail: (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    if (!email) return false;
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
   },
   
-  // Validate German phone
+  // Check if string is valid German phone number
   isValidGermanPhone: (phone) => {
-    const phoneRegex = /^(\+49|0)[1-9][0-9]{1,14}$/;
-    return phoneRegex.test(phone.replace(/[\s\-]/g, ''));
+    if (!phone) return false;
+    const cleaned = phone.replace(/\D/g, '');
+    return cleaned.length >= 10 && (cleaned.startsWith('0') || cleaned.startsWith('49'));
   },
   
-  // Validate German postal code
-  isValidGermanPostalCode: (plz) => {
-    const plzRegex = /^\d{5}$/;
-    return plzRegex.test(plz);
+  // Check if string is valid German postal code
+  isValidGermanPostalCode: (code) => {
+    if (!code) return false;
+    return /^\d{5}$/.test(code);
+  },
+  
+  // Generate random string
+  generateRandomString: (length = 8) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
   },
 };
 
 // Array utilities
 export const arrayUtils = {
-  // Group array by key
+  // Group array by property
   groupBy: (array, key) => {
+    if (!Array.isArray(array)) return {};
     return array.reduce((result, item) => {
       const group = item[key];
       if (!result[group]) result[group] = [];
@@ -209,37 +283,28 @@ export const arrayUtils = {
     }, {});
   },
   
-  // Sort array by multiple keys
-  sortBy: (array, ...keys) => {
+  // Sort array by property
+  sortBy: (array, key, order = 'asc') => {
+    if (!Array.isArray(array)) return [];
     return [...array].sort((a, b) => {
-      for (const key of keys) {
-        const aVal = typeof key === 'function' ? key(a) : a[key];
-        const bVal = typeof key === 'function' ? key(b) : b[key];
-        
-        if (aVal < bVal) return -1;
-        if (aVal > bVal) return 1;
-      }
+      const aVal = a[key];
+      const bVal = b[key];
+      
+      if (aVal < bVal) return order === 'asc' ? -1 : 1;
+      if (aVal > bVal) return order === 'asc' ? 1 : -1;
       return 0;
     });
   },
   
-  // Remove duplicates
-  unique: (array, key) => {
-    if (!key) {
-      return [...new Set(array)];
-    }
-    
-    const seen = new Set();
-    return array.filter(item => {
-      const val = item[key];
-      if (seen.has(val)) return false;
-      seen.add(val);
-      return true;
-    });
+  // Get unique values
+  unique: (array) => {
+    if (!Array.isArray(array)) return [];
+    return [...new Set(array)];
   },
   
   // Chunk array into smaller arrays
   chunk: (array, size) => {
+    if (!Array.isArray(array) || size <= 0) return [];
     const chunks = [];
     for (let i = 0; i < array.length; i += size) {
       chunks.push(array.slice(i, i + size));
@@ -249,11 +314,13 @@ export const arrayUtils = {
   
   // Find item by ID
   findById: (array, id) => {
+    if (!Array.isArray(array)) return null;
     return array.find(item => item.id === id || item._id === id);
   },
   
   // Update item in array
   updateItem: (array, id, updates) => {
+    if (!Array.isArray(array)) return [];
     return array.map(item => 
       (item.id === id || item._id === id) ? { ...item, ...updates } : item
     );
@@ -261,15 +328,29 @@ export const arrayUtils = {
   
   // Remove item from array
   removeItem: (array, id) => {
+    if (!Array.isArray(array)) return [];
     return array.filter(item => item.id !== id && item._id !== id);
   },
 };
 
 // Object utilities
 export const objectUtils = {
-  // Deep clone object
+  // Deep clone object (handles circular references)
   deepClone: (obj) => {
-    return JSON.parse(JSON.stringify(obj));
+    if (obj === null || typeof obj !== "object") return obj;
+    if (obj instanceof Date) return new Date(obj.getTime());
+    if (obj instanceof Array) return obj.map(item => objectUtils.deepClone(item));
+    if (obj instanceof RegExp) return new RegExp(obj);
+    
+    const clonedObj = new obj.constructor();
+    
+    for (let key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        clonedObj[key] = objectUtils.deepClone(obj[key]);
+      }
+    }
+    
+    return clonedObj;
   },
   
   // Merge objects deeply
@@ -282,7 +363,7 @@ export const objectUtils = {
           if (!(key in target)) {
             Object.assign(output, { [key]: source[key] });
           } else {
-            output[key] = deepMerge(target[key], source[key]);
+            output[key] = objectUtils.deepMerge(target[key], source[key]);
           }
         } else {
           Object.assign(output, { [key]: source[key] });
@@ -295,6 +376,7 @@ export const objectUtils = {
   
   // Pick specific keys from object
   pick: (obj, keys) => {
+    if (!obj || typeof obj !== 'object') return {};
     return keys.reduce((result, key) => {
       if (key in obj) {
         result[key] = obj[key];
@@ -305,6 +387,7 @@ export const objectUtils = {
   
   // Omit specific keys from object
   omit: (obj, keys) => {
+    if (!obj || typeof obj !== 'object') return {};
     const result = { ...obj };
     keys.forEach(key => delete result[key]);
     return result;
@@ -312,11 +395,13 @@ export const objectUtils = {
   
   // Check if object is empty
   isEmpty: (obj) => {
+    if (!obj || typeof obj !== 'object') return true;
     return Object.keys(obj).length === 0;
   },
   
   // Clean undefined/null values
   clean: (obj) => {
+    if (!obj || typeof obj !== 'object') return {};
     const cleaned = {};
     Object.keys(obj).forEach(key => {
       if (obj[key] !== null && obj[key] !== undefined) {
@@ -431,7 +516,6 @@ export const storageUtils = {
         const item = localStorage.getItem(key);
         return item ? JSON.parse(item) : defaultValue;
       } catch (error) {
-        console.error('Error reading from localStorage:', error);
         return defaultValue;
       }
     },
@@ -441,7 +525,6 @@ export const storageUtils = {
         localStorage.setItem(key, JSON.stringify(value));
         return true;
       } catch (error) {
-        console.error('Error writing to localStorage:', error);
         return false;
       }
     },
@@ -451,7 +534,6 @@ export const storageUtils = {
         localStorage.removeItem(key);
         return true;
       } catch (error) {
-        console.error('Error removing from localStorage:', error);
         return false;
       }
     },
@@ -461,7 +543,6 @@ export const storageUtils = {
         localStorage.clear();
         return true;
       } catch (error) {
-        console.error('Error clearing localStorage:', error);
         return false;
       }
     },
@@ -474,7 +555,6 @@ export const storageUtils = {
         const item = sessionStorage.getItem(key);
         return item ? JSON.parse(item) : defaultValue;
       } catch (error) {
-        console.error('Error reading from sessionStorage:', error);
         return defaultValue;
       }
     },
@@ -484,7 +564,6 @@ export const storageUtils = {
         sessionStorage.setItem(key, JSON.stringify(value));
         return true;
       } catch (error) {
-        console.error('Error writing to sessionStorage:', error);
         return false;
       }
     },
@@ -494,7 +573,6 @@ export const storageUtils = {
         sessionStorage.removeItem(key);
         return true;
       } catch (error) {
-        console.error('Error removing from sessionStorage:', error);
         return false;
       }
     },
@@ -504,7 +582,6 @@ export const storageUtils = {
         sessionStorage.clear();
         return true;
       } catch (error) {
-        console.error('Error clearing sessionStorage:', error);
         return false;
       }
     },
@@ -516,8 +593,8 @@ const isObject = (item) => {
   return item && typeof item === 'object' && !Array.isArray(item);
 };
 
-// Export all utilities
-export default {
+// All utilities
+const utils = {
   date: dateUtils,
   number: numberUtils,
   string: stringUtils,
@@ -526,3 +603,6 @@ export default {
   validation: validationUtils,
   storage: storageUtils,
 };
+
+// Export all utilities
+export default utils;

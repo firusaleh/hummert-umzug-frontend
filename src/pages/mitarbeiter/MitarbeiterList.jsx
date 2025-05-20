@@ -6,7 +6,6 @@ import {
   Filter, 
   ChevronLeft, 
   ChevronRight,
-  Plus,
   Phone,
   Mail,
   Calendar,

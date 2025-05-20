@@ -46,23 +46,23 @@ export default function UmzugsaufnahmeFormular({ initialData = {}, onSave, onCan
     const safeInitialData = initialData || {};
     
     if (Object.keys(safeInitialData).length > 0) {
-      setFormData({
-        ...formData,
+      setFormData(prevFormData => ({
+        ...prevFormData,
         ...safeInitialData,
         // Stelle sicher, dass verschachtelte Objekte korrekt übernommen werden
         auszugsadresse: {
-          ...formData.auszugsadresse,
+          ...prevFormData.auszugsadresse,
           ...(safeInitialData.auszugsadresse || {})
         },
         einzugsadresse: {
-          ...formData.einzugsadresse,
+          ...prevFormData.einzugsadresse,
           ...(safeInitialData.einzugsadresse || {})
         },
         angebotspreis: {
-          ...formData.angebotspreis,
+          ...prevFormData.angebotspreis,
           ...(safeInitialData.angebotspreis || {})
         }
-      });
+      }));
     }
   }, [initialData]);
 

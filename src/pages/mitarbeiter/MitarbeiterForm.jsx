@@ -10,7 +10,6 @@ import {
   User, 
   Calendar, 
   MapPin, 
-  Upload,
   ImagePlus
 } from 'lucide-react';
 import { mitarbeiterService } from '../../services/api';
@@ -47,7 +46,6 @@ const MitarbeiterForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const isNeueModus = !id;
-  const isEditMode = !!id;
   
   // State für Formularfelder
   const [formData, setFormData] = useState({
@@ -153,8 +151,10 @@ const MitarbeiterForm = () => {
     }
   };
 
-  // Ausschnitt aus MitarbeiterForm.jsx - Anpassung für die onSubmit-Funktion
-  const onSubmit = async (values, { setSubmitting, resetForm }) => {
+  // Ausgelagerter Code für Formik-Integration (derzeit nicht verwendet)
+  // Erhalten als Referenz für zukünftige Formik-Integration
+  /* 
+  const formikSubmit = async (values, { setSubmitting, resetForm }) => {
     try {
       // Füge die Benutzer-ID hinzu, die vom Backend erwartet wird
       const mitarbeiterData = {
@@ -181,6 +181,7 @@ const MitarbeiterForm = () => {
       setSubmitting(false);
     }
   };
+  */
 
   // Formular absenden (bestehende Methode)
   const handleSubmit = async (e) => {

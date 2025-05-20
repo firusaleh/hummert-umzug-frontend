@@ -14,7 +14,9 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.9.0",
+    "date-fns": "^3.6.0",
     "dayjs": "^1.11.13",
+    "dompurify": "^3.2.6",
     "formik": "^2.4.6",
     "lucide-react": "^0.507.0",
     "pdfmake": "^0.2.19",
@@ -27,6 +29,7 @@
     "react-scripts": "5.0.1",
     "react-toastify": "^11.0.5",
     "recharts": "^2.15.3",
+    "socket.io-client": "^4.8.1",
     "web-vitals": "^2.1.4",
     "yup": "^1.6.1"
   },

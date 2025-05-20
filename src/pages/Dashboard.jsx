@@ -10,7 +10,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart as RechartsBarChart, Bar } from 'recharts';
-import api, { umzuegeService, mitarbeiterService, finanzenService } from '../services/api';
+import { umzuegeService, mitarbeiterService, finanzenService } from '../services/api';
 
 // StatCard Komponente für die Statistikkarten
 const StatCard = ({ title, value, icon, change, changeType, loading }) => {
@@ -133,7 +133,7 @@ const Dashboard = () => {
             setMonthlyData(formattedData);
           }
         } catch (monthlyError) {
-          console.error('Fehler beim Laden der monatlichen Daten:', monthlyError);
+          // Fehler beim Laden der monatlichen Daten - verwende Fallback-Daten
           
           // Fallback: Simulierte Daten für die letzten 5 Monate
           const fallbackData = [];
@@ -160,7 +160,7 @@ const Dashboard = () => {
           
           setCategoryData(categoryStats);
         } catch (categoryError) {
-          console.error('Fehler beim Laden der Kategoriendaten:', categoryError);
+          // Fehler beim Laden der Kategoriendaten
           setCategoryData([]);
         }
 
@@ -179,7 +179,7 @@ const Dashboard = () => {
         
         setLoading(false);
       } catch (err) {
-        console.error('Fehler beim Laden der Dashboard-Daten:', err);
+        // Fehler beim Laden der Dashboard-Daten
         setError('Die Dashboard-Daten konnten nicht geladen werden.');
         setLoading(false);
       }

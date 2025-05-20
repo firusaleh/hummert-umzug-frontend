@@ -15,9 +15,9 @@ const Einstellungen = () => {
   // State für verschiedene Einstellungen
   const [userSettings, setUserSettings] = useState({
     // Persönliche Daten
-    vorname: 'Admin',
-    nachname: 'Benutzer',
-    email: 'admin@hummert-umzug.de',
+    vorname: '',
+    nachname: '',
+    email: '',
     sprache: 'de',
     
     // Benachrichtigungen
@@ -58,45 +58,56 @@ const Einstellungen = () => {
   };
 
   // Benutzerdaten speichern
-  const handleSaveUserSettings = (e) => {
+  const handleSaveUserSettings = async (e) => {
     e.preventDefault();
-    // Hier würde in einer echten Anwendung ein API-Aufruf stattfinden
-    console.log('Benutzereinstellungen gespeichert:', userSettings);
     
-    setSuccessMessage('Einstellungen wurden erfolgreich gespeichert.');
-    
-    // Erfolgsmeldung nach 3 Sekunden ausblenden
-    setTimeout(() => {
-      setSuccessMessage('');
-    }, 3000);
+    try {
+      // Hier würde ein API-Aufruf stattfinden
+      // await api.updateUserSettings(userSettings);
+      
+      setSuccessMessage('Einstellungen wurden erfolgreich gespeichert.');
+      
+      // Erfolgsmeldung nach 3 Sekunden ausblenden
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+    } catch (error) {
+      setSuccessMessage('Fehler beim Speichern der Einstellungen.');
+    }
   };
 
   // Passwort ändern
-  const handleChangePassword = (e) => {
+  const handleChangePassword = async (e) => {
     e.preventDefault();
     
     // Einfache Validierung
     if (passwordData.neuesPasswort !== passwordData.neuesPasswortWiederholen) {
-      alert('Die Passwörter stimmen nicht überein.');
+      setSuccessMessage('Die Passwörter stimmen nicht überein.');
       return;
     }
     
-    if (passwordData.neuesPasswort.length < 8) {
-      alert('Das neue Passwort muss mindestens 8 Zeichen lang sein.');
+    // Stärkere Passwortvalidierung
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$/;
+    if (!passwordRegex.test(passwordData.neuesPasswort)) {
+      setSuccessMessage('Das Passwort muss mindestens 12 Zeichen lang sein und Groß- und Kleinbuchstaben, Zahlen und Sonderzeichen enthalten.');
       return;
     }
     
-    // Hier würde in einer echten Anwendung ein API-Aufruf stattfinden
-    console.log('Passwort geändert');
-    
-    // Formular zurücksetzen
-    setPasswordData({
-      aktuellesPasswort: '',
-      neuesPasswort: '',
-      neuesPasswortWiederholen: ''
-    });
-    
-    setSuccessMessage('Passwort wurde erfolgreich geändert.');
+    try {
+      // Hier würde ein API-Aufruf stattfinden
+      // await api.changePassword(passwordData);
+      
+      // Formular zurücksetzen
+      setPasswordData({
+        aktuellesPasswort: '',
+        neuesPasswort: '',
+        neuesPasswortWiederholen: ''
+      });
+      
+      setSuccessMessage('Passwort wurde erfolgreich geändert.');
+    } catch (error) {
+      setSuccessMessage('Fehler beim Ändern des Passworts.');
+    }
     
     // Erfolgsmeldung nach 3 Sekunden ausblenden
     setTimeout(() => {
@@ -235,7 +246,7 @@ const Einstellungen = () => {
                   minLength={8}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Mindestens 8 Zeichen, mit Groß- und Kleinbuchstaben, Zahlen und Sonderzeichen.
+                  Mindestens 12 Zeichen, mit Groß- und Kleinbuchstaben, Zahlen und Sonderzeichen.
                 </p>
               </div>
               

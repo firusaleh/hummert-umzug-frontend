@@ -1,3 +1,4 @@
+// src/pages/zeiterfassung/ZeiterfassungSystem.jsx - Enhanced with security fixes and error handling
 import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, Check, Plus, Edit, Trash2, Search, User, Users, Briefcase } from 'lucide-react';
 import { zeiterfassungService } from '../../services/api';
@@ -38,7 +39,6 @@ export default function ZeiterfassungSystem() {
         const projekteResponse = await zeiterfassungService.getUmzugsprojekte();
         setUmzugsprojekte(projekteResponse.data);
       } catch (error) {
-        console.error('Fehler beim Laden der Basisdaten:', error);
         setError('Fehler beim Laden der Mitarbeiter und Projekte.');
       } finally {
         setLoading(false);
@@ -60,7 +60,6 @@ export default function ZeiterfassungSystem() {
         const zeiterfassungenResponse = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
         setZeiterfassungen(zeiterfassungenResponse.data);
       } catch (error) {
-        console.error('Fehler beim Laden der Zeiterfassungen:', error);
         setError('Die Zeiterfassungen konnten nicht geladen werden.');
         setZeiterfassungen([]);
       } finally {
@@ -73,17 +72,21 @@ export default function ZeiterfassungSystem() {
   
   // Berechne Arbeitsstunden
   const berechneArbeitsstunden = (start, end, pauseMinuten) => {
-    if (!start || !end) return 0;
-    
-    const [startHours, startMinutes] = start.split(':').map(Number);
-    const [endHours, endMinutes] = end.split(':').map(Number);
-    
-    const startZeit = startHours * 60 + startMinutes;
-    const endZeit = endHours * 60 + endMinutes;
-    
-    const arbeitszeitMinuten = endZeit - startZeit - pauseMinuten;
-    
-    return Math.max(0, arbeitszeitMinuten / 60);
+    try {
+      if (!start || !end) return 0;
+      
+      const [startHours, startMinutes] = start.split(':').map(Number);
+      const [endHours, endMinutes] = end.split(':').map(Number);
+      
+      const startZeit = startHours * 60 + startMinutes;
+      const endZeit = endHours * 60 + endMinutes;
+      
+      const arbeitszeitMinuten = endZeit - startZeit - pauseMinuten;
+      
+      return Math.max(0, arbeitszeitMinuten / 60);
+    } catch (error) {
+      return 0;
+    }
   };
   
   // Formular zurücksetzen
@@ -103,21 +106,25 @@ export default function ZeiterfassungSystem() {
   
   // Zeiterfassung laden zum Bearbeiten
   const handleBearbeiten = (id) => {
-    const zeiterfassung = zeiterfassungen.find(z => z._id === id);
-    
-    if (zeiterfassung) {
-      setFormular({
-        mitarbeiterId: zeiterfassung.mitarbeiterId._id,
-        projektId: zeiterfassung.projektId,
-        datum: zeiterfassung.datum,
-        startzeit: zeiterfassung.startzeit,
-        endzeit: zeiterfassung.endzeit,
-        pause: zeiterfassung.pause.toString(),
-        taetigkeit: zeiterfassung.taetigkeit,
-        notizen: zeiterfassung.notizen || ''
-      });
+    try {
+      const zeiterfassung = zeiterfassungen.find(z => z._id === id);
       
-      setBearbeitungId(id);
+      if (zeiterfassung) {
+        setFormular({
+          mitarbeiterId: zeiterfassung.mitarbeiterId._id,
+          projektId: zeiterfassung.projektId,
+          datum: zeiterfassung.datum,
+          startzeit: zeiterfassung.startzeit,
+          endzeit: zeiterfassung.endzeit,
+          pause: zeiterfassung.pause.toString(),
+          taetigkeit: zeiterfassung.taetigkeit,
+          notizen: zeiterfassung.notizen || ''
+        });
+        
+        setBearbeitungId(id);
+      }
+    } catch (error) {
+      setError('Fehler beim Laden der Zeiterfassung.');
     }
   };
   
@@ -125,22 +132,22 @@ export default function ZeiterfassungSystem() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    const arbeitsstunden = berechneArbeitsstunden(
-      formular.startzeit,
-      formular.endzeit,
-      parseInt(formular.pause, 10)
-    );
-    
-    const zeiterfassungDaten = {
-      ...formular,
-      pause: parseInt(formular.pause, 10),
-      arbeitsstunden
-    };
-    
-    setLoading(true);
-    setError(null);
-    
     try {
+      const arbeitsstunden = berechneArbeitsstunden(
+        formular.startzeit,
+        formular.endzeit,
+        parseInt(formular.pause, 10)
+      );
+      
+      const zeiterfassungDaten = {
+        ...formular,
+        pause: parseInt(formular.pause, 10),
+        arbeitsstunden
+      };
+      
+      setLoading(true);
+      setError(null);
+      
       if (bearbeitungId) {
         // Update einer bestehenden Zeiterfassung
         await zeiterfassungService.updateZeiterfassung(bearbeitungId, zeiterfassungDaten);
@@ -160,8 +167,7 @@ export default function ZeiterfassungSystem() {
       // Formular zurücksetzen
       resetForm();
     } catch (error) {
-      console.error('Fehler beim Speichern der Zeiterfassung:', error);
-      setError(`Die Zeiterfassung konnte nicht gespeichert werden: ${error.response?.data?.message || 'Unbekannter Fehler'}`);
+      setError(`Die Zeiterfassung konnte nicht gespeichert werden.`);
     } finally {
       setLoading(false);
     }
@@ -180,8 +186,7 @@ export default function ZeiterfassungSystem() {
         const response = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
         setZeiterfassungen(response.data);
       } catch (error) {
-        console.error('Fehler beim Löschen der Zeiterfassung:', error);
-        setError(`Die Zeiterfassung konnte nicht gelöscht werden: ${error.response?.data?.message || 'Unbekannter Fehler'}`);
+        setError(`Die Zeiterfassung konnte nicht gelöscht werden.`);
       } finally {
         setLoading(false);
       }
@@ -296,6 +301,7 @@ export default function ZeiterfassungSystem() {
                     onClick={() => handleBearbeiten(zeiterfassung._id)}
                     className="text-indigo-600 hover:text-indigo-900 mr-3"
                     disabled={loading}
+                    aria-label="Bearbeiten"
                   >
                     <Edit className="h-4 w-4" />
                   </button>
@@ -303,6 +309,7 @@ export default function ZeiterfassungSystem() {
                     onClick={() => handleLoeschen(zeiterfassung._id)}
                     className="text-red-600 hover:text-red-900"
                     disabled={loading}
+                    aria-label="Löschen"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

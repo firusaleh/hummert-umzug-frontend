@@ -41,8 +41,10 @@ const Register = () => {
       return;
     }
     
-    if (password.length < 6) {
-      setError('Das Passwort muss mindestens 6 Zeichen lang sein');
+    // Stärkere Passwortvalidierung
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$/;
+    if (!passwordRegex.test(password)) {
+      setError('Das Passwort muss mindestens 12 Zeichen lang sein und Groß- und Kleinbuchstaben, Zahlen und Sonderzeichen enthalten');
       return;
     }
     
@@ -64,7 +66,7 @@ const Register = () => {
         setError(result.message || 'Registrierung fehlgeschlagen');
       }
     } catch (err) {
-      console.error('Registrierungsfehler:', err);
+      // Fehlerbehandlung ohne sensitive Daten zu loggen
       setError('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.');
     } finally {
       setLoading(false);
@@ -157,7 +159,7 @@ const Register = () => {
             minLength="6"
           />
           <small style={{ color: '#6c757d', fontSize: '0.8rem' }}>
-            Mindestens 6 Zeichen
+            Mindestens 12 Zeichen mit Groß-/Kleinbuchstaben, Zahlen und Sonderzeichen
           </small>
         </div>
         

@@ -15,7 +15,6 @@ const RechnungForm = () => {
   const [umzuege, setUmzuege] = useState([]);
   const [angebote, setAngebote] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedAngebot, setSelectedAngebot] = useState(null);
 
   const isEditMode = !!id;
 
@@ -104,14 +103,12 @@ const RechnungForm = () => {
   // Lade Angebotsdaten, wenn ein Angebot ausgewählt wird
   const handleAngebotChange = async (angebotId, setFieldValue) => {
     if (!angebotId) {
-      setSelectedAngebot(null);
       return;
     }
 
     try {
       const angebotResponse = await finanzenService.getAngebotById(angebotId);
       const angebot = angebotResponse.data.angebot;
-      setSelectedAngebot(angebot);
 
       // Übernehme Daten aus dem Angebot
       setFieldValue('kunde', angebot.kunde._id);

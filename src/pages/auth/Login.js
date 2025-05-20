@@ -26,7 +26,7 @@ const Login = () => {
       try {
         await checkApiAvailability();
       } catch (err) {
-        console.error("Fehler beim Prüfen der API-Verfügbarkeit:", err);
+        // Fehler wird intern behandelt
       }
     };
     
@@ -53,7 +53,6 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Login-Formular abgesendet');
     
     // Formular validieren
     if (!validateForm()) {
@@ -68,30 +67,25 @@ const Login = () => {
         setErrors({
           general: 'Der Server ist derzeit nicht erreichbar. Bitte versuchen Sie es später erneut.'
         });
-        setButtonLoading(false);
         return;
       }
       
       const credentials = { email, password };
-      console.log('Login-Versuch mit:', { email, password: '***' });
       
       // Login-Versuch
       const result = await login(credentials);
-      console.log('Login-Ergebnis:', result);
       
       if (result && result.success) {
-        console.log('Login erfolgreich!');
         // Weiterleitung zur ursprünglichen Seite oder zum Dashboard
         const from = location.state?.from?.pathname || '/dashboard';
         navigate(from, { replace: true });
       } else {
-        console.error('Login fehlgeschlagen:', result?.message || 'Unbekannter Fehler');
         setErrors({
           general: result?.message || 'Login fehlgeschlagen'
         });
       }
     } catch (err) {
-      console.error('Login-Fehler:', err);
+      // Fehlerbehandlung ohne sensitive Daten zu loggen
       setErrors({
         general: 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.'
       });

@@ -54,7 +54,7 @@ const useCursorPagination = (endpoint, options = {}) => {
     if (autoLoad) {
       fetchData();
     }
-  }, []);
+  }, [autoLoad, fetchData]);
 
   const loadMore = useCallback(() => {
     if (nextCursor && hasMore && !loading) {
