@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { finanzenService } from '../../services/api';
+import { extractApiData, ensureArray } from '../../utils/apiUtils';
 
 const FinanzenMonatsansicht = () => {
   const [jahr, setJahr] = useState(new Date().getFullYear());
@@ -25,8 +26,14 @@ const FinanzenMonatsansicht = () => {
     const fetchJahresUebersicht = async () => {
       setIsLoading(true);
       try {
-        const response = await finanzenService.getMonatsuebersicht(jahr);
-        setFinanzDaten(response.data);
+        const response = await finanzenService.getMonatsUebersicht(jahr);
+        const finanzData = extractApiData(response);
+        
+        if (!finanzData) {
+          throw new Error('Keine gültigen Finanzdaten erhalten');
+        }
+        
+        setFinanzDaten(finanzData);
       } catch (error) {
         console.error('Fehler beim Laden der Jahresübersicht:', error);
         setError('Die Jahresübersicht konnte nicht geladen werden.');
@@ -44,8 +51,29 @@ const FinanzenMonatsansicht = () => {
       setIsLoadingDetails(true);
       try {
         // Monate in API sind 1-basiert (1=Januar, 12=Dezember)
-        const response = await finanzenService.getMonatsdetails(monatsIndex + 1, jahr);
-        setMonatDetails(response.data);
+        const response = await finanzenService.getMonatsDetails(jahr, monatsIndex + 1);
+        const monatData = extractApiData(response);
+        
+        if (!monatData) {
+          throw new Error('Keine gültigen Monatsdetails erhalten');
+        }
+        
+        // Normalisiere Daten
+        const normalizedMonatData = {
+          ...monatData,
+          rechnungen: ensureArray(monatData.rechnungen),
+          ausgaben: ensureArray(monatData.ausgaben),
+          angebote: ensureArray(monatData.angebote),
+          finanzuebersicht: monatData.finanzuebersicht || {
+            einnahmen: 0,
+            ausgaben: 0,
+            gewinn: 0,
+            offeneRechnungen: 0
+          },
+          ausgabenNachKategorie: monatData.ausgabenNachKategorie || {}
+        };
+        
+        setMonatDetails(normalizedMonatData);
       } catch (error) {
         console.error('Fehler beim Laden der Monatsdetails:', error);
         toast.error('Fehler beim Laden der Monatsdetails');
@@ -88,10 +116,20 @@ const FinanzenMonatsansicht = () => {
   const getAusgabenKategorienData = () => {
     if (!monatDetails || !monatDetails.ausgabenNachKategorie) return [];
 
-    return Object.entries(monatDetails.ausgabenNachKategorie).map(([kategorie, betrag], index) => ({
-      name: kategorie,
-      value: betrag
-    }));
+    // Stelle sicher, dass ausgabenNachKategorie ein Objekt ist
+    if (typeof monatDetails.ausgabenNachKategorie !== 'object') return [];
+
+    try {
+      return Object.entries(monatDetails.ausgabenNachKategorie)
+        .filter(([kategorie, betrag]) => betrag !== null && betrag !== undefined)
+        .map(([kategorie, betrag], index) => ({
+          name: kategorie || 'Sonstige',
+          value: parseFloat(betrag) || 0
+        }));
+    } catch (error) {
+      console.error('Fehler bei der Verarbeitung der Ausgabenkategorien:', error);
+      return [];
+    }
   };
 
   if (isLoading) {
@@ -159,15 +197,21 @@ const FinanzenMonatsansicht = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
           <div className="bg-green-50 rounded-lg p-4">
             <p className="text-sm text-gray-600">Gesamteinnahmen</p>
-            <p className="text-2xl font-bold">{finanzDaten?.jahresgesamtwerte.gesamtEinnahmen.toFixed(2)} €</p>
+            <p className="text-2xl font-bold">
+              {(finanzDaten?.jahresgesamtwerte?.gesamtEinnahmen || 0).toFixed(2)} €
+            </p>
           </div>
           <div className="bg-red-50 rounded-lg p-4">
             <p className="text-sm text-gray-600">Gesamtausgaben</p>
-            <p className="text-2xl font-bold">{finanzDaten?.jahresgesamtwerte.gesamtAusgaben.toFixed(2)} €</p>
+            <p className="text-2xl font-bold">
+              {(finanzDaten?.jahresgesamtwerte?.gesamtAusgaben || 0).toFixed(2)} €
+            </p>
           </div>
           <div className="bg-purple-50 rounded-lg p-4">
             <p className="text-sm text-gray-600">Jahresgewinn</p>
-            <p className="text-2xl font-bold">{finanzDaten?.jahresgesamtwerte.gesamtGewinn.toFixed(2)} €</p>
+            <p className="text-2xl font-bold">
+              {(finanzDaten?.jahresgesamtwerte?.gesamtGewinn || 0).toFixed(2)} €
+            </p>
           </div>
         </div>
       </div>
