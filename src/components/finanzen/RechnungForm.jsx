@@ -5,7 +5,15 @@ import { Formik, Form, Field, FieldArray, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { toast } from 'react-toastify';
 import dayjs from 'dayjs';
-import { finanzenService, umzuegeService } from '../../services/api';
+import { finanzenService, umzuegeService, clientService } from '../../services/api';
+import { 
+  extractApiData, 
+  ensureArray,
+  toNumber,
+  validatePositions,
+  calculateNettobetrag,
+  calculateMwst
+} from '../../utils/apiUtils';
 
 const RechnungForm = () => {
   const { id } = useParams();
@@ -58,51 +66,33 @@ const RechnungForm = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Lade Kunden mit sicherer Fehlerbehandlung
+        // Lade Kunden mit dem Service
         try {
-          const kundenResponse = await fetch('/api/clients');
-          if (!kundenResponse.ok) {
-            throw new Error(`HTTP error! status: ${kundenResponse.status}`);
-          }
-          
-          // Sicheres JSON-Parsing
-          let kundenData;
-          try {
-            kundenData = await kundenResponse.json();
-          } catch (parseError) {
-            console.error('JSON Parsing Fehler (Kunden):', parseError);
-            kundenData = { clients: [] };
-            toast.error('Fehler beim Verarbeiten der Kundendaten');
-          }
-          
-          // Sicherstellen, dass clients ein Array ist
-          setKunden(Array.isArray(kundenData.clients) ? kundenData.clients : []);
+          const kundenResponse = await clientService.getAll();
+          setKunden(ensureArray(extractApiData(kundenResponse, 'clients')));
         } catch (clientError) {
           console.error('Fehler beim Laden der Kunden:', clientError);
+          toast.error('Fehler beim Laden der Kundendaten');
           setKunden([]);
         }
 
-        // Lade Umzüge mit sicherer Fehlerbehandlung
+        // Lade Umzüge mit dem Service
         try {
           const umzuegeResponse = await umzuegeService.getAll();
-          // Prüfe, ob die Antwort die erwartete Struktur hat
-          const umzuegeListe = umzuegeResponse?.data?.umzuege || 
-                             (Array.isArray(umzuegeResponse?.data) ? umzuegeResponse.data : []);
-          setUmzuege(umzuegeListe);
+          setUmzuege(ensureArray(extractApiData(umzuegeResponse, 'umzuege')));
         } catch (umzuegeError) {
           console.error('Fehler beim Laden der Umzüge:', umzuegeError);
+          toast.error('Fehler beim Laden der Umzugsdaten');
           setUmzuege([]);
         }
 
-        // Lade Angebote mit sicherer Fehlerbehandlung
+        // Lade Angebote mit dem Service
         try {
           const angeboteResponse = await finanzenService.getAngebote();
-          // Prüfe, ob die Antwort die erwartete Struktur hat
-          const angeboteListe = angeboteResponse?.data?.angebote || 
-                              (Array.isArray(angeboteResponse?.data) ? angeboteResponse.data : []);
-          setAngebote(angeboteListe);
+          setAngebote(ensureArray(extractApiData(angeboteResponse, 'angebote')));
         } catch (angeboteError) {
           console.error('Fehler beim Laden der Angebote:', angeboteError);
+          toast.error('Fehler beim Laden der Angebotsdaten');
           setAngebote([]);
         }
 
@@ -110,38 +100,23 @@ const RechnungForm = () => {
         if (isEditMode) {
           try {
             const rechnungResponse = await finanzenService.getRechnungById(id);
-            if (rechnungResponse?.data) {
-              // Stelle sicher, dass wir die richtige Datenstruktur haben
-              const rechnungDaten = rechnungResponse.data.rechnung || rechnungResponse.data;
+            const rechnungDaten = extractApiData(rechnungResponse, 'rechnung');
+            
+            if (rechnungDaten && typeof rechnungDaten === 'object') {
+              // Transformiere die Daten mit den Hilfsfunktionen
+              const validatedRechnung = {
+                ...rechnungDaten,
+                mehrwertsteuer: toNumber(rechnungDaten.mehrwertsteuer, 19),
+                positionsliste: validatePositions(
+                  rechnungDaten.positionsliste, 
+                  (menge, einzelpreis) => (toNumber(menge) * toNumber(einzelpreis)).toFixed(2)
+                )
+              };
               
-              // Validiere die Daten
-              if (rechnungDaten && typeof rechnungDaten === 'object') {
-                // Stelle sicher, dass positionsliste ein Array ist
-                if (rechnungDaten.positionsliste && !Array.isArray(rechnungDaten.positionsliste)) {
-                  rechnungDaten.positionsliste = [];
-                }
-                
-                // Stelle sicher, dass numerische Werte korrekt sind
-                if (rechnungDaten.mehrwertsteuer && typeof rechnungDaten.mehrwertsteuer !== 'number') {
-                  rechnungDaten.mehrwertsteuer = parseFloat(rechnungDaten.mehrwertsteuer) || 19;
-                }
-                
-                // Stelle sicher, dass menge und einzelpreis in jeder Position korrekte Zahlen sind
-                if (Array.isArray(rechnungDaten.positionsliste)) {
-                  rechnungDaten.positionsliste = rechnungDaten.positionsliste.map(pos => ({
-                    ...pos,
-                    menge: typeof pos.menge === 'number' ? pos.menge : parseFloat(pos.menge) || 1,
-                    einzelpreis: typeof pos.einzelpreis === 'number' ? pos.einzelpreis : parseFloat(pos.einzelpreis) || 0
-                  }));
-                }
-                
-                setRechnung(rechnungDaten);
-              } else {
-                console.error('Ungültiges Rechnungsdatenformat:', rechnungDaten);
-                toast.error('Rechnung konnte nicht geladen werden: Ungültiges Format');
-                setRechnung(initialValues);
-              }
+              setRechnung(validatedRechnung);
             } else {
+              console.error('Ungültiges Rechnungsdatenformat:', rechnungDaten);
+              toast.error('Rechnung konnte nicht geladen werden: Ungültiges Format');
               setRechnung(initialValues);
             }
           } catch (rechnungError) {
@@ -161,70 +136,49 @@ const RechnungForm = () => {
     fetchData();
   }, [id, isEditMode]);
 
-  // Berechnung des Gesamtpreises für eine Position
+  // Berechnung des Gesamtpreises für eine Position - verwendet apiUtils.toNumber
   const calculateGesamtpreis = (menge, einzelpreis) => {
-    // Stelle sicher, dass wir mit Zahlen arbeiten
-    const numMenge = parseFloat(menge) || 0;
-    const numEinzelpreis = parseFloat(einzelpreis) || 0;
-    return (numMenge * numEinzelpreis).toFixed(2);
+    return (toNumber(menge) * toNumber(einzelpreis)).toFixed(2);
   };
 
-  // Berechnung des Gesamtbetrags für alle Positionen
+  // Berechnung des Gesamtbetrags für alle Positionen - verwendet apiUtils.calculateNettobetrag und calculateMwst
   const calculateGesamtbetrag = (positionsliste, mehrwertsteuer) => {
-    // Sicherstellen, dass positionsliste ein Array ist
-    if (!Array.isArray(positionsliste)) {
-      console.warn('Positionsliste ist kein Array:', positionsliste);
+    try {
+      // Sicherstellen, dass positionsliste ein Array ist
+      const positions = ensureArray(positionsliste);
+      
+      // Berechnung mit Hilfsfunktionen
+      const nettobetrag = calculateNettobetrag(positions);
+      const mwst = calculateMwst(nettobetrag, mehrwertsteuer);
+      
+      return (nettobetrag + mwst).toFixed(2);
+    } catch (error) {
+      console.error('Fehler bei Gesamtbetragsberechnung:', error);
       return '0.00';
     }
-    
-    // Mehrwertsteuer als Zahl parsen
-    const mwstRate = parseFloat(mehrwertsteuer) || 0;
-    
-    // Berechnung des Nettobetrags mit Fehlerbehandlung für jede Position
-    const nettobetrag = positionsliste.reduce((sum, pos) => {
-      // Sicherstellen, dass pos ein Objekt ist
-      if (!pos || typeof pos !== 'object') return sum;
-      
-      // Werte als Zahlen parsen
-      const menge = parseFloat(pos.menge) || 0;
-      const einzelpreis = parseFloat(pos.einzelpreis) || 0;
-      
-      return sum + (menge * einzelpreis);
-    }, 0);
-    
-    const mwst = nettobetrag * (mwstRate / 100);
-    return (nettobetrag + mwst).toFixed(2);
   };
 
   // Lade Angebotsdaten, wenn ein Angebot ausgewählt wird
   const handleAngebotChange = async (angebotId, setFieldValue) => {
-    if (!angebotId) {
-      return;
-    }
+    if (!angebotId) return;
 
     try {
       const angebotResponse = await finanzenService.getAngebotById(angebotId);
-      
-      if (!angebotResponse || !angebotResponse.data) {
-        throw new Error('Ungültige Antwort vom Server');
-      }
-      
-      // Sicheres Extrahieren des Angebots
-      const angebot = angebotResponse.data.angebot || angebotResponse.data;
+      const angebot = extractApiData(angebotResponse, 'angebot');
       
       if (!angebot || typeof angebot !== 'object') {
         throw new Error('Angebot hat ein ungültiges Format');
       }
       
-      // Sicheres Auslesen und Setzen der Felder mit Fehlerbehandlung
+      // Formularfelder mit validierten Daten setzen
       try {
-        // Kunde mit Validierung setzen
+        // Kunde ID mit Validierung 
         if (angebot.kunde) {
           const kundeId = angebot.kunde._id || angebot.kunde;
           setFieldValue('kunde', kundeId);
         }
         
-        // Umzug mit Validierung setzen
+        // Umzug ID mit Validierung
         if (angebot.umzug) {
           const umzugId = angebot.umzug._id || angebot.umzug;
           setFieldValue('umzug', umzugId);
@@ -232,27 +186,12 @@ const RechnungForm = () => {
           setFieldValue('umzug', '');
         }
         
-        // Mehrwertsteuer sicher als Zahl setzen
-        setFieldValue('mehrwertsteuer', parseFloat(angebot.mehrwertsteuer) || 19);
+        // Mehrwertsteuer mit sicherer Konvertierung
+        setFieldValue('mehrwertsteuer', toNumber(angebot.mehrwertsteuer, 19));
         
-        // Positionsliste validieren und setzen
-        if (Array.isArray(angebot.positionsliste)) {
-          // Stelle sicher, dass alle Elemente der Positionsliste gültige Zahlen haben
-          const validPositions = angebot.positionsliste.map(pos => ({
-            ...pos,
-            menge: parseFloat(pos.menge) || 1,
-            einzelpreis: parseFloat(pos.einzelpreis) || 0,
-            gesamtpreis: calculateGesamtpreis(pos.menge, pos.einzelpreis)
-          }));
-          
-          setFieldValue('positionsliste', validPositions);
-        } else {
-          // Fallback, wenn keine gültige Positionsliste gefunden wurde
-          console.warn('Keine gültige Positionsliste im Angebot gefunden');
-          setFieldValue('positionsliste', [
-            { bezeichnung: '', menge: 1, einheit: 'Stück', einzelpreis: 0, gesamtpreis: 0 }
-          ]);
-        }
+        // Positionsliste mit zentraler Validierungsfunktion
+        const validPositions = validatePositions(angebot.positionsliste, calculateGesamtpreis);
+        setFieldValue('positionsliste', validPositions);
         
         toast.success('Angebotsdaten übernommen');
       } catch (parseError) {
@@ -268,42 +207,35 @@ const RechnungForm = () => {
   // Formular absenden
   const handleSubmit = async (values, { setSubmitting }) => {
     try {
-      // Daten vor dem Absenden validieren und normalisieren
+      // Daten mit gemeinsamen Hilfsfunktionen validieren
       const sanitizedValues = {
         ...values,
-        // Sicherstellen, dass die Mehrwertsteuer eine Zahl ist
-        mehrwertsteuer: parseFloat(values.mehrwertsteuer) || 0,
-        // Validiere die Positionsliste
-        positionsliste: Array.isArray(values.positionsliste) 
-          ? values.positionsliste.map(pos => ({
-              ...pos,
-              // Sicherstellen, dass numerische Werte korrekt sind
-              menge: parseFloat(pos.menge) || 0,
-              einzelpreis: parseFloat(pos.einzelpreis) || 0,
-              // Berechne gesamtpreis neu, um sicherzustellen, dass er korrekt ist
-              gesamtpreis: calculateGesamtpreis(pos.menge, pos.einzelpreis)
-            }))
-          : []
+        mehrwertsteuer: toNumber(values.mehrwertsteuer, 19),
+        positionsliste: validatePositions(values.positionsliste, calculateGesamtpreis)
       };
       
-      // Sicherstellen, dass alle erforderlichen Felder vorhanden sind
+      // Validierung der Pflichtfelder
       if (!sanitizedValues.kunde) {
         throw new Error('Kunde muss ausgewählt werden');
       }
       
-      if (sanitizedValues.positionsliste.length === 0) {
+      if (ensureArray(sanitizedValues.positionsliste).length === 0) {
         throw new Error('Mindestens eine Position muss hinzugefügt werden');
       }
       
-      // Senden der Daten an die API
+      // API-Aufruf mit Erfolgsbehandlung
+      let result;
       if (isEditMode) {
-        await finanzenService.updateRechnung(id, sanitizedValues);
+        result = await finanzenService.updateRechnung(id, sanitizedValues);
         toast.success('Rechnung erfolgreich aktualisiert');
       } else {
-        await finanzenService.createRechnung(sanitizedValues);
+        result = await finanzenService.createRechnung(sanitizedValues);
         toast.success('Rechnung erfolgreich erstellt');
       }
+      
+      // Erfolgreiche Navigation
       navigate('/finanzen/rechnungen');
+      return result;
     } catch (error) {
       console.error('Fehler beim Speichern der Rechnung:', error);
       toast.error(error.message || 'Fehler beim Speichern der Rechnung');

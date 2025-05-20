@@ -5,7 +5,15 @@ import { Formik, Form, Field, FieldArray, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { toast } from 'react-toastify';
 import dayjs from 'dayjs';
-import { finanzenService, umzuegeService } from '../../services/api';
+import { finanzenService, umzuegeService, clientService } from '../../services/api';
+import { 
+  extractApiData, 
+  ensureArray,
+  toNumber,
+  validatePositions,
+  calculateNettobetrag,
+  calculateMwst
+} from '../../utils/apiUtils';
 
 const AngebotForm = () => {
   const { id } = useParams();
@@ -52,39 +60,23 @@ const AngebotForm = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // In der realen Implementierung würden wir die API aufrufen
+        // Lade Kunden mit dem Service
         try {
-          // Verwende einen sichereren Ansatz mit Fehlerbehandlung
-          const kundenResponse = await fetch('/api/clients');
-          if (!kundenResponse.ok) {
-            throw new Error(`HTTP error! status: ${kundenResponse.status}`);
-          }
-          
-          // Sichere JSON-Parsing mit try-catch
-          let kundenData;
-          try {
-            kundenData = await kundenResponse.json();
-          } catch (parseError) {
-            console.error('JSON Parsing Fehler:', parseError);
-            kundenData = { clients: [] };
-            toast.error('Fehler beim Verarbeiten der Kundendaten');
-          }
-          
-          setKunden(Array.isArray(kundenData.clients) ? kundenData.clients : []);
+          const kundenResponse = await clientService.getAll();
+          setKunden(ensureArray(extractApiData(kundenResponse, 'clients')));
         } catch (clientError) {
           console.error('Fehler beim Laden der Kunden:', clientError);
+          toast.error('Fehler beim Laden der Kundendaten');
           setKunden([]);
         }
 
         // Lade Umzüge mit dem Service
         try {
           const umzuegeResponse = await umzuegeService.getAll();
-          // Prüfe, ob die Antwort die erwartete Struktur hat
-          const umzuegeListe = umzuegeResponse?.data?.umzuege || 
-                              (Array.isArray(umzuegeResponse?.data) ? umzuegeResponse.data : []);
-          setUmzuege(umzuegeListe);
+          setUmzuege(ensureArray(extractApiData(umzuegeResponse, 'umzuege')));
         } catch (umzuegeError) {
           console.error('Fehler beim Laden der Umzüge:', umzuegeError);
+          toast.error('Fehler beim Laden der Umzugsdaten');
           setUmzuege([]);
         }
 
@@ -92,37 +84,24 @@ const AngebotForm = () => {
         if (isEditMode) {
           try {
             const angebotResponse = await finanzenService.getAngebotById(id);
-            if (angebotResponse?.data) {
-              // Stelle sicher, dass wir die richtige Datenstruktur haben
-              const angebotDaten = angebotResponse.data.angebot || angebotResponse.data;
+            const angebotDaten = extractApiData(angebotResponse, 'angebot');
+            
+            if (angebotDaten && typeof angebotDaten === 'object') {
+              // Transformiere die Daten mit den Hilfsfunktionen
+              const validatedAngebot = {
+                ...angebotDaten,
+                mehrwertsteuer: toNumber(angebotDaten.mehrwertsteuer, 19),
+                positionsliste: validatePositions(
+                  angebotDaten.positionsliste, 
+                  (menge, einzelpreis) => (toNumber(menge) * toNumber(einzelpreis)).toFixed(2)
+                )
+              };
               
-              // Validiere die Daten
-              if (angebotDaten && typeof angebotDaten === 'object') {
-                // Stelle sicher, dass positionsliste ein Array ist
-                if (angebotDaten.positionsliste && !Array.isArray(angebotDaten.positionsliste)) {
-                  angebotDaten.positionsliste = [];
-                }
-                
-                // Stelle sicher, dass numerische Werte korrekt sind
-                if (angebotDaten.mehrwertsteuer && typeof angebotDaten.mehrwertsteuer !== 'number') {
-                  angebotDaten.mehrwertsteuer = parseFloat(angebotDaten.mehrwertsteuer) || 19;
-                }
-                
-                // Stelle sicher, dass menge und einzelpreis in jeder Position korrekte Zahlen sind
-                if (Array.isArray(angebotDaten.positionsliste)) {
-                  angebotDaten.positionsliste = angebotDaten.positionsliste.map(pos => ({
-                    ...pos,
-                    menge: typeof pos.menge === 'number' ? pos.menge : parseFloat(pos.menge) || 1,
-                    einzelpreis: typeof pos.einzelpreis === 'number' ? pos.einzelpreis : parseFloat(pos.einzelpreis) || 0
-                  }));
-                }
-                
-                setAngebot(angebotDaten);
-              } else {
-                console.error('Ungültiges Angebotsdatenformat:', angebotDaten);
-                toast.error('Angebot konnte nicht geladen werden: Ungültiges Format');
-                setAngebot(initialValues);
-              }
+              setAngebot(validatedAngebot);
+            } else {
+              console.error('Ungültiges Angebotsdatenformat:', angebotDaten);
+              toast.error('Angebot konnte nicht geladen werden: Ungültiges Format');
+              setAngebot(initialValues);
             }
           } catch (angebotError) {
             console.error('Fehler beim Laden des Angebots:', angebotError);
@@ -141,82 +120,60 @@ const AngebotForm = () => {
     fetchData();
   }, [id, isEditMode]);
 
-  // Berechnung des Gesamtpreises für eine Position
+  // Berechnung des Gesamtpreises für eine Position - verwendet apiUtils.toNumber
   const calculateGesamtpreis = (menge, einzelpreis) => {
-    // Stelle sicher, dass wir mit Zahlen arbeiten
-    const numMenge = parseFloat(menge) || 0;
-    const numEinzelpreis = parseFloat(einzelpreis) || 0;
-    return (numMenge * numEinzelpreis).toFixed(2);
+    return (toNumber(menge) * toNumber(einzelpreis)).toFixed(2);
   };
 
-  // Berechnung des Gesamtbetrags für alle Positionen
+  // Berechnung des Gesamtbetrags für alle Positionen - verwendet apiUtils.calculateNettobetrag und calculateMwst
   const calculateGesamtbetrag = (positionsliste, mehrwertsteuer) => {
-    // Sicherstellen, dass positionsliste ein Array ist
-    if (!Array.isArray(positionsliste)) {
-      console.warn('Positionsliste ist kein Array:', positionsliste);
+    try {
+      // Sicherstellen, dass positionsliste ein Array ist
+      const positions = ensureArray(positionsliste);
+      
+      // Berechnung mit Hilfsfunktionen
+      const nettobetrag = calculateNettobetrag(positions);
+      const mwst = calculateMwst(nettobetrag, mehrwertsteuer);
+      
+      return (nettobetrag + mwst).toFixed(2);
+    } catch (error) {
+      console.error('Fehler bei Gesamtbetragsberechnung:', error);
       return '0.00';
     }
-    
-    // Mehrwertsteuer als Zahl parsen
-    const mwstRate = parseFloat(mehrwertsteuer) || 0;
-    
-    // Berechnung des Nettobetrags mit Fehlerbehandlung für jede Position
-    const nettobetrag = positionsliste.reduce((sum, pos) => {
-      // Sicherstellen, dass pos ein Objekt ist
-      if (!pos || typeof pos !== 'object') return sum;
-      
-      // Werte als Zahlen parsen
-      const menge = parseFloat(pos.menge) || 0;
-      const einzelpreis = parseFloat(pos.einzelpreis) || 0;
-      
-      return sum + (menge * einzelpreis);
-    }, 0);
-    
-    const mwst = nettobetrag * (mwstRate / 100);
-    return (nettobetrag + mwst).toFixed(2);
   };
 
   // Formular absenden
   const handleSubmit = async (values, { setSubmitting }) => {
     try {
-      // Daten vor dem Absenden validieren und normalisieren
+      // Daten mit gemeinsamen Hilfsfunktionen validieren
       const sanitizedValues = {
         ...values,
-        // Sicherstellen, dass die Mehrwertsteuer eine Zahl ist
-        mehrwertsteuer: parseFloat(values.mehrwertsteuer) || 0,
-        // Validiere die Positionsliste
-        positionsliste: Array.isArray(values.positionsliste) 
-          ? values.positionsliste.map(pos => ({
-              ...pos,
-              // Sicherstellen, dass numerische Werte korrekt sind
-              menge: parseFloat(pos.menge) || 0,
-              einzelpreis: parseFloat(pos.einzelpreis) || 0,
-              // Berechne gesamtpreis neu, um sicherzustellen, dass er korrekt ist
-              gesamtpreis: calculateGesamtpreis(pos.menge, pos.einzelpreis)
-            }))
-          : []
+        mehrwertsteuer: toNumber(values.mehrwertsteuer, 19),
+        positionsliste: validatePositions(values.positionsliste, calculateGesamtpreis)
       };
       
-      // Sicherstellen, dass alle erforderlichen Felder vorhanden sind
+      // Validierung der Pflichtfelder
       if (!sanitizedValues.kunde) {
         throw new Error('Kunde muss ausgewählt werden');
       }
       
-      if (sanitizedValues.positionsliste.length === 0) {
+      if (ensureArray(sanitizedValues.positionsliste).length === 0) {
         throw new Error('Mindestens eine Position muss hinzugefügt werden');
       }
       
-      // Senden der Daten an die API
+      // API-Aufruf mit Erfolgsbehandlung
+      let result;
       if (isEditMode) {
-        await finanzenService.updateAngebot(id, sanitizedValues);
+        result = await finanzenService.updateAngebot(id, sanitizedValues);
         toast.success('Angebot erfolgreich aktualisiert');
       } else {
-        await finanzenService.createAngebot(sanitizedValues);
+        result = await finanzenService.createAngebot(sanitizedValues);
         toast.success('Angebot erfolgreich erstellt');
       }
       
-      // Zur Angebotsübersicht navigieren
+      // Erfolgreiche Navigation
       navigate('/finanzen/angebote');
+      return result;
     } catch (error) {
       console.error('Fehler beim Speichern des Angebots:', error);
       toast.error(error.message || 'Fehler beim Speichern des Angebots');

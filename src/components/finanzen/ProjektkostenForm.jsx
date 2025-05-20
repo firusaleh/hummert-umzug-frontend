@@ -1,4 +1,4 @@
-// src/components/finanzen/ProjektkostenForm.jsx (Fortsetzung)
+// src/components/finanzen/ProjektkostenForm.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
@@ -6,6 +6,12 @@ import * as Yup from 'yup';
 import { toast } from 'react-toastify';
 import dayjs from 'dayjs';
 import { finanzenService, umzuegeService, fileService } from '../../services/api';
+import { 
+  extractApiData, 
+  ensureArray, 
+  toNumber,
+  safeJsonParse
+} from '../../utils/apiUtils';
 
 const ProjektkostenForm = () => {
   const { id } = useParams();
@@ -51,17 +57,47 @@ const ProjektkostenForm = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const umzuegeResponse = await umzuegeService.getAll();
-        setUmzuege(umzuegeResponse.data.umzuege || []);
+        // Lade Umzüge mit dem Service
+        try {
+          const umzuegeResponse = await umzuegeService.getAll();
+          setUmzuege(ensureArray(extractApiData(umzuegeResponse, 'umzuege')));
+        } catch (umzuegeError) {
+          console.error('Fehler beim Laden der Umzüge:', umzuegeError);
+          toast.error('Fehler beim Laden der Umzugsdaten');
+          setUmzuege([]);
+        }
 
         // Wenn im Bearbeitungsmodus, lade vorhandene Projektkosten
         if (isEditMode) {
-          const projektkostenResponse = await finanzenService.getProjektkostenById(id);
-          setProjektkosten(projektkostenResponse.data.projektkosten);
-          
-          // Setze hochgeladene Dateien
-          if (projektkostenResponse.data.projektkosten.belege) {
-            setUploadedFiles(projektkostenResponse.data.projektkosten.belege);
+          try {
+            const projektkostenResponse = await finanzenService.getProjektkostenById(id);
+            const projektkostenDaten = extractApiData(projektkostenResponse, 'projektkosten');
+            
+            if (projektkostenDaten && typeof projektkostenDaten === 'object') {
+              // Transformiere die Daten für die Konsistenz
+              const validatedProjektkosten = {
+                ...projektkostenDaten,
+                betrag: toNumber(projektkostenDaten.betrag, 0),
+                // Stelle sicher, dass das Datumsformat korrekt ist
+                datum: projektkostenDaten.datum ? dayjs(projektkostenDaten.datum).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+                bezahltAm: projektkostenDaten.bezahltAm ? dayjs(projektkostenDaten.bezahltAm).format('YYYY-MM-DD') : ''
+              };
+              
+              setProjektkosten(validatedProjektkosten);
+              
+              // Setze hochgeladene Dateien mit Fehlerbehandlung
+              if (projektkostenDaten.belege) {
+                setUploadedFiles(ensureArray(projektkostenDaten.belege));
+              }
+            } else {
+              console.error('Ungültiges Projektkostendatenformat:', projektkostenDaten);
+              toast.error('Projektkosten konnten nicht geladen werden: Ungültiges Format');
+              setProjektkosten(initialValues);
+            }
+          } catch (projektkostenError) {
+            console.error('Fehler beim Laden der Projektkosten:', projektkostenError);
+            toast.error('Projektkosten konnten nicht geladen werden');
+            setProjektkosten(initialValues);
           }
         }
       } catch (error) {
@@ -80,9 +116,9 @@ const ProjektkostenForm = () => {
     setSelectedFiles(Array.from(event.target.files));
   };
 
-  // Upload-Funktion
+  // Upload-Funktion mit verbesserter Fehlerbehandlung
   const uploadBelege = async (projektkostenId) => {
-    if (selectedFiles.length === 0) return [];
+    if (!selectedFiles.length) return [];
 
     try {
       const formData = new FormData();
@@ -94,37 +130,56 @@ const ProjektkostenForm = () => {
       formData.append('reference', projektkostenId);
 
       const uploadResponse = await fileService.uploadFile(formData);
-      return uploadResponse.data.files || [];
+      return ensureArray(extractApiData(uploadResponse, 'files'));
     } catch (error) {
       console.error('Fehler beim Hochladen der Belege:', error);
-      toast.error('Fehler beim Hochladen der Belege');
+      toast.error(error.message || 'Fehler beim Hochladen der Belege');
       return [];
     }
   };
 
-  // Formular absenden
+  // Formular absenden mit verbesserter Fehlerbehandlung
   const handleSubmit = async (values, { setSubmitting }) => {
     try {
-      let response;
+      // Daten mit gemeinsamen Hilfsfunktionen validieren
+      const sanitizedValues = {
+        ...values,
+        betrag: toNumber(values.betrag, 0)
+      };
       
+      // Validierung der Pflichtfelder
+      if (!sanitizedValues.bezeichnung) {
+        throw new Error('Bezeichnung muss angegeben werden');
+      }
+      
+      // API-Aufruf mit Erfolgsbehandlung
+      let result;
       if (isEditMode) {
-        response = await finanzenService.updateProjektkosten(id, values);
+        result = await finanzenService.updateProjektkosten(id, sanitizedValues);
         toast.success('Projektkosten erfolgreich aktualisiert');
       } else {
-        response = await finanzenService.createProjektkosten(values);
+        result = await finanzenService.createProjektkosten(sanitizedValues);
         toast.success('Projektkosten erfolgreich erstellt');
       }
       
       // Belege hochladen, wenn vorhanden
       if (selectedFiles.length > 0) {
-        const projektkostenId = isEditMode ? id : response.data.projektkosten._id;
-        await uploadBelege(projektkostenId);
+        const projektkostenData = extractApiData(result, 'projektkosten');
+        const projektkostenId = isEditMode ? id : (projektkostenData?._id || '');
+        
+        if (!projektkostenId) {
+          console.warn('Keine Projektkosten-ID für Belegupload verfügbar');
+          toast.warning('Projektkosten gespeichert, aber Belege konnten nicht zugeordnet werden');
+        } else {
+          await uploadBelege(projektkostenId);
+        }
       }
       
+      // Erfolgreiche Navigation
       navigate('/finanzen/projektkosten');
     } catch (error) {
       console.error('Fehler beim Speichern der Projektkosten:', error);
-      toast.error('Fehler beim Speichern der Projektkosten');
+      toast.error(error.message || 'Fehler beim Speichern der Projektkosten');
     } finally {
       setSubmitting(false);
     }
