@@ -16,10 +16,17 @@ const AufnahmenList = () => {
     try {
       const response = await aufnahmenService.getAll();
       console.log('Geladene Aufnahmen:', response.data);
-      setAufnahmen(response.data);
+      
+      // Sicherstellen, dass wir ein Array haben, auch wenn die API nichts zurückgibt
+      const aufnahmenData = Array.isArray(response.data) ? response.data : [];
+      setAufnahmen(aufnahmenData);
     } catch (error) {
       console.error('Fehler beim Laden der Aufnahmen:', error);
-      alert('Die Aufnahmen konnten nicht geladen werden.');
+      // Verbesserte Fehlermeldung mit Details
+      const errorMessage = error.response?.data?.message || error.message || 'Die Aufnahmen konnten nicht geladen werden.';
+      alert(`Fehler: ${errorMessage}`);
+      // Leeres Array setzen, damit die UI nicht bricht
+      setAufnahmen([]);
     } finally {
       setLoading(false);
     }
@@ -41,14 +48,22 @@ const AufnahmenList = () => {
   };
   
   const handleDeleteAufnahme = async (id) => {
+    if (!id) {
+      alert('Fehler: Keine Aufnahme-ID angegeben.');
+      return;
+    }
+    
     if (window.confirm('Möchten Sie diese Aufnahme wirklich löschen?')) {
+      setLoading(true);
       try {
         await aufnahmenService.delete(id);
         // Nach erfolgreicher Löschung aktualisierte Liste laden
         loadAufnahmen();
       } catch (error) {
         console.error('Fehler beim Löschen der Aufnahme:', error);
-        alert('Die Aufnahme konnte nicht gelöscht werden.');
+        const errorMessage = error.response?.data?.message || error.message || 'Die Aufnahme konnte nicht gelöscht werden.';
+        alert(`Fehler: ${errorMessage}`);
+        setLoading(false);
       }
     }
   };
@@ -64,33 +79,54 @@ const AufnahmenList = () => {
     setLoading(true);
     
     try {
+      // Daten validieren bevor wir sie an die API senden
+      if (!data.kundenName) {
+        throw new Error('Bitte geben Sie einen Kundennamen ein.');
+      }
+      
+      let result;
       if (currentAufnahme) {
         // Bestehende Aufnahme aktualisieren
-        await aufnahmenService.update(currentAufnahme._id, data);
+        result = await aufnahmenService.update(currentAufnahme._id, data);
+        console.log('Aufnahme aktualisiert:', result);
       } else {
         // Neue Aufnahme erstellen
-        await aufnahmenService.create(data);
+        result = await aufnahmenService.create(data);
+        console.log('Neue Aufnahme erstellt:', result);
       }
       
       // Formular schließen und Aufnahmen neu laden
       setShowForm(false);
       setCurrentAufnahme(null);
       loadAufnahmen();
+      
+      // Erfolg bestätigen
+      const action = currentAufnahme ? 'aktualisiert' : 'erstellt';
+      alert(`Aufnahme erfolgreich ${action}!`);
     } catch (error) {
       console.error('Fehler beim Speichern:', error);
-      alert('Es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.');
+      const errorMessage = error.response?.data?.message || error.message || 'Es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.';
+      alert(`Fehler: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
   };
   
   // Gefilterte Aufnahmen basierend auf Suchbegriff
-  const filteredAufnahmen = aufnahmen.filter(aufnahme => 
-    aufnahme.kundenName?.toLowerCase().includes(suchbegriff.toLowerCase()) ||
-    aufnahme.auszugsadresse?.strasse?.toLowerCase().includes(suchbegriff.toLowerCase()) ||
-    aufnahme.auszugsadresse?.ort?.toLowerCase().includes(suchbegriff.toLowerCase()) ||
-    aufnahme.status?.toLowerCase().includes(suchbegriff.toLowerCase())
-  );
+  const filteredAufnahmen = aufnahmen.filter(aufnahme => {
+    const searchTerm = suchbegriff.toLowerCase();
+    // Sichere Überprüfung auf vorhandene Eigenschaften
+    const kundenNameMatch = aufnahme.kundenName ? aufnahme.kundenName.toLowerCase().includes(searchTerm) : false;
+    const strasseMatch = aufnahme.auszugsadresse && aufnahme.auszugsadresse.strasse 
+      ? aufnahme.auszugsadresse.strasse.toLowerCase().includes(searchTerm) 
+      : false;
+    const ortMatch = aufnahme.auszugsadresse && aufnahme.auszugsadresse.ort 
+      ? aufnahme.auszugsadresse.ort.toLowerCase().includes(searchTerm) 
+      : false;
+    const statusMatch = aufnahme.status ? aufnahme.status.toLowerCase().includes(searchTerm) : false;
+    
+    return kundenNameMatch || strasseMatch || ortMatch || statusMatch;
+  });
   
   // Formatiere Status für die Anzeige
   const formatStatus = (status) => {
@@ -156,15 +192,15 @@ const AufnahmenList = () => {
                         {filteredAufnahmen.map((aufnahme) => (
                           <tr key={aufnahme._id} className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="font-medium text-gray-900">{aufnahme.kundenName}</div>
+                              <div className="font-medium text-gray-900">{aufnahme.kundenName || 'Unbekannt'}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-gray-500">
                               {aufnahme.auszugsadresse ? 
-                                `${aufnahme.auszugsadresse.strasse} ${aufnahme.auszugsadresse.hausnummer}, ${aufnahme.auszugsadresse.plz} ${aufnahme.auszugsadresse.ort}` 
-                                : ''}
+                                `${aufnahme.auszugsadresse.strasse || ''} ${aufnahme.auszugsadresse.hausnummer || ''}, ${aufnahme.auszugsadresse.plz || ''} ${aufnahme.auszugsadresse.ort || ''}`.trim().replace(/, $/, '') 
+                                : 'Keine Adresse'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-gray-500">
-                              {aufnahme.datum ? new Date(aufnahme.datum).toLocaleDateString('de-DE') : ''}
+                              {aufnahme.datum ? new Date(aufnahme.datum).toLocaleDateString('de-DE') : 'Kein Datum'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -173,7 +209,7 @@ const AufnahmenList = () => {
                                 aufnahme.status === 'angebot_erstellt' ? 'bg-blue-100 text-blue-800' :
                                 'bg-gray-100 text-gray-800'
                               }`}>
-                                {formatStatus(aufnahme.status)}
+                                {aufnahme.status ? formatStatus(aufnahme.status) : 'Nicht definiert'}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
