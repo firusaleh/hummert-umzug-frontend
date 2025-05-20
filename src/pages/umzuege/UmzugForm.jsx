@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../../services/api';
+import api, { umzuegeService, mitarbeiterService, fahrzeugeService } from '../../services/api';
+import { toast } from 'react-toastify';
+import { extractApiData, ensureArray } from '../../utils/apiUtils';
 
 export default function UmzugForm() {
   const { id } = useParams();
@@ -110,94 +112,39 @@ export default function UmzugForm() {
     return transformed;
   }, []);
 
-  // Simuliere API-Aufruf zum Laden der Daten bei Bearbeitung
+  // Lade Daten vom API
   useEffect(() => {
+    // Daten laden für die Bearbeitung eines vorhandenen Umzugs
     if (id) {
       const fetchUmzug = async () => {
         try {
           setLoading(true);
-          // In einer echten Anwendung würde hier ein API-Aufruf mit der ID stattfinden
-          try {
-            const response = await api.get(`/umzuege/${id}`);
-            setFormData(response.data);
-          } catch (error) {
-            console.error('Fehler beim Laden des Umzugs vom API:', error);
-            // Fallback zu Mockdaten
-            const mockUmzug = {
-              id: 1,
-              kundennummer: 'U-2025-001',
-              auftraggeber: {
-                name: 'Familie Becker',
-                telefon: '0123-4567890',
-                email: 'becker@beispiel.de'
-              },
-              kontakte: [
-                { name: 'Thomas Becker', telefon: '0123-4567890', email: 'thomas.becker@beispiel.de', isKunde: true }
-              ],
-              auszugsadresse: {
-                strasse: 'Rosenweg',
-                hausnummer: '8',
-                plz: '10115',
-                ort: 'Berlin',
-                land: 'Deutschland',
-                etage: 3,
-                aufzug: true,
-                entfernung: 10
-              },
-              einzugsadresse: {
-                strasse: 'Tulpenallee',
-                hausnummer: '23',
-                plz: '80333',
-                ort: 'München',
-                land: 'Deutschland',
-                etage: 2,
-                aufzug: false,
-                entfernung: 15
-              },
-              zwischenstopps: [
-                {
-                  strasse: 'Lagerstraße',
-                  hausnummer: '1',
-                  plz: '70174',
-                  ort: 'Stuttgart',
-                  land: 'Deutschland',
-                  etage: 0,
-                  aufzug: true,
-                  entfernung: 5
-                }
-              ],
-              startDatum: '2025-05-15T08:00:00',
-              endDatum: '2025-05-15T18:00:00',
-              status: 'geplant',
-              preis: {
-                netto: 1500,
-                brutto: 1785,
-                mwst: 19,
-                bezahlt: false,
-                zahlungsart: 'rechnung'
-              },
-              aufnahmeId: '',
-              fahrzeuge: [
-                { id: 1, typ: '7,5t LKW', kennzeichen: 'B-HU 1234' },
-                { id: 2, typ: 'Transporter', kennzeichen: 'B-HU 5678' }
-              ],
-              mitarbeiter: [
-                { id: 1, rolle: 'teamleiter' },
-                { id: 2, rolle: 'helfer' },
-                { id: 3, rolle: 'fahrer' },
-                { id: 4, rolle: 'helfer' }
-              ],
-              extraLeistungen: [
-                { beschreibung: 'Klaviertransport', preis: 250, menge: 1 },
-                { beschreibung: 'Verpackungsservice', preis: 350, menge: 1 }
-              ]
-            };
-            setFormData(mockUmzug);
+          // API-Aufruf mit standardisierter Fehlerbehandlung
+          const response = await umzuegeService.getById(id);
+          const umzugData = extractApiData(response);
+          
+          if (!umzugData) {
+            throw new Error('Keine gültigen Umzugsdaten erhalten');
           }
+          
+          // Bereite Datumsfelder für das Formular vor
+          if (umzugData.startDatum) {
+            const startDate = new Date(umzugData.startDatum);
+            umzugData.startDatum = startDate.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:MM
+          }
+          
+          if (umzugData.endDatum) {
+            const endDate = new Date(umzugData.endDatum);
+            umzugData.endDatum = endDate.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:MM
+          }
+          
+          setFormData(umzugData);
           setLoading(false);
         } catch (error) {
           console.error('Fehler beim Laden des Umzugs:', error);
+          toast.error('Der Umzug konnte nicht geladen werden: ' + (error.message || 'Unbekannter Fehler'));
           setLoading(false);
+          navigate('/umzuege'); // Zurück zur Übersicht bei Fehler
         }
       };
 
@@ -218,27 +165,72 @@ export default function UmzugForm() {
       }));
     }
     
-    // Mitarbeiter laden - Mock-Daten verwenden statt API-Aufruf
-    const mockMitarbeiter = [
-      { _id: '1', vorname: 'Max', nachname: 'Mustermann', rolle: 'Teamleiter' },
-      { _id: '2', vorname: 'Anna', nachname: 'Schmidt', rolle: 'Helfer' },
-      { _id: '3', vorname: 'Lukas', nachname: 'Meyer', rolle: 'Fahrer' },
-      { _id: '4', vorname: 'Julia', nachname: 'Weber', rolle: 'Helfer' },
-      { _id: '5', vorname: 'Felix', nachname: 'Schulz', rolle: 'Fahrer' },
-      { _id: '6', vorname: 'Laura', nachname: 'König', rolle: 'Helfer' }
-    ];
-    setVerfuegbareMitarbeiter(mockMitarbeiter);
+    // Mitarbeiter und Fahrzeuge parallel laden
+    const fetchResources = async () => {
+      try {
+        // Parallel Anfragen für bessere Performance
+        const [mitarbeiterResponse, fahrzeugeResponse] = await Promise.allSettled([
+          mitarbeiterService.getAll(),
+          fahrzeugeService.getAll()
+        ]);
+        
+        // Mitarbeiter verarbeiten
+        if (mitarbeiterResponse.status === 'fulfilled') {
+          const mitarbeiterData = extractApiData(mitarbeiterResponse.value);
+          const mitarbeiterListe = ensureArray(mitarbeiterData.mitarbeiter || mitarbeiterData);
+          
+          if (mitarbeiterListe.length > 0) {
+            // Transformiere die Mitarbeiterdaten ins richtige Format für das Formular
+            const formattedMitarbeiter = mitarbeiterListe.map(mitarbeiter => ({
+              _id: mitarbeiter._id,
+              vorname: mitarbeiter.vorname || '',
+              nachname: mitarbeiter.nachname || '',
+              position: mitarbeiter.position || 'Helfer',
+              abteilung: mitarbeiter.abteilung || ''
+            }));
+            
+            setVerfuegbareMitarbeiter(formattedMitarbeiter);
+          } else {
+            console.warn('Keine Mitarbeiter gefunden');
+            setVerfuegbareMitarbeiter([]);
+          }
+        } else {
+          console.error('Fehler beim Laden der Mitarbeiter:', mitarbeiterResponse.reason);
+          toast.error('Mitarbeiterdaten konnten nicht geladen werden');
+          setVerfuegbareMitarbeiter([]);
+        }
+        
+        // Fahrzeuge verarbeiten
+        if (fahrzeugeResponse.status === 'fulfilled') {
+          const fahrzeugeData = extractApiData(fahrzeugeResponse.value);
+          const fahrzeugeListe = ensureArray(fahrzeugeData.fahrzeuge || fahrzeugeData);
+          
+          if (fahrzeugeListe.length > 0) {
+            // Transformiere die Fahrzeugdaten ins richtige Format für das Formular
+            const formattedFahrzeuge = fahrzeugeListe.map(fahrzeug => ({
+              _id: fahrzeug._id,
+              kennzeichen: fahrzeug.kennzeichen || '',
+              typ: fahrzeug.typ || 'Unbekannt'
+            }));
+            
+            setVerfuegbareFahrzeuge(formattedFahrzeuge);
+          } else {
+            console.warn('Keine Fahrzeuge gefunden');
+            setVerfuegbareFahrzeuge([]);
+          }
+        } else {
+          console.error('Fehler beim Laden der Fahrzeuge:', fahrzeugeResponse.reason);
+          toast.error('Fahrzeugdaten konnten nicht geladen werden');
+          setVerfuegbareFahrzeuge([]);
+        }
+      } catch (error) {
+        console.error('Fehler beim Laden der Ressourcen:', error);
+        toast.error('Ressourcen konnten nicht geladen werden');
+      }
+    };
     
-    // Fahrzeuge laden - Direkt die Mockdaten für Fahrzeuge setzen ohne API-Aufruf
-    const mockFahrzeuge = [
-      { _id: '1', kennzeichen: 'B-HU 1234', typ: '7,5t LKW' },
-      { _id: '2', kennzeichen: 'B-HU 5678', typ: 'Transporter' },
-      { _id: '3', kennzeichen: 'B-HU 9012', typ: '12t LKW' },
-      { _id: '4', kennzeichen: 'B-HU 3456', typ: 'Transporter' }
-    ];
-    setVerfuegbareFahrzeuge(mockFahrzeuge);
-    
-  }, [id]);
+    fetchResources();
+  }, [id, navigate]);
 
   // Behandelt Änderungen in Input-Feldern
   const handleInputChange = (e) => {
@@ -353,7 +345,7 @@ export default function UmzugForm() {
     }));
   };
 
-  // Formular absenden - mit verbesserter Fehlerbehandlung und Datenformatierung
+  // Formular absenden - mit standardisierter Fehlerbehandlung und Datenformatierung
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -388,7 +380,7 @@ export default function UmzugForm() {
     });
 
     if (missingFields.length > 0) {
-      alert(`Folgende Pflichtfelder fehlen oder sind ungültig: ${missingFields.join(', ')}`);
+      toast.error(`Folgende Pflichtfelder fehlen oder sind ungültig: ${missingFields.join(', ')}`);
       return;
     }
     
@@ -396,62 +388,60 @@ export default function UmzugForm() {
       // Daten transformieren für API
       const transformedData = transformUmzugData(formData);
       
-      console.log('Transformierte Daten zum Speichern:', transformedData);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Transformierte Daten zum Speichern:', transformedData);
+      }
       
       if (isNeueModus) {
-        // Neuen Umzug erstellen
+        // Neuen Umzug erstellen mit standardisierter API
         try {
-          const response = await api.post('/umzuege', transformedData);
-          console.log('Umzug erfolgreich erstellt:', response.data);
-          // Nach Erfolg zur Übersicht navigieren
+          const response = await umzuegeService.create(transformedData);
+          const responseData = extractApiData(response);
+          
+          if (!responseData) {
+            throw new Error('Keine gültige Antwort vom Server erhalten');
+          }
+          
+          toast.success('Umzug erfolgreich erstellt');
           navigate('/umzuege');
         } catch (error) {
           console.error('Fehler beim Erstellen des Umzugs:', error);
           
-          // Detaillierte Fehlermeldung
-          let errorMessage = 'Der Umzug konnte nicht gespeichert werden.';
-          if (error.response && error.response.data) {
-            console.log('Server-Antwort:', error.response.data);
-            if (error.response.data.message) {
-              errorMessage += ` Grund: ${error.response.data.message}`;
-            }
-            if (error.response.data.errors) {
-              errorMessage += ` Validierungsfehler: ${JSON.stringify(error.response.data.errors)}`;
-            }
+          // Fehlermeldung mit Toast statt Alert
+          let errorMessage = 'Der Umzug konnte nicht gespeichert werden. ';
+          if (error.message) {
+            errorMessage += error.message;
           }
           
-          alert(errorMessage);
-          return; // Navigation wird verhindert
+          toast.error(errorMessage);
         }
       } else {
-        // Bestehenden Umzug aktualisieren
+        // Bestehenden Umzug aktualisieren mit standardisierter API
         try {
-          const response = await api.put(`/umzuege/${id}`, transformedData);
-          console.log('Umzug erfolgreich aktualisiert:', response.data);
-          // Nach Erfolg zur Übersicht navigieren
+          const response = await umzuegeService.update(id, transformedData);
+          const responseData = extractApiData(response);
+          
+          if (!responseData) {
+            throw new Error('Keine gültige Antwort vom Server erhalten');
+          }
+          
+          toast.success('Umzug erfolgreich aktualisiert');
           navigate('/umzuege');
         } catch (error) {
           console.error('Fehler beim Aktualisieren des Umzugs:', error);
           
-          // Detaillierte Fehlermeldung
-          let errorMessage = 'Der Umzug konnte nicht aktualisiert werden.';
-          if (error.response && error.response.data) {
-            console.log('Server-Antwort:', error.response.data);
-            if (error.response.data.message) {
-              errorMessage += ` Grund: ${error.response.data.message}`;
-            }
-            if (error.response.data.errors) {
-              errorMessage += ` Validierungsfehler: ${JSON.stringify(error.response.data.errors)}`;
-            }
+          // Fehlermeldung mit Toast statt Alert
+          let errorMessage = 'Der Umzug konnte nicht aktualisiert werden. ';
+          if (error.message) {
+            errorMessage += error.message;
           }
           
-          alert(errorMessage);
-          return; // Navigation wird verhindert
+          toast.error(errorMessage);
         }
       }
     } catch (error) {
       console.error('Fehler beim Speichern des Umzugs:', error);
-      alert('Es ist ein unerwarteter Fehler aufgetreten. Bitte versuchen Sie es später erneut.');
+      toast.error('Es ist ein unerwarteter Fehler aufgetreten. Bitte versuchen Sie es später erneut.');
     }
   };
 
