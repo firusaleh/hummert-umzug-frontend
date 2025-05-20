@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { projectService, clientService } from '../../services/api';
+import { toast } from 'react-toastify';
 
 const ProjectForm = ({ project, isEditing = false }) => {
   const navigate = useNavigate();
@@ -17,15 +18,34 @@ const ProjectForm = ({ project, isEditing = false }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Helper function to extract API data
+  const extractApiData = (response) => {
+    if (!response) return null;
+    if (response.data) return response.data;
+    if (response.success && response.data) return response.data;
+    return response;
+  };
+
+  // Helper function to ensure we have an array
+  const ensureArray = (data) => {
+    if (!data) return [];
+    return Array.isArray(data) ? data : [data];
+  };
+
   useEffect(() => {
     // Clients laden
     const fetchClients = async () => {
       try {
-        const response = await clientService.getClients();
-        setClients(response.data);
+        setLoading(true);
+        const response = await clientService.getAll();
+        const clientsData = extractApiData(response);
+        setClients(ensureArray(clientsData));
+        setLoading(false);
       } catch (err) {
         setError('Fehler beim Laden der Clients');
-        console.error(err);
+        console.error('Fehler beim Laden der Clients:', err);
+        toast.error('Clients konnten nicht geladen werden');
+        setLoading(false);
       }
     };
 
@@ -58,15 +78,25 @@ const ProjectForm = ({ project, isEditing = false }) => {
     setError(null);
 
     try {
-      if (isEditing) {
-        await projectService.updateProject(project._id, formData);
+      let response;
+      
+      if (isEditing && project?._id) {
+        response = await projectService.update(project._id, formData);
       } else {
-        await projectService.createProject(formData);
+        response = await projectService.create(formData);
       }
+      
+      if (response.success === false) {
+        throw new Error(response.message || 'Fehler beim Speichern des Projekts');
+      }
+      
+      toast.success(isEditing ? 'Projekt erfolgreich aktualisiert' : 'Projekt erfolgreich erstellt');
       navigate('/projects');
     } catch (err) {
-      setError(err.response?.data?.message || 'Ein Fehler ist aufgetreten');
-      console.error(err);
+      const errorMessage = err.response?.data?.message || err.message || 'Ein Fehler ist aufgetreten';
+      setError(errorMessage);
+      console.error('Fehler beim Speichern des Projekts:', err);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

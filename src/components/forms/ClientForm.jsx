@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clientService } from '../../services/api';
+import { toast } from 'react-toastify';
 
 const ClientForm = ({ client, isEditing = false }) => {
   const navigate = useNavigate();
@@ -66,15 +67,25 @@ const ClientForm = ({ client, isEditing = false }) => {
     setError(null);
 
     try {
-      if (isEditing) {
-        await clientService.updateClient(client._id, formData);
+      let response;
+      
+      if (isEditing && client?._id) {
+        response = await clientService.update(client._id, formData);
       } else {
-        await clientService.createClient(formData);
+        response = await clientService.create(formData);
       }
+      
+      if (response.success === false) {
+        throw new Error(response.message || 'Fehler beim Speichern des Kunden');
+      }
+      
+      toast.success(isEditing ? 'Kunde erfolgreich aktualisiert' : 'Kunde erfolgreich erstellt');
       navigate('/clients');
     } catch (err) {
-      setError(err.response?.data?.message || 'Ein Fehler ist aufgetreten');
-      console.error(err);
+      const errorMessage = err.response?.data?.message || err.message || 'Ein Fehler ist aufgetreten';
+      setError(errorMessage);
+      console.error('Fehler beim Speichern des Kunden:', err);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

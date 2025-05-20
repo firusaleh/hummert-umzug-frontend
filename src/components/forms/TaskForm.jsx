@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { taskService, projectService, userService } from '../../services/api';
+import { toast } from 'react-toastify';
 
 const TaskForm = ({ task, projectId, isEditing = false }) => {
   const navigate = useNavigate();
@@ -19,19 +20,56 @@ const TaskForm = ({ task, projectId, isEditing = false }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Helper function to extract API data
+  const extractApiData = (response) => {
+    if (!response) return null;
+    if (response.data) return response.data;
+    if (response.success && response.data) return response.data;
+    return response;
+  };
+
+  // Helper function to ensure we have an array
+  const ensureArray = (data) => {
+    if (!data) return [];
+    return Array.isArray(data) ? data : [data];
+  };
+
   useEffect(() => {
     // Projekte und Benutzer laden
     const fetchData = async () => {
       try {
-        const [projectsResponse, usersResponse] = await Promise.all([
-          projectService.getProjects(),
-          userService.getUsers() // Diese Funktion müsste im userService implementiert werden
+        setLoading(true);
+
+        // Use Promise.allSettled for better error handling with multiple requests
+        const [projectsResult, usersResult] = await Promise.allSettled([
+          projectService.getAll(),
+          userService.getAll()
         ]);
-        setProjects(projectsResponse.data);
-        setUsers(usersResponse.data);
+
+        // Handle projects data
+        if (projectsResult.status === 'fulfilled') {
+          const projectsData = extractApiData(projectsResult.value);
+          setProjects(ensureArray(projectsData));
+        } else {
+          console.error('Fehler beim Laden der Projekte:', projectsResult.reason);
+          toast.error('Projekte konnten nicht geladen werden');
+        }
+
+        // Handle users data
+        if (usersResult.status === 'fulfilled') {
+          const usersData = extractApiData(usersResult.value);
+          setUsers(ensureArray(usersData));
+        } else {
+          console.error('Fehler beim Laden der Benutzer:', usersResult.reason);
+          toast.error('Benutzer konnten nicht geladen werden');
+        }
+
+        setLoading(false);
       } catch (err) {
         setError('Fehler beim Laden der Daten');
         console.error(err);
+        toast.error('Fehler beim Laden der Formulardaten');
+        setLoading(false);
       }
     };
 
@@ -65,15 +103,25 @@ const TaskForm = ({ task, projectId, isEditing = false }) => {
     setError(null);
 
     try {
-      if (isEditing) {
-        await taskService.updateTask(task._id, formData);
+      let response;
+      
+      if (isEditing && task?._id) {
+        response = await taskService.update(task._id, formData);
       } else {
-        await taskService.createTask(formData);
+        response = await taskService.create(formData);
       }
+      
+      if (response.success === false) {
+        throw new Error(response.message || 'Fehler beim Speichern der Aufgabe');
+      }
+      
+      toast.success(isEditing ? 'Aufgabe erfolgreich aktualisiert' : 'Aufgabe erfolgreich erstellt');
       navigate(projectId ? `/projects/${projectId}` : '/tasks');
     } catch (err) {
-      setError(err.response?.data?.message || 'Ein Fehler ist aufgetreten');
-      console.error(err);
+      const errorMessage = err.response?.data?.message || err.message || 'Ein Fehler ist aufgetreten';
+      setError(errorMessage);
+      console.error('Fehler beim Speichern der Aufgabe:', err);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

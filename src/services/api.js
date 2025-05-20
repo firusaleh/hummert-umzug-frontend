@@ -236,8 +236,76 @@ export const umzuegeService = {
   }
 };
 
-export const mitarbeiterService = createService('/mitarbeiter');
-export const fahrzeugeService = createService('/fahrzeuge');
+export const mitarbeiterService = {
+  ...createService('/mitarbeiter'),
+  
+  // Method to upload a profile image
+  uploadImage: async (id, formData) => {
+    try {
+      const response = await api.post(`/mitarbeiter/${id}/profile-image`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: progressEvent => {
+          if (formData.onProgress && typeof formData.onProgress === 'function') {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            formData.onProgress(percentCompleted);
+          }
+        }
+      });
+      return response.data;
+    } catch (error) {
+      logError(`uploadImage /mitarbeiter/${id}/profile-image`, error);
+      return formatApiError(error, 'Fehler beim Hochladen des Profilbilds');
+    }
+  }
+};
+export const fahrzeugeService = {
+  ...createService('/fahrzeuge'),
+  
+  // Method to update vehicle status
+  updateStatus: async (id, statusData) => {
+    try {
+      const response = await api.patch(`/fahrzeuge/${id}/status`, statusData);
+      return response.data;
+    } catch (error) {
+      logError(`updateStatus /fahrzeuge/${id}/status`, error);
+      return formatApiError(error, 'Fehler beim Aktualisieren des Status');
+    }
+  },
+  
+  // Method to update odometer reading
+  updateKilometerstand: async (id, kilometerstand) => {
+    try {
+      const response = await api.patch(`/fahrzeuge/${id}/kilometerstand`, { kilometerstand });
+      return response.data;
+    } catch (error) {
+      logError(`updateKilometerstand /fahrzeuge/${id}/kilometerstand`, error);
+      return formatApiError(error, 'Fehler beim Aktualisieren des Kilometerstands');
+    }
+  },
+  
+  // Method to upload a vehicle image
+  uploadImage: async (id, formData) => {
+    try {
+      const response = await api.post(`/fahrzeuge/${id}/image`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: progressEvent => {
+          if (formData.onProgress && typeof formData.onProgress === 'function') {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            formData.onProgress(percentCompleted);
+          }
+        }
+      });
+      return response.data;
+    } catch (error) {
+      logError(`uploadImage /fahrzeuge/${id}/image`, error);
+      return formatApiError(error, 'Fehler beim Hochladen des Fahrzeugbilds');
+    }
+  }
+};
 export const aufnahmenService = createService('/aufnahmen');
 
 // Financial services with correct backend endpoints
