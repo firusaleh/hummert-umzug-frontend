@@ -58,21 +58,97 @@ const RechnungForm = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // In der realen Implementierung würden wir die API aufrufen
-        const kundenResponse = await fetch('/api/clients');
-        const kundenData = await kundenResponse.json();
-        setKunden(kundenData.clients || []);
+        // Lade Kunden mit sicherer Fehlerbehandlung
+        try {
+          const kundenResponse = await fetch('/api/clients');
+          if (!kundenResponse.ok) {
+            throw new Error(`HTTP error! status: ${kundenResponse.status}`);
+          }
+          
+          // Sicheres JSON-Parsing
+          let kundenData;
+          try {
+            kundenData = await kundenResponse.json();
+          } catch (parseError) {
+            console.error('JSON Parsing Fehler (Kunden):', parseError);
+            kundenData = { clients: [] };
+            toast.error('Fehler beim Verarbeiten der Kundendaten');
+          }
+          
+          // Sicherstellen, dass clients ein Array ist
+          setKunden(Array.isArray(kundenData.clients) ? kundenData.clients : []);
+        } catch (clientError) {
+          console.error('Fehler beim Laden der Kunden:', clientError);
+          setKunden([]);
+        }
 
-        const umzuegeResponse = await umzuegeService.getAll();
-        setUmzuege(umzuegeResponse.data.umzuege || []);
+        // Lade Umzüge mit sicherer Fehlerbehandlung
+        try {
+          const umzuegeResponse = await umzuegeService.getAll();
+          // Prüfe, ob die Antwort die erwartete Struktur hat
+          const umzuegeListe = umzuegeResponse?.data?.umzuege || 
+                             (Array.isArray(umzuegeResponse?.data) ? umzuegeResponse.data : []);
+          setUmzuege(umzuegeListe);
+        } catch (umzuegeError) {
+          console.error('Fehler beim Laden der Umzüge:', umzuegeError);
+          setUmzuege([]);
+        }
 
-        const angeboteResponse = await finanzenService.getAngebote();
-        setAngebote(angeboteResponse.data.angebote || []);
+        // Lade Angebote mit sicherer Fehlerbehandlung
+        try {
+          const angeboteResponse = await finanzenService.getAngebote();
+          // Prüfe, ob die Antwort die erwartete Struktur hat
+          const angeboteListe = angeboteResponse?.data?.angebote || 
+                              (Array.isArray(angeboteResponse?.data) ? angeboteResponse.data : []);
+          setAngebote(angeboteListe);
+        } catch (angeboteError) {
+          console.error('Fehler beim Laden der Angebote:', angeboteError);
+          setAngebote([]);
+        }
 
         // Wenn im Bearbeitungsmodus, lade vorhandene Rechnungsdaten
         if (isEditMode) {
-          const rechnungResponse = await finanzenService.getRechnungById(id);
-          setRechnung(rechnungResponse.data.rechnung);
+          try {
+            const rechnungResponse = await finanzenService.getRechnungById(id);
+            if (rechnungResponse?.data) {
+              // Stelle sicher, dass wir die richtige Datenstruktur haben
+              const rechnungDaten = rechnungResponse.data.rechnung || rechnungResponse.data;
+              
+              // Validiere die Daten
+              if (rechnungDaten && typeof rechnungDaten === 'object') {
+                // Stelle sicher, dass positionsliste ein Array ist
+                if (rechnungDaten.positionsliste && !Array.isArray(rechnungDaten.positionsliste)) {
+                  rechnungDaten.positionsliste = [];
+                }
+                
+                // Stelle sicher, dass numerische Werte korrekt sind
+                if (rechnungDaten.mehrwertsteuer && typeof rechnungDaten.mehrwertsteuer !== 'number') {
+                  rechnungDaten.mehrwertsteuer = parseFloat(rechnungDaten.mehrwertsteuer) || 19;
+                }
+                
+                // Stelle sicher, dass menge und einzelpreis in jeder Position korrekte Zahlen sind
+                if (Array.isArray(rechnungDaten.positionsliste)) {
+                  rechnungDaten.positionsliste = rechnungDaten.positionsliste.map(pos => ({
+                    ...pos,
+                    menge: typeof pos.menge === 'number' ? pos.menge : parseFloat(pos.menge) || 1,
+                    einzelpreis: typeof pos.einzelpreis === 'number' ? pos.einzelpreis : parseFloat(pos.einzelpreis) || 0
+                  }));
+                }
+                
+                setRechnung(rechnungDaten);
+              } else {
+                console.error('Ungültiges Rechnungsdatenformat:', rechnungDaten);
+                toast.error('Rechnung konnte nicht geladen werden: Ungültiges Format');
+                setRechnung(initialValues);
+              }
+            } else {
+              setRechnung(initialValues);
+            }
+          } catch (rechnungError) {
+            console.error('Fehler beim Laden der Rechnung:', rechnungError);
+            toast.error('Rechnung konnte nicht geladen werden');
+            setRechnung(initialValues);
+          }
         }
       } catch (error) {
         console.error('Fehler beim Laden der Daten:', error);
@@ -87,16 +163,36 @@ const RechnungForm = () => {
 
   // Berechnung des Gesamtpreises für eine Position
   const calculateGesamtpreis = (menge, einzelpreis) => {
-    return (menge * einzelpreis).toFixed(2);
+    // Stelle sicher, dass wir mit Zahlen arbeiten
+    const numMenge = parseFloat(menge) || 0;
+    const numEinzelpreis = parseFloat(einzelpreis) || 0;
+    return (numMenge * numEinzelpreis).toFixed(2);
   };
 
   // Berechnung des Gesamtbetrags für alle Positionen
   const calculateGesamtbetrag = (positionsliste, mehrwertsteuer) => {
+    // Sicherstellen, dass positionsliste ein Array ist
+    if (!Array.isArray(positionsliste)) {
+      console.warn('Positionsliste ist kein Array:', positionsliste);
+      return '0.00';
+    }
+    
+    // Mehrwertsteuer als Zahl parsen
+    const mwstRate = parseFloat(mehrwertsteuer) || 0;
+    
+    // Berechnung des Nettobetrags mit Fehlerbehandlung für jede Position
     const nettobetrag = positionsliste.reduce((sum, pos) => {
-      return sum + (pos.menge * pos.einzelpreis);
+      // Sicherstellen, dass pos ein Objekt ist
+      if (!pos || typeof pos !== 'object') return sum;
+      
+      // Werte als Zahlen parsen
+      const menge = parseFloat(pos.menge) || 0;
+      const einzelpreis = parseFloat(pos.einzelpreis) || 0;
+      
+      return sum + (menge * einzelpreis);
     }, 0);
     
-    const mwst = nettobetrag * (mehrwertsteuer / 100);
+    const mwst = nettobetrag * (mwstRate / 100);
     return (nettobetrag + mwst).toFixed(2);
   };
 
@@ -108,34 +204,109 @@ const RechnungForm = () => {
 
     try {
       const angebotResponse = await finanzenService.getAngebotById(angebotId);
-      const angebot = angebotResponse.data.angebot;
-
-      // Übernehme Daten aus dem Angebot
-      setFieldValue('kunde', angebot.kunde._id);
-      setFieldValue('umzug', angebot.umzug ? angebot.umzug._id : '');
-      setFieldValue('mehrwertsteuer', angebot.mehrwertsteuer);
-      setFieldValue('positionsliste', angebot.positionsliste);
-
+      
+      if (!angebotResponse || !angebotResponse.data) {
+        throw new Error('Ungültige Antwort vom Server');
+      }
+      
+      // Sicheres Extrahieren des Angebots
+      const angebot = angebotResponse.data.angebot || angebotResponse.data;
+      
+      if (!angebot || typeof angebot !== 'object') {
+        throw new Error('Angebot hat ein ungültiges Format');
+      }
+      
+      // Sicheres Auslesen und Setzen der Felder mit Fehlerbehandlung
+      try {
+        // Kunde mit Validierung setzen
+        if (angebot.kunde) {
+          const kundeId = angebot.kunde._id || angebot.kunde;
+          setFieldValue('kunde', kundeId);
+        }
+        
+        // Umzug mit Validierung setzen
+        if (angebot.umzug) {
+          const umzugId = angebot.umzug._id || angebot.umzug;
+          setFieldValue('umzug', umzugId);
+        } else {
+          setFieldValue('umzug', '');
+        }
+        
+        // Mehrwertsteuer sicher als Zahl setzen
+        setFieldValue('mehrwertsteuer', parseFloat(angebot.mehrwertsteuer) || 19);
+        
+        // Positionsliste validieren und setzen
+        if (Array.isArray(angebot.positionsliste)) {
+          // Stelle sicher, dass alle Elemente der Positionsliste gültige Zahlen haben
+          const validPositions = angebot.positionsliste.map(pos => ({
+            ...pos,
+            menge: parseFloat(pos.menge) || 1,
+            einzelpreis: parseFloat(pos.einzelpreis) || 0,
+            gesamtpreis: calculateGesamtpreis(pos.menge, pos.einzelpreis)
+          }));
+          
+          setFieldValue('positionsliste', validPositions);
+        } else {
+          // Fallback, wenn keine gültige Positionsliste gefunden wurde
+          console.warn('Keine gültige Positionsliste im Angebot gefunden');
+          setFieldValue('positionsliste', [
+            { bezeichnung: '', menge: 1, einheit: 'Stück', einzelpreis: 0, gesamtpreis: 0 }
+          ]);
+        }
+        
+        toast.success('Angebotsdaten übernommen');
+      } catch (parseError) {
+        console.error('Fehler beim Verarbeiten der Angebotsdaten:', parseError);
+        toast.error('Fehler beim Verarbeiten des Angebots');
+      }
     } catch (error) {
       console.error('Fehler beim Laden des Angebots:', error);
-      toast.error('Fehler beim Laden des Angebots');
+      toast.error(error.message || 'Fehler beim Laden des Angebots');
     }
   };
 
   // Formular absenden
   const handleSubmit = async (values, { setSubmitting }) => {
     try {
+      // Daten vor dem Absenden validieren und normalisieren
+      const sanitizedValues = {
+        ...values,
+        // Sicherstellen, dass die Mehrwertsteuer eine Zahl ist
+        mehrwertsteuer: parseFloat(values.mehrwertsteuer) || 0,
+        // Validiere die Positionsliste
+        positionsliste: Array.isArray(values.positionsliste) 
+          ? values.positionsliste.map(pos => ({
+              ...pos,
+              // Sicherstellen, dass numerische Werte korrekt sind
+              menge: parseFloat(pos.menge) || 0,
+              einzelpreis: parseFloat(pos.einzelpreis) || 0,
+              // Berechne gesamtpreis neu, um sicherzustellen, dass er korrekt ist
+              gesamtpreis: calculateGesamtpreis(pos.menge, pos.einzelpreis)
+            }))
+          : []
+      };
+      
+      // Sicherstellen, dass alle erforderlichen Felder vorhanden sind
+      if (!sanitizedValues.kunde) {
+        throw new Error('Kunde muss ausgewählt werden');
+      }
+      
+      if (sanitizedValues.positionsliste.length === 0) {
+        throw new Error('Mindestens eine Position muss hinzugefügt werden');
+      }
+      
+      // Senden der Daten an die API
       if (isEditMode) {
-        await finanzenService.updateRechnung(id, values);
+        await finanzenService.updateRechnung(id, sanitizedValues);
         toast.success('Rechnung erfolgreich aktualisiert');
       } else {
-        await finanzenService.createRechnung(values);
+        await finanzenService.createRechnung(sanitizedValues);
         toast.success('Rechnung erfolgreich erstellt');
       }
       navigate('/finanzen/rechnungen');
     } catch (error) {
       console.error('Fehler beim Speichern der Rechnung:', error);
-      toast.error('Fehler beim Speichern der Rechnung');
+      toast.error(error.message || 'Fehler beim Speichern der Rechnung');
     } finally {
       setSubmitting(false);
     }
@@ -352,10 +523,16 @@ const RechnungForm = () => {
                                   name={`positionsliste.${index}.menge`}
                                   className="block w-24 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                   onChange={(e) => {
+                                    // Sichere Konvertierung in eine Zahl
                                     const value = e.target.value;
-                                    setFieldValue(`positionsliste.${index}.menge`, value);
-                                    // Berechne Gesamtpreis
-                                    const gesamtpreis = calculateGesamtpreis(value, values.positionsliste[index].einzelpreis);
+                                    const numValue = parseFloat(value) || 0;
+                                    
+                                    // Update des Feldes mit dem validierten Wert
+                                    setFieldValue(`positionsliste.${index}.menge`, numValue);
+                                    
+                                    // Berechne Gesamtpreis mit sicheren Werten
+                                    const einzelpreis = parseFloat(values.positionsliste[index].einzelpreis) || 0;
+                                    const gesamtpreis = calculateGesamtpreis(numValue, einzelpreis);
                                     setFieldValue(`positionsliste.${index}.gesamtpreis`, gesamtpreis);
                                   }}
                                 />
@@ -381,10 +558,16 @@ const RechnungForm = () => {
                                   name={`positionsliste.${index}.einzelpreis`}
                                   className="block w-32 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                   onChange={(e) => {
+                                    // Sichere Konvertierung in eine Zahl
                                     const value = e.target.value;
-                                    setFieldValue(`positionsliste.${index}.einzelpreis`, value);
-                                    // Berechne Gesamtpreis
-                                    const gesamtpreis = calculateGesamtpreis(values.positionsliste[index].menge, value);
+                                    const numValue = parseFloat(value) || 0;
+                                    
+                                    // Update des Feldes mit dem validierten Wert
+                                    setFieldValue(`positionsliste.${index}.einzelpreis`, numValue);
+                                    
+                                    // Berechne Gesamtpreis mit sicheren Werten
+                                    const menge = parseFloat(values.positionsliste[index].menge) || 0;
+                                    const gesamtpreis = calculateGesamtpreis(menge, numValue);
                                     setFieldValue(`positionsliste.${index}.gesamtpreis`, gesamtpreis);
                                   }}
                                 />
@@ -430,15 +613,50 @@ const RechnungForm = () => {
                 <div className="text-right">
                   <p className="text-sm text-gray-500">Nettobetrag</p>
                   <p className="text-lg font-medium text-gray-900">
-                    {values.positionsliste.reduce((sum, pos) => sum + (pos.menge * pos.einzelpreis), 0).toFixed(2)} €
+                    {(() => {
+                      try {
+                        // Sicherstellen, dass positionsliste ein Array ist und alle Werte Zahlen sind
+                        if (!Array.isArray(values.positionsliste)) return '0.00';
+                        
+                        const nettobetrag = values.positionsliste.reduce((sum, pos) => {
+                          const menge = parseFloat(pos.menge) || 0;
+                          const einzelpreis = parseFloat(pos.einzelpreis) || 0;
+                          return sum + (menge * einzelpreis);
+                        }, 0);
+                        
+                        return nettobetrag.toFixed(2);
+                      } catch (e) {
+                        console.error('Fehler bei der Berechnung des Nettobetrags:', e);
+                        return '0.00';
+                      }
+                    })()} €
                   </p>
                 </div>
               </div>
               <div className="flex justify-end mt-2">
                 <div className="text-right">
-                  <p className="text-sm text-gray-500">Mehrwertsteuer ({values.mehrwertsteuer}%)</p>
+                  <p className="text-sm text-gray-500">Mehrwertsteuer ({parseFloat(values.mehrwertsteuer) || 0}%)</p>
                   <p className="text-lg font-medium text-gray-900">
-                    {(values.positionsliste.reduce((sum, pos) => sum + (pos.menge * pos.einzelpreis), 0) * (values.mehrwertsteuer / 100)).toFixed(2)} €
+                    {(() => {
+                      try {
+                        // Sicherstellen, dass positionsliste ein Array ist und alle Werte Zahlen sind
+                        if (!Array.isArray(values.positionsliste)) return '0.00';
+                        
+                        const nettobetrag = values.positionsliste.reduce((sum, pos) => {
+                          const menge = parseFloat(pos.menge) || 0;
+                          const einzelpreis = parseFloat(pos.einzelpreis) || 0;
+                          return sum + (menge * einzelpreis);
+                        }, 0);
+                        
+                        const mwstRate = parseFloat(values.mehrwertsteuer) || 0;
+                        const mwst = nettobetrag * (mwstRate / 100);
+                        
+                        return mwst.toFixed(2);
+                      } catch (e) {
+                        console.error('Fehler bei der Berechnung der Mehrwertsteuer:', e);
+                        return '0.00';
+                      }
+                    })()} €
                   </p>
                 </div>
               </div>
