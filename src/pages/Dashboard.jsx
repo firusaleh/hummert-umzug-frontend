@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart as RechartsBarChart, Bar } from 'recharts';
 import { umzuegeService, mitarbeiterService, finanzenService } from '../services/api';
+import { extractApiData, ensureArray } from '../utils/apiUtils';
 
 // StatCard Komponente für die Statistikkarten
 const StatCard = ({ title, value, icon, change, changeType, loading }) => {
@@ -91,22 +92,22 @@ const Dashboard = () => {
           // Ersetze durch den richtigen Service für Aufnahmen wenn vorhanden, oder verwende einen Mock
           Promise.resolve({ data: { total: 215 } }),
           mitarbeiterService.getAll(),
-          finanzenService.getUebersicht(),
+          finanzenService.getFinanzuebersicht(),
           umzuegeService.getAll({ status: 'Geplant', limit: 5, sort: 'startDatum' })
         ]);
 
-        // Stats setzen mit Fallback auf 0 wenn die API fehlschlägt
-        const totalMoves = movesResponse.status === 'fulfilled' ? 
-          (movesResponse.value?.data?.length || 0) : 0;
+        // Stats setzen mit Fallback auf 0 wenn die API fehlschlägt und Nutzung der standardisierten Hilfsfunktionen
+        const moves = movesResponse.status === 'fulfilled' ? extractApiData(movesResponse.value) : null;
+        const totalMoves = moves ? ensureArray(moves.umzuege || moves).length : 0;
           
-        const totalInspections = inspectionsResponse.status === 'fulfilled' ? 
-          (inspectionsResponse.value?.data?.total || 0) : 0;
+        const inspections = inspectionsResponse.status === 'fulfilled' ? extractApiData(inspectionsResponse.value) : null;
+        const totalInspections = inspections?.total || 0;
           
-        const totalEmployees = employeesResponse.status === 'fulfilled' ? 
-          (employeesResponse.value?.data?.length || 0) : 0;
+        const employees = employeesResponse.status === 'fulfilled' ? extractApiData(employeesResponse.value) : null;
+        const totalEmployees = employees ? ensureArray(employees.mitarbeiter || employees).length : 0;
           
-        const totalRevenue = financeResponse.status === 'fulfilled' ? 
-          (financeResponse.value?.data?.umsatzGesamt || 0) : 0;
+        const financeData = financeResponse.status === 'fulfilled' ? extractApiData(financeResponse.value) : null;
+        const totalRevenue = financeData?.umsatzGesamt || financeData?.aktuelleUebersicht?.gesamtEinnahmen || 0;
 
         setStats({
           totalMoves,
@@ -121,16 +122,21 @@ const Dashboard = () => {
         
         try {
           // Versuchen, die Monatsübersicht für das aktuelle Jahr zu laden
-          const monthlyResponse = await finanzenService.getMonatsuebersicht(currentYear);
+          const monthlyResponse = await finanzenService.getMonatsUebersicht(currentYear);
+          const monthlyData = extractApiData(monthlyResponse);
           
-          if (monthlyResponse?.data?.monatsUebersichten) {
-            const formattedData = monthlyResponse.data.monatsUebersichten.map(month => ({
+          if (monthlyData && monthlyData.monatsUebersichten) {
+            const monatsListe = ensureArray(monthlyData.monatsUebersichten);
+            
+            const formattedData = monatsListe.map(month => ({
               name: getMonthShortName(month.monat - 1), // API gibt Monate 1-12 zurück, JS verwendet 0-11
               umzuege: month.umzuege || 0,
               aufnahmen: month.aufnahmen || 0
             }));
             
             setMonthlyData(formattedData);
+          } else {
+            throw new Error("Keine gültigen Monatsdaten erhalten");
           }
         } catch (monthlyError) {
           // Fehler beim Laden der monatlichen Daten - verwende Fallback-Daten
@@ -164,23 +170,34 @@ const Dashboard = () => {
           setCategoryData([]);
         }
 
-        // Bevorstehende Umzüge
+        // Bevorstehende Umzüge mit standardisierter Fehlerbehandlung
         if (upcomingMovesResponse.status === 'fulfilled') {
-          const moves = upcomingMovesResponse.value?.data || [];
-          // Sicherstellen, dass nur zukünftige Umzüge angezeigt werden
-          const today = new Date();
-          const filteredMoves = moves
-            .filter(move => new Date(move.startDatum) >= today)
-            .sort((a, b) => new Date(a.startDatum) - new Date(b.startDatum))
-            .slice(0, 5);
+          try {
+            const movesData = extractApiData(upcomingMovesResponse.value);
+            const moves = ensureArray(movesData.umzuege || movesData);
             
-          setUpcomingMoves(filteredMoves);
+            // Sicherstellen, dass nur zukünftige Umzüge angezeigt werden
+            const today = new Date();
+            
+            const filteredMoves = moves
+              .filter(move => move && move.startDatum && new Date(move.startDatum) >= today)
+              .sort((a, b) => new Date(a.startDatum) - new Date(b.startDatum))
+              .slice(0, 5);
+              
+            setUpcomingMoves(filteredMoves);
+          } catch (error) {
+            console.error('Fehler bei der Verarbeitung bevorstehender Umzüge:', error);
+            setUpcomingMoves([]);
+          }
+        } else {
+          setUpcomingMoves([]);
         }
         
         setLoading(false);
       } catch (err) {
-        // Fehler beim Laden der Dashboard-Daten
-        setError('Die Dashboard-Daten konnten nicht geladen werden.');
+        // Verbesserte Fehlerbehandlung beim Laden der Dashboard-Daten
+        console.error('Dashboard Fehler:', err);
+        setError('Die Dashboard-Daten konnten nicht vollständig geladen werden: ' + (err.message || 'Unbekannter Fehler'));
         setLoading(false);
       }
     };
