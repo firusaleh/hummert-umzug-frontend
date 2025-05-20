@@ -399,7 +399,8 @@ export const finanzenService = {
   
   getMonatsUebersicht: async (jahr) => {
     try {
-      const response = await api.get(`/finanzen/uebersicht/${jahr}`);
+      // Die Backend-Route erwartet '/finanzen/monatsuebersicht/:jahr'
+      const response = await api.get(`/finanzen/monatsuebersicht/${jahr}`);
       return response.data;
     } catch (error) {
       logError(`finanzen:getMonatsUebersicht/${jahr}`, error);
@@ -409,7 +410,8 @@ export const finanzenService = {
   
   getMonatsDetails: async (jahr, monat) => {
     try {
-      const response = await api.get(`/finanzen/uebersicht/${jahr}/${monat}`);
+      // Die Backend-Route erwartet '/finanzen/monat/:monat/:jahr'
+      const response = await api.get(`/finanzen/monat/${monat}/${jahr}`);
       return response.data;
     } catch (error) {
       logError(`finanzen:getMonatsDetails/${jahr}/${monat}`, error);

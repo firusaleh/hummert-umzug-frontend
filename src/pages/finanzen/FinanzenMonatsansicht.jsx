@@ -51,7 +51,11 @@ const FinanzenMonatsansicht = () => {
       setIsLoadingDetails(true);
       try {
         // Monate in API sind 1-basiert (1=Januar, 12=Dezember)
-        const response = await finanzenService.getMonatsDetails(jahr, monatsIndex + 1);
+        // Die Reihenfolge von monat und jahr ist wichtig: 
+        // Backend-Route erwartet '/finanzen/monat/:monat/:jahr'
+        const monatNummer = monatsIndex + 1; // Umwandlung von 0-basiert zu 1-basiert
+        
+        const response = await finanzenService.getMonatsDetails(jahr, monatNummer);
         const monatData = extractApiData(response);
         
         if (!monatData) {
