@@ -34,7 +34,12 @@ const tokenManager = {
     }
   },
   setUser: (user) => localStorage.setItem('user', JSON.stringify(user)),
-  removeUser: () => localStorage.removeItem('user')
+  removeUser: () => localStorage.removeItem('user'),
+  clearAuthData: () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('tokenTimestamp');
+  }
 };
 
 // Request interceptor - no logging of sensitive data
@@ -56,16 +61,18 @@ api.interceptors.response.use(
     // Handle authentication errors
     if (error.response && error.response.status === 401) {
       const isTokenExpired = error.response.data?.message?.includes('Token') ||
-                            error.response.data?.message?.includes('abgelaufen') ||
-                            error.response.data?.message?.includes('Sitzung');
+                           error.response.data?.message?.includes('abgelaufen') ||
+                           error.response.data?.message?.includes('Sitzung') ||
+                           error.response.data?.message?.includes('nicht authentifiziert');
       
       if (isTokenExpired) {
-        // Clear auth data and redirect to login
-        tokenManager.removeToken();
-        tokenManager.removeUser();
+        // Clear auth data
+        tokenManager.clearAuthData();
         
+        // Only redirect to login if we're not already on the login page
         if (!window.location.pathname.includes('/login')) {
-          window.location.replace('/login');
+          window.location.replace('/login?session=expired');
+          // Return an empty promise that never resolves to prevent further error handling
           return new Promise(() => {});
         }
       }
@@ -135,6 +142,10 @@ export const authService = {
   register: async (userData) => {
     try {
       const response = await api.post('/auth/register', userData);
+      if (response.data.token) {
+        tokenManager.setToken(response.data.token);
+        tokenManager.setUser(response.data.user);
+      }
       return response.data;
     } catch (error) {
       logError('auth:register', error, { email: userData.email });
@@ -145,6 +156,10 @@ export const authService = {
   login: async (credentials) => {
     try {
       const response = await api.post('/auth/login', credentials);
+      if (response.data.token) {
+        tokenManager.setToken(response.data.token);
+        tokenManager.setUser(response.data.user);
+      }
       return response.data;
     } catch (error) {
       logError('auth:login', error, { email: credentials.email });
@@ -153,15 +168,17 @@ export const authService = {
   },
   
   logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('tokenTimestamp');
-    window.location.href = '/login';
+    tokenManager.clearAuthData();
+    // Only redirect if not already on login page
+    if (!window.location.pathname.includes('/login')) {
+      window.location.href = '/login';
+    }
   },
   
   checkAuth: async () => {
     try {
-      return await api.get('/auth/check');
+      const response = await api.get('/auth/check');
+      return response.data;
     } catch (error) {
       logError('auth:checkAuth', error);
       throw formatApiError(error, 'Authentifizierungsprüfung fehlgeschlagen');
@@ -203,10 +220,8 @@ export const mitarbeiterService = createService('/mitarbeiter');
 export const fahrzeugeService = createService('/fahrzeuge');
 export const aufnahmenService = createService('/aufnahmen');
 
-// Add the missing services
+// Financial services with correct backend endpoints
 export const finanzenService = {
-  ...createService('/finanzen'),
-
   // Angebote-bezogene Methoden
   getAngebote: async (params) => {
     try {
@@ -538,6 +553,26 @@ export const benachrichtigungenService = {
       logError('deleteAllRead /benachrichtigungen/read', error);
       return formatApiError(error, 'Fehler beim Löschen gelesener Benachrichtigungen');
     }
+  },
+  
+  getUnread: async () => {
+    try {
+      const response = await api.get('/benachrichtigungen/unread');
+      return response.data;
+    } catch (error) {
+      logError('getUnread /benachrichtigungen/unread', error);
+      return formatApiError(error, 'Fehler beim Laden ungelesener Benachrichtigungen');
+    }
+  },
+  
+  getCount: async () => {
+    try {
+      const response = await api.get('/benachrichtigungen/count');
+      return response.data;
+    } catch (error) {
+      logError('getCount /benachrichtigungen/count', error);
+      return formatApiError(error, 'Fehler beim Abrufen der Benachrichtigungsanzahl');
+    }
   }
 };
 
@@ -633,7 +668,8 @@ export const fileService = {
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
         if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/, '');
+          // Fix: Use global replace to remove all quotes
+          filename = filenameMatch[1].replace(/['"]/g, '');
         }
       }
       
