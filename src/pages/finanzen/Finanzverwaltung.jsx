@@ -14,11 +14,36 @@ const Finanzverwaltung = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await finanzenService.getUebersicht();
-        setFinanzDaten(response.data);
+        // Fix: Using the correct method name getFinanzuebersicht() instead of getUebersicht()
+        const response = await finanzenService.getFinanzuebersicht();
+        // Handle case where response might not be in expected format
+        if (response && response.success === false) {
+          throw new Error(response.message || 'Fehler beim Laden der Finanzdaten');
+        }
+        
+        // Ensure we have the expected data structure
+        const finanzData = response.data || response;
+        
+        // Validate that the response has the required structure
+        if (!finanzData || !finanzData.aktuelleUebersicht) {
+          console.warn('Unerwartetes Datenformat der Finanzübersicht:', finanzData);
+          // Create default structure to prevent UI errors
+          setFinanzDaten({
+            aktuelleUebersicht: {
+              gesamtEinnahmen: 0,
+              gesamtAusgaben: 0,
+              aktuellerGewinn: 0,
+              bezahlteRechnungen: 0
+            },
+            monatsDaten: [],
+            jahresVergleich: []
+          });
+        } else {
+          setFinanzDaten(finanzData);
+        }
       } catch (error) {
         console.error('Fehler beim Laden der Finanzdaten:', error);
-        setError('Die Finanzdaten konnten nicht geladen werden.');
+        setError(error.message || 'Die Finanzdaten konnten nicht geladen werden.');
         toast.error('Fehler beim Laden der Finanzdaten');
       } finally {
         setIsLoading(false);
