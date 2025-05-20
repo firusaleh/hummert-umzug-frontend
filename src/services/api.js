@@ -216,7 +216,26 @@ export const authService = {
 // Services using the standardized approach
 export const userService = createService('/users');
 export const clientService = createService('/clients');
-export const umzuegeService = createService('/umzuege');
+
+// Umzuege service with additional methods
+export const umzuegeService = {
+  ...createService('/umzuege'),
+  
+  // Method to update the status of a move
+  updateStatus: async (id, statusData) => {
+    try {
+      const response = await api.post(`/umzuege/${id}/status`, statusData);
+      return response.data;
+    } catch (error) {
+      console.error(`updateStatus /umzuege/${id}/status`, error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Fehler beim Aktualisieren des Status'
+      };
+    }
+  }
+};
+
 export const mitarbeiterService = createService('/mitarbeiter');
 export const fahrzeugeService = createService('/fahrzeuge');
 export const aufnahmenService = createService('/aufnahmen');
