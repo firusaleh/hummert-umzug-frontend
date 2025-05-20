@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api, { fileService, aufnahmenService } from '../../services/api';
+import api, { fileService, aufnahmenService, mitarbeiterService } from '../../services/api';
+import { toast } from 'react-toastify';
+import { extractApiData, ensureArray } from '../../utils/apiUtils';
 
 export default function AufnahmeForm() {
   const { id } = useParams();
@@ -48,6 +50,7 @@ export default function AufnahmeForm() {
   });
 
   const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [uploadProgress, setUploadProgress] = useState({});
   const [verfuegbareMitarbeiter, setVerfuegbareMitarbeiter] = useState([]);
 
   // Transformationsfunktion für aufnahmeData
@@ -107,71 +110,51 @@ export default function AufnahmeForm() {
     return transformed;
   }, []);
 
-  // Simuliere API-Aufruf zum Laden der Daten bei Bearbeitung
+  // API-Aufrufe zum Laden der Daten
   useEffect(() => {
     if (id) {
       const fetchAufnahme = async () => {
         try {
           setLoading(true);
-          // In einer echten Anwendung würde hier ein API-Aufruf mit der ID stattfinden
-          const response = await aufnahmenService.getById(id);
-          setFormData(response.data);
           
-          // Dateien laden
+          // Aufnahmedaten mit standardisierter Fehlerbehandlung laden
+          const response = await aufnahmenService.getById(id);
+          const aufnahmeData = extractApiData(response);
+          
+          if (!aufnahmeData) {
+            throw new Error('Keine gültigen Aufnahmedaten erhalten');
+          }
+          
+          // Datumsfelder vorbereiten, falls nötig
+          if (aufnahmeData.datum) {
+            const datumObj = new Date(aufnahmeData.datum);
+            aufnahmeData.datum = datumObj.toISOString().substring(0, 10);
+            
+            // Uhrzeit extrahieren, falls noch nicht vorhanden
+            if (!aufnahmeData.uhrzeit) {
+              aufnahmeData.uhrzeit = datumObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            }
+          }
+          
+          setFormData(aufnahmeData);
+          
+          // Dateien laden - mit standardisierter Fehlerbehandlung
           try {
             const filesResponse = await api.get(`/uploads?bezugId=${id}&bezugModell=Aufnahme`);
-            setUploadedFiles(filesResponse.data || []);
+            const filesData = extractApiData(filesResponse);
+            setUploadedFiles(ensureArray(filesData) || []);
           } catch (fileError) {
             console.error('Fehler beim Laden der Dateien:', fileError);
             // Keine Aktion notwendig, Uploads sind optional
+            setUploadedFiles([]);
           }
           
           setLoading(false);
         } catch (error) {
           console.error('Fehler beim Laden der Aufnahme:', error);
+          toast.error('Die Aufnahme konnte nicht geladen werden: ' + (error.message || 'Unbekannter Fehler'));
           setLoading(false);
-          
-          // Fallback zu Mockdaten für Demo
-          const mockAufnahme = {
-            kundenName: 'Musterfirma GmbH',
-            kontaktperson: 'Max Mustermann',
-            telefon: '0123-4567890',
-            email: 'info@musterfirma.de',
-            auszugsadresse: {
-              strasse: 'Musterstraße',
-              hausnummer: '123',
-              plz: '12345',
-              ort: 'Musterstadt',
-              land: 'Deutschland',
-              etage: 2,
-              aufzug: true,
-              entfernung: 10
-            },
-            einzugsadresse: {
-              strasse: 'Beispielweg',
-              hausnummer: '45',
-              plz: '54321',
-              ort: 'Beispielort',
-              land: 'Deutschland',
-              etage: 1,
-              aufzug: false,
-              entfernung: 20
-            },
-            umzugstyp: 'gewerbe',
-            umzugsvolumen: '75',
-            datum: '2025-05-15',
-            uhrzeit: '09:00',
-            angebotspreis: {
-              netto: 2500,
-              brutto: 2975,
-              mwst: 19
-            },
-            notizen: 'Beispielnotizen zur Aufnahme',
-            besonderheiten: 'Schwere Maschinen, Treppen ohne Aufzug',
-            bewertung: 4,
-            mitarbeiterId: '1'
-          };
-          setFormData(mockAufnahme);
+          navigate('/aufnahmen'); // Zurück zur Übersicht bei Fehler
         }
       };
 
@@ -186,26 +169,36 @@ export default function AufnahmeForm() {
       }));
     }
     
-    // Mitarbeiter laden
+    // Mitarbeiter laden mit standardisierter Fehlerbehandlung
     const fetchMitarbeiter = async () => {
       try {
-        const response = await api.get('/mitarbeiter');
-        setVerfuegbareMitarbeiter(response.data);
+        const response = await mitarbeiterService.getAll();
+        const mitarbeiterData = extractApiData(response);
+        
+        if (mitarbeiterData) {
+          const mitarbeiterListe = ensureArray(mitarbeiterData.mitarbeiter || mitarbeiterData);
+          
+          // Mitarbeiterdaten ins richtige Format bringen
+          const formattedMitarbeiter = mitarbeiterListe.map(mitarbeiter => ({
+            _id: mitarbeiter._id,
+            vorname: mitarbeiter.vorname || '',
+            nachname: mitarbeiter.nachname || '',
+            rolle: mitarbeiter.position || mitarbeiter.rolle || 'Aufnahmeteam'
+          }));
+          
+          setVerfuegbareMitarbeiter(formattedMitarbeiter);
+        } else {
+          throw new Error('Keine Mitarbeiterdaten erhalten');
+        }
       } catch (error) {
         console.error('Fehler beim Laden der Mitarbeiter:', error);
-        
-        // Fallback zu Mockdaten für Demo
-        const mockMitarbeiter = [
-          { _id: '1', vorname: 'Max', nachname: 'Mustermann', rolle: 'Aufnahmeteam' },
-          { _id: '2', vorname: 'Anna', nachname: 'Schmidt', rolle: 'Aufnahmeteam' },
-          { _id: '3', vorname: 'Thomas', nachname: 'Müller', rolle: 'Aufnahmeteam' }
-        ];
-        setVerfuegbareMitarbeiter(mockMitarbeiter);
+        toast.error('Mitarbeiterdaten konnten nicht geladen werden');
+        setVerfuegbareMitarbeiter([]);
       }
     };
     
     fetchMitarbeiter();
-  }, [id]);
+  }, [id, navigate]);
 
   // Behandelt Änderungen in Input-Feldern
   const handleInputChange = (e) => {
@@ -230,37 +223,89 @@ export default function AufnahmeForm() {
     }
   };
 
-  // Datei-Upload
-  const handleFileUpload = (e) => {
+  // Datei-Upload mit dem echten fileService
+  const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     
     if (files.length === 0) return;
     
-    // In einer echten Anwendung würde hier ein API-Aufruf zum Hochladen der Datei stattfinden
-    files.forEach(file => {
-      // Simuliere erfolgreichen Upload für Demo
-      const mockUploadedFile = {
-        _id: Date.now().toString() + Math.random().toString(36).substring(2, 8),
-        name: file.name,
-        groesse: file.size,
-        typ: file.type,
-        datum: new Date().toISOString(),
-        pfad: URL.createObjectURL(file),
-        bezugId: id || 'temp',
-        bezugModell: 'Aufnahme'
-      };
+    // Setze Upload-Fortschritt zurück
+    setUploadProgress({});
+    
+    try {
+      for (const file of files) {
+        // Zeige Toast für den Start des Uploads
+        const toastId = toast.info(`Upload von ${file.name} gestartet...`, { autoClose: false });
+        
+        // Hochladen mit Fortschrittsanzeige
+        const uploadResult = await fileService.upload({
+          file: file,
+          category: 'Aufnahme',
+          description: `Aufnahme-Dokument: ${file.name}`,
+          project: id || 'temp', // temporäre ID für neue Aufnahmen
+          onProgress: (progress) => {
+            // Update toast mit Fortschritt
+            toast.update(toastId, { 
+              render: `${file.name}: ${progress}% hochgeladen`,
+              type: toast.TYPE.INFO
+            });
+          }
+        });
+        
+        // Toast nach Fertigstellung schließen
+        toast.dismiss(toastId);
+        
+        if (uploadResult.success) {
+          // Bei Erfolg die hochgeladene Datei zur Liste hinzufügen
+          const fileData = uploadResult.data.file || uploadResult.data;
+          setUploadedFiles(prev => [...prev, {
+            _id: fileData._id,
+            name: fileData.name || file.name,
+            groesse: fileData.groesse || file.size,
+            typ: fileData.typ || file.type,
+            datum: fileData.datum || new Date().toISOString(),
+            pfad: fileData.pfad || '',
+            bezugId: fileData.bezugId || id || 'temp',
+            bezugModell: fileData.bezugModell || 'Aufnahme'
+          }]);
+          
+          toast.success(`${file.name} erfolgreich hochgeladen`);
+        } else {
+          toast.error(`Fehler beim Hochladen von ${file.name}`);
+        }
+      }
+    } catch (error) {
+      console.error('Fehler beim Datei-Upload:', error);
+      toast.error('Fehler beim Hochladen der Dateien: ' + (error.message || 'Unbekannter Fehler'));
+    }
+  };
+
+  // Datei löschen über API
+  const handleFileDelete = async (fileId) => {
+    try {
+      // Bestätigung anfordern
+      if (!window.confirm('Sind Sie sicher, dass Sie diese Datei löschen möchten?')) {
+        return;
+      }
       
-      setUploadedFiles(prev => [...prev, mockUploadedFile]);
-    });
+      // API-Aufruf zum Löschen der Datei
+      const response = await fileService.delete(fileId);
+      const deleteResult = extractApiData(response);
+      
+      if (deleteResult && deleteResult.success) {
+        // Datei aus lokaler Liste entfernen
+        setUploadedFiles(prev => prev.filter(file => file._id !== fileId));
+        toast.success('Datei erfolgreich gelöscht');
+      } else {
+        throw new Error(deleteResult?.message || 'Unbekannter Fehler');
+      }
+    } catch (error) {
+      console.error('Fehler beim Löschen der Datei:', error);
+      toast.error('Fehler beim Löschen der Datei: ' + (error.message || 'Unbekannter Fehler'));
+    }
   };
 
-  // Datei löschen
-  const handleFileDelete = (fileId) => {
-    // In einer echten Anwendung würde hier ein API-Aufruf zum Löschen der Datei stattfinden
-    setUploadedFiles(prev => prev.filter(file => file._id !== fileId));
-  };
-
-  // Formular absenden
+  // Formular absenden mit standardisierter Fehlerbehandlung
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -270,11 +315,13 @@ export default function AufnahmeForm() {
       
       // Validierung
       if (!transformedData.kundenName) {
-        alert('Bitte geben Sie einen Kundennamen ein.');
+        toast.error('Bitte geben Sie einen Kundennamen ein.');
         return;
       }
       
-      console.log('Speichere Aufnahme:', transformedData);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Speichere Aufnahme:', transformedData);
+      }
       
       let response;
       
@@ -282,35 +329,48 @@ export default function AufnahmeForm() {
         // Aktualisieren einer bestehenden Aufnahme
         const filesData = uploadedFiles.map(file => ({ fileId: file._id }));
         response = await aufnahmenService.update(id, { ...transformedData, dateien: filesData });
+        const responseData = extractApiData(response);
+        
+        if (!responseData) {
+          throw new Error('Keine gültige Antwort vom Server erhalten');
+        }
+        
+        toast.success('Aufnahme erfolgreich aktualisiert');
       } else {
         // Erstellen einer neuen Aufnahme
         response = await aufnahmenService.create(transformedData);
+        const responseData = extractApiData(response);
+        
+        if (!responseData) {
+          throw new Error('Keine gültige Antwort vom Server erhalten');
+        }
+        
+        // Neue Aufnahme-ID extrahieren
+        const aufnahmeId = responseData._id || responseData.aufnahme?._id;
         
         // Wenn Dateien vorhanden sind, diese der neuen Aufnahme zuordnen
-        if (uploadedFiles.length > 0 && response.data.aufnahme) {
-          const aufnahmeId = response.data.aufnahme._id;
-          
+        if (uploadedFiles.length > 0 && aufnahmeId) {
           for (const file of uploadedFiles) {
-            // In einer echten Anwendung würde hier ein API-Aufruf zum Aktualisieren der Datei-Referenzen stattfinden
-            await fileService.uploadFile({
-              file: file,
-              project: aufnahmeId,
-              category: 'Aufnahme'
-            });
+            if (file.bezugId === 'temp') {
+              // Datei zu neu erstellter Aufnahme zuordnen
+              await fileService.update(file._id, {
+                bezugId: aufnahmeId,
+                bezugModell: 'Aufnahme'
+              });
+            }
           }
         }
+        
+        toast.success('Aufnahme erfolgreich erstellt');
       }
       
       setUploadedFiles([]);
-      
-      // Erfolgsmeldung
-      alert(`Aufnahme erfolgreich ${id ? 'aktualisiert' : 'erstellt'}`);
       
       // Zurück zur Aufnahmen-Übersicht navigieren
       navigate('/aufnahmen');
     } catch (error) {
       console.error('Fehler beim Speichern der Aufnahme:', error);
-      alert(`Fehler: ${error.response?.data?.message || 'Unbekannter Fehler'}`);
+      toast.error('Fehler beim Speichern: ' + (error.message || 'Unbekannter Fehler'));
     }
   };
 
