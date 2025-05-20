@@ -215,6 +215,7 @@ export const authService = {
 
 // Services using the standardized approach
 export const userService = createService('/users');
+export const clientService = createService('/clients');
 export const umzuegeService = createService('/umzuege');
 export const mitarbeiterService = createService('/mitarbeiter');
 export const fahrzeugeService = createService('/fahrzeuge');
