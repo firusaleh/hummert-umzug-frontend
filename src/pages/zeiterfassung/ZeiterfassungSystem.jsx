@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, Check, Plus, Edit, Trash2, Search, User, Users, Briefcase } from 'lucide-react';
 import { zeiterfassungService } from '../../services/api';
+import { extractArrayData, isErrorResponse, getErrorMessage } from '../../utils/dataUtils';
 
 export default function ZeiterfassungSystem() {
   // State für Daten
@@ -31,26 +32,23 @@ export default function ZeiterfassungSystem() {
       setError(null);
       
       try {
-        // Lade Mitarbeiter
+        // Lade Mitarbeiter mit der neuen utility Funktion
         const mitarbeiterResponse = await zeiterfassungService.getMitarbeiter();
-        console.log('Vollständige Mitarbeiter-Response:', mitarbeiterResponse);
+        console.log('Mitarbeiter Response erhalten:', mitarbeiterResponse);
         
-        if (mitarbeiterResponse.success === false) {
-          throw new Error(mitarbeiterResponse.message || 'Fehler beim Laden der Mitarbeiter');
+        // Prüfe auf Fehler
+        if (isErrorResponse(mitarbeiterResponse)) {
+          throw new Error(getErrorMessage(mitarbeiterResponse, 'Fehler beim Laden der Mitarbeiter'));
         }
         
-        let mitarbeiterListe = [];
+        // Extrahiere Mitarbeiterdaten mit der utility Funktion
+        const mitarbeiterListe = extractArrayData(
+          mitarbeiterResponse, 
+          ['mitarbeiter', 'users'], 
+          []
+        );
         
-        // Robust handling of data structure
-        if (mitarbeiterResponse.data) {
-          if (Array.isArray(mitarbeiterResponse.data)) {
-            mitarbeiterListe = mitarbeiterResponse.data;
-          } else if (mitarbeiterResponse.data.mitarbeiter && Array.isArray(mitarbeiterResponse.data.mitarbeiter)) {
-            mitarbeiterListe = mitarbeiterResponse.data.mitarbeiter;
-          }
-        }
-        
-        console.log('Verarbeitete Mitarbeiterliste:', mitarbeiterListe);
+        console.log('Extrahierte Mitarbeiterliste:', mitarbeiterListe);
         
         // Wenn keine Mitarbeiter geladen werden konnten
         if (mitarbeiterListe.length === 0) {
@@ -59,28 +57,23 @@ export default function ZeiterfassungSystem() {
         
         setMitarbeiter(mitarbeiterListe);
         
-        // Lade Projekte
+        // Lade Projekte mit der gleichen utility Funktion
         const projekteResponse = await zeiterfassungService.getUmzugsprojekte();
-        console.log('Vollständige Projekt-Response:', projekteResponse);
+        console.log('Projekte Response erhalten:', projekteResponse);
         
-        if (projekteResponse.success === false) {
-          throw new Error(projekteResponse.message || 'Fehler beim Laden der Projekte');
+        // Prüfe auf Fehler
+        if (isErrorResponse(projekteResponse)) {
+          throw new Error(getErrorMessage(projekteResponse, 'Fehler beim Laden der Projekte'));
         }
         
-        let projekteListe = [];
+        // Extrahiere Projektdaten mit der utility Funktion
+        const projekteListe = extractArrayData(
+          projekteResponse, 
+          ['projekte', 'umzuege'], 
+          []
+        );
         
-        // Robust handling of data structure
-        if (projekteResponse.data) {
-          if (Array.isArray(projekteResponse.data)) {
-            projekteListe = projekteResponse.data;
-          } else if (projekteResponse.data.projekte && Array.isArray(projekteResponse.data.projekte)) {
-            projekteListe = projekteResponse.data.projekte;
-          } else if (projekteResponse.data.umzuege && Array.isArray(projekteResponse.data.umzuege)) {
-            projekteListe = projekteResponse.data.umzuege;
-          }
-        }
-        
-        console.log('Verarbeitete Projektliste:', projekteListe);
+        console.log('Extrahierte Projektliste:', projekteListe);
         
         // Wenn keine Projekte geladen werden konnten
         if (projekteListe.length === 0) {
@@ -109,56 +102,54 @@ export default function ZeiterfassungSystem() {
       
       try {
         const zeiterfassungenResponse = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
-        console.log('Vollständige Zeiterfassungen Response:', zeiterfassungenResponse);
+        console.log('Zeiterfassungen Response erhalten:', zeiterfassungenResponse);
         
-        if (zeiterfassungenResponse.success === false) {
-          throw new Error(zeiterfassungenResponse.message || 'Fehler beim Laden der Zeiterfassungen');
+        // Prüfe auf Fehler
+        if (isErrorResponse(zeiterfassungenResponse)) {
+          throw new Error(getErrorMessage(zeiterfassungenResponse, 'Fehler beim Laden der Zeiterfassungen'));
         }
         
-        let zeiterfassungsListe = [];
+        // Extrahiere Zeiterfassungsdaten mit der utility Funktion
+        const zeiterfassungsListe = extractArrayData(
+          zeiterfassungenResponse, 
+          ['eintraege', 'zeiterfassungen'], 
+          []
+        );
         
-        // Robust handling of data structure
-        if (zeiterfassungenResponse.data) {
-          if (Array.isArray(zeiterfassungenResponse.data)) {
-            zeiterfassungsListe = zeiterfassungenResponse.data;
-          } else if (zeiterfassungenResponse.data.eintraege && Array.isArray(zeiterfassungenResponse.data.eintraege)) {
-            zeiterfassungsListe = zeiterfassungenResponse.data.eintraege;
-          } else if (zeiterfassungenResponse.data.zeiterfassungen && Array.isArray(zeiterfassungenResponse.data.zeiterfassungen)) {
-            zeiterfassungsListe = zeiterfassungenResponse.data.zeiterfassungen;
-          }
-        }
+        console.log('Extrahierte Zeiterfassungsliste:', zeiterfassungsListe);
         
-        console.log('Verarbeitete Zeiterfassungsliste:', zeiterfassungsListe);
-        
-        // Ensure all entries have the required structure for rendering
-        zeiterfassungsListe = zeiterfassungsListe.map(entry => {
-          // Ensure mitarbeiterId is an object with _id, vorname and nachname
-          if (typeof entry.mitarbeiterId === 'string') {
-            // Find the corresponding mitarbeiter object
-            const mitarbeiterObj = mitarbeiter.find(m => m._id === entry.mitarbeiterId);
+        // Normalisiere die Mitarbeiter-Referenzen in den Zeiterfassungen
+        const normalizedEntries = zeiterfassungsListe.map(entry => {
+          // Erstelle eine Kopie des Eintrags
+          const normalizedEntry = { ...entry };
+          
+          // Normalisiere mitarbeiterId
+          if (typeof normalizedEntry.mitarbeiterId === 'string') {
+            // Suche den Mitarbeiter anhand der ID
+            const mitarbeiterObj = mitarbeiter.find(m => m._id === normalizedEntry.mitarbeiterId);
             if (mitarbeiterObj) {
-              entry.mitarbeiterId = mitarbeiterObj;
+              normalizedEntry.mitarbeiterId = mitarbeiterObj;
             } else {
-              // Create a placeholder if the mitarbeiter isn't found
-              entry.mitarbeiterId = {
-                _id: entry.mitarbeiterId,
+              // Erstelle einen Platzhalter, wenn der Mitarbeiter nicht gefunden wird
+              normalizedEntry.mitarbeiterId = {
+                _id: normalizedEntry.mitarbeiterId,
                 vorname: 'Unbekannt',
                 nachname: ''
               };
             }
-          } else if (!entry.mitarbeiterId || !entry.mitarbeiterId._id) {
-            // Create a placeholder if mitarbeiterId is missing or invalid
-            entry.mitarbeiterId = {
+          } else if (!normalizedEntry.mitarbeiterId || !normalizedEntry.mitarbeiterId._id) {
+            // Erstelle einen Platzhalter, wenn mitarbeiterId fehlt oder ungültig ist
+            normalizedEntry.mitarbeiterId = {
               _id: 'unknown',
               vorname: 'Unbekannt',
               nachname: ''
             };
           }
           
-          return entry;
+          return normalizedEntry;
         });
         
-        setZeiterfassungen(zeiterfassungsListe);
+        setZeiterfassungen(normalizedEntries);
       } catch (error) {
         console.error('Fehler beim Laden der Zeiterfassungen:', error);
         setError(`Die Zeiterfassungen konnten nicht geladen werden: ${error.message}`);
@@ -281,31 +272,65 @@ export default function ZeiterfassungSystem() {
       if (bearbeitungId) {
         // Update einer bestehenden Zeiterfassung
         submitResponse = await zeiterfassungService.updateZeiterfassung(bearbeitungId, zeiterfassungDaten);
-        if (submitResponse.success === false) {
-          throw new Error(submitResponse.message || 'Fehler beim Aktualisieren der Zeiterfassung');
+        
+        // Prüfe auf Fehler mit dem utility
+        if (isErrorResponse(submitResponse)) {
+          throw new Error(getErrorMessage(submitResponse, 'Fehler beim Aktualisieren der Zeiterfassung'));
         }
+        
         console.log('Zeiterfassung aktualisiert:', submitResponse);
       } else {
         // Erstellen einer neuen Zeiterfassung
         submitResponse = await zeiterfassungService.addZeiterfassung(zeiterfassungDaten);
-        if (submitResponse.success === false) {
-          throw new Error(submitResponse.message || 'Fehler beim Erstellen der Zeiterfassung');
+        
+        // Prüfe auf Fehler mit dem utility
+        if (isErrorResponse(submitResponse)) {
+          throw new Error(getErrorMessage(submitResponse, 'Fehler beim Erstellen der Zeiterfassung'));
         }
+        
         console.log('Zeiterfassung erstellt:', submitResponse);
       }
       
       // Lade aktualisierte Daten vom Server
-      // Make sure we reload the data from the server after adding/updating
       const response = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
-      if (response.success === false) {
-        throw new Error(response.message || 'Fehler beim Laden der aktualisierten Zeiterfassungen');
+      
+      // Prüfe auf Fehler mit dem utility
+      if (isErrorResponse(response)) {
+        throw new Error(getErrorMessage(response, 'Fehler beim Laden der aktualisierten Zeiterfassungen'));
       }
       
-      // Extract updated time entries - the backend returns the list directly
       console.log('Aktualisierte Zeiterfassungen Response:', response);
-      const zeiterfassungenData = response?.data || [];
-      console.log('Aktualisierte Zeiterfassungen geladen:', zeiterfassungenData);
-      setZeiterfassungen(Array.isArray(zeiterfassungenData) ? zeiterfassungenData : []);
+      
+      // Extrahiere Zeiterfassungsdaten mit der utility Funktion
+      const zeiterfassungsListe = extractArrayData(
+        response, 
+        ['eintraege', 'zeiterfassungen'], 
+        []
+      );
+      
+      console.log('Aktualisierte Zeiterfassungen extrahiert:', zeiterfassungsListe);
+      
+      // Normalisiere Mitarbeiter-Referenzen
+      const normalizedEntries = zeiterfassungsListe.map(entry => {
+        const normalizedEntry = { ...entry };
+        
+        if (typeof normalizedEntry.mitarbeiterId === 'string') {
+          const mitarbeiterObj = mitarbeiter.find(m => m._id === normalizedEntry.mitarbeiterId);
+          if (mitarbeiterObj) {
+            normalizedEntry.mitarbeiterId = mitarbeiterObj;
+          } else {
+            normalizedEntry.mitarbeiterId = {
+              _id: normalizedEntry.mitarbeiterId,
+              vorname: 'Unbekannt',
+              nachname: ''
+            };
+          }
+        }
+        
+        return normalizedEntry;
+      });
+      
+      setZeiterfassungen(normalizedEntries);
       
       // Formular zurücksetzen
       resetForm();
@@ -328,23 +353,54 @@ export default function ZeiterfassungSystem() {
       
       try {
         const deleteResponse = await zeiterfassungService.deleteZeiterfassung(id);
-        if (deleteResponse.success === false) {
-          throw new Error(deleteResponse.message || 'Fehler beim Löschen der Zeiterfassung');
+        
+        // Prüfe auf Fehler mit dem utility
+        if (isErrorResponse(deleteResponse)) {
+          throw new Error(getErrorMessage(deleteResponse, 'Fehler beim Löschen der Zeiterfassung'));
         }
         
         console.log('Zeiterfassung gelöscht:', deleteResponse);
         
         // Lade aktualisierte Daten vom Server
         const response = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
-        if (response.success === false) {
-          throw new Error(response.message || 'Fehler beim Laden der aktualisierten Zeiterfassungen');
+        
+        // Prüfe auf Fehler mit dem utility
+        if (isErrorResponse(response)) {
+          throw new Error(getErrorMessage(response, 'Fehler beim Laden der aktualisierten Zeiterfassungen'));
         }
         
-        // Extract updated time entries
         console.log('Aktualisierte Zeiterfassungen Response nach Löschen:', response);
-        const zeiterfassungenData = response?.data || [];
-        console.log('Aktualisierte Zeiterfassungen nach Löschen:', zeiterfassungenData);
-        setZeiterfassungen(Array.isArray(zeiterfassungenData) ? zeiterfassungenData : []);
+        
+        // Extrahiere Zeiterfassungsdaten mit der utility Funktion
+        const zeiterfassungsListe = extractArrayData(
+          response, 
+          ['eintraege', 'zeiterfassungen'], 
+          []
+        );
+        
+        console.log('Aktualisierte Zeiterfassungen nach Löschen:', zeiterfassungsListe);
+        
+        // Normalisiere Mitarbeiter-Referenzen
+        const normalizedEntries = zeiterfassungsListe.map(entry => {
+          const normalizedEntry = { ...entry };
+          
+          if (typeof normalizedEntry.mitarbeiterId === 'string') {
+            const mitarbeiterObj = mitarbeiter.find(m => m._id === normalizedEntry.mitarbeiterId);
+            if (mitarbeiterObj) {
+              normalizedEntry.mitarbeiterId = mitarbeiterObj;
+            } else {
+              normalizedEntry.mitarbeiterId = {
+                _id: normalizedEntry.mitarbeiterId,
+                vorname: 'Unbekannt',
+                nachname: ''
+              };
+            }
+          }
+          
+          return normalizedEntry;
+        });
+        
+        setZeiterfassungen(normalizedEntries);
                             
         // Erfolgsbenachrichtigung
         alert('Zeiterfassung erfolgreich gelöscht!');

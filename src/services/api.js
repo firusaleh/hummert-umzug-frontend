@@ -780,12 +780,11 @@ export const zeiterfassungService = {
         headers: response.headers,
         dataType: typeof response.data,
         dataIsArray: Array.isArray(response.data),
-        dataLength: Array.isArray(response.data) ? response.data.length : 'not an array',
-        data: response.data
+        dataLength: Array.isArray(response.data) ? response.data.length : 'not an array'
       });
       
-      // Return the full response, including response.data which contains the actual data
-      return { success: true, data: response.data };
+      // Return data directly, not wrapped in success/data object
+      return response.data;
     } catch (error) {
       console.error('Fehler beim Laden der Mitarbeiter:', error);
       console.error('Error details:', error.response ? {
@@ -823,12 +822,11 @@ export const zeiterfassungService = {
         headers: response.headers,
         dataType: typeof response.data,
         dataIsArray: Array.isArray(response.data),
-        dataLength: Array.isArray(response.data) ? response.data.length : 'not an array',
-        data: response.data
+        dataLength: Array.isArray(response.data) ? response.data.length : 'not an array'
       });
       
-      // Return the full response, including response.data which contains the actual data
-      return { success: true, data: response.data };
+      // Return data directly, not wrapped in success/data object
+      return response.data;
     } catch (error) {
       console.error('Fehler beim Laden der Projekte:', error);
       console.error('Error details:', error.response ? {
@@ -846,8 +844,16 @@ export const zeiterfassungService = {
   getZeiterfassungen: async (projektId) => {
     try {
       const response = await api.get(`/zeiterfassung/projekt/${projektId}`);
-      // Return the full response, including response.data which contains the actual data
-      return { success: true, data: response.data };
+      console.log('Raw zeiterfassungen API response:', {
+        status: response.status,
+        statusText: response.statusText,
+        dataType: typeof response.data,
+        dataIsArray: Array.isArray(response.data),
+        dataLength: Array.isArray(response.data) ? response.data.length : 'not an array'
+      });
+      
+      // Return data directly, not wrapped in success/data object
+      return response.data;
     } catch (error) {
       logError(`zeiterfassung:getZeiterfassungen/${projektId}`, error);
       return formatApiError(error, 'Fehler beim Laden der Zeiterfassungen für das Projekt');
@@ -859,8 +865,13 @@ export const zeiterfassungService = {
     try {
       // Using the correct endpoint from zeiterfassung.routes.js
       const response = await api.post('/zeiterfassung', data);
-      // Return the full response, including response.data which contains the actual data
-      return { success: true, data: response.data };
+      console.log('Add zeiterfassung API response:', {
+        status: response.status,
+        statusText: response.statusText
+      });
+      
+      // Return data directly, not wrapped in success/data object
+      return response.data;
     } catch (error) {
       logError('zeiterfassung:addZeiterfassung', error);
       return formatApiError(error, 'Fehler beim Hinzufügen der Zeiterfassung');
@@ -872,8 +883,13 @@ export const zeiterfassungService = {
     try {
       // Using the correct endpoint from zeiterfassung.routes.js
       const response = await api.put(`/zeiterfassung/${id}`, data);
-      // Return the full response, including response.data which contains the actual data
-      return { success: true, data: response.data };
+      console.log('Update zeiterfassung API response:', {
+        status: response.status,
+        statusText: response.statusText
+      });
+      
+      // Return data directly, not wrapped in success/data object
+      return response.data;
     } catch (error) {
       logError(`zeiterfassung:updateZeiterfassung/${id}`, error);
       return formatApiError(error, 'Fehler beim Aktualisieren der Zeiterfassung');
@@ -885,8 +901,13 @@ export const zeiterfassungService = {
     try {
       // Using the correct endpoint from zeiterfassung.routes.js
       const response = await api.delete(`/zeiterfassung/${id}`);
-      // Return the full response, including response.data which contains the actual data
-      return { success: true, data: response.data };
+      console.log('Delete zeiterfassung API response:', {
+        status: response.status,
+        statusText: response.statusText
+      });
+      
+      // Return data directly, not wrapped in success/data object
+      return response.data;
     } catch (error) {
       logError(`zeiterfassung:deleteZeiterfassung/${id}`, error);
       return formatApiError(error, 'Fehler beim Löschen der Zeiterfassung');
