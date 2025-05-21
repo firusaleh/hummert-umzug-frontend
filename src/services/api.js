@@ -761,7 +761,8 @@ export const zeiterfassungService = {
     try {
       // Using the correct endpoint from zeiterfassung.routes.js
       const response = await api.get('/zeiterfassung/mitarbeiter');
-      return response;
+      // Return the full response, including response.data which contains the actual data
+      return { success: true, data: response.data };
     } catch (error) {
       logError('zeiterfassung:getMitarbeiter', error);
       return formatApiError(error, 'Fehler beim Laden der Mitarbeiterdaten');
@@ -773,7 +774,8 @@ export const zeiterfassungService = {
     try {
       // Using the correct endpoint from zeiterfassung.routes.js
       const response = await api.get('/zeiterfassung/projekte');
-      return response;
+      // Return the full response, including response.data which contains the actual data
+      return { success: true, data: response.data };
     } catch (error) {
       logError('zeiterfassung:getUmzugsprojekte', error);
       return formatApiError(error, 'Fehler beim Laden der Projektdaten');
@@ -784,7 +786,8 @@ export const zeiterfassungService = {
   getZeiterfassungen: async (projektId) => {
     try {
       const response = await api.get(`/zeiterfassung/projekt/${projektId}`);
-      return response;
+      // Return the full response, including response.data which contains the actual data
+      return { success: true, data: response.data };
     } catch (error) {
       logError(`zeiterfassung:getZeiterfassungen/${projektId}`, error);
       return formatApiError(error, 'Fehler beim Laden der Zeiterfassungen für das Projekt');
@@ -796,7 +799,8 @@ export const zeiterfassungService = {
     try {
       // Using the correct endpoint from zeiterfassung.routes.js
       const response = await api.post('/zeiterfassung', data);
-      return response;
+      // Return the full response, including response.data which contains the actual data
+      return { success: true, data: response.data };
     } catch (error) {
       logError('zeiterfassung:addZeiterfassung', error);
       return formatApiError(error, 'Fehler beim Hinzufügen der Zeiterfassung');
@@ -808,7 +812,8 @@ export const zeiterfassungService = {
     try {
       // Using the correct endpoint from zeiterfassung.routes.js
       const response = await api.put(`/zeiterfassung/${id}`, data);
-      return response;
+      // Return the full response, including response.data which contains the actual data
+      return { success: true, data: response.data };
     } catch (error) {
       logError(`zeiterfassung:updateZeiterfassung/${id}`, error);
       return formatApiError(error, 'Fehler beim Aktualisieren der Zeiterfassung');
@@ -820,7 +825,8 @@ export const zeiterfassungService = {
     try {
       // Using the correct endpoint from zeiterfassung.routes.js
       const response = await api.delete(`/zeiterfassung/${id}`);
-      return response;
+      // Return the full response, including response.data which contains the actual data
+      return { success: true, data: response.data };
     } catch (error) {
       logError(`zeiterfassung:deleteZeiterfassung/${id}`, error);
       return formatApiError(error, 'Fehler beim Löschen der Zeiterfassung');

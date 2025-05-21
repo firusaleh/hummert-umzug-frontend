@@ -38,8 +38,10 @@ export default function ZeiterfassungSystem() {
         }
         
         // Extract mitarbeiter data from the response
-        // Backend route /zeiterfassung/mitarbeiter returns the data directly in response.data
-        const mitarbeiterData = mitarbeiterResponse.data || [];
+        // The response from api.get has the structure { data: [...] }
+        console.log('Mitarbeiter Response:', mitarbeiterResponse);
+        // Access the actual data in mitarbeiterResponse
+        const mitarbeiterData = mitarbeiterResponse?.data || [];
         console.log('Mitarbeiter geladen:', mitarbeiterData);
         setMitarbeiter(Array.isArray(mitarbeiterData) ? mitarbeiterData : []);
         
@@ -50,8 +52,10 @@ export default function ZeiterfassungSystem() {
         }
         
         // Extract umzuege data from the response
-        // Backend route /zeiterfassung/projekte returns the data directly in response.data
-        const projekteData = projekteResponse.data || [];
+        // The response from api.get has the structure { data: [...] }
+        console.log('Projekte Response:', projekteResponse);
+        // Access the actual data in projekteResponse
+        const projekteData = projekteResponse?.data || [];
         console.log('Projekte geladen:', projekteData);
         setUmzugsprojekte(Array.isArray(projekteData) ? projekteData : []);
       } catch (error) {
@@ -80,8 +84,10 @@ export default function ZeiterfassungSystem() {
         }
         
         // Extract time entries data from the response
-        // Backend route /zeiterfassung/projekt/:projektId returns the data directly in response.data
-        const zeiterfassungenData = zeiterfassungenResponse.data || [];
+        // The response from api.get has the structure { data: [...] }
+        console.log('Zeiterfassungen Response:', zeiterfassungenResponse);
+        // Access the actual data in zeiterfassungenResponse
+        const zeiterfassungenData = zeiterfassungenResponse?.data || [];
         console.log('Zeiterfassungen geladen:', zeiterfassungenData);
         setZeiterfassungen(Array.isArray(zeiterfassungenData) ? zeiterfassungenData : []);
       } catch (error) {
@@ -227,7 +233,8 @@ export default function ZeiterfassungSystem() {
       }
       
       // Extract updated time entries - the backend returns the list directly
-      const zeiterfassungenData = response.data || [];
+      console.log('Aktualisierte Zeiterfassungen Response:', response);
+      const zeiterfassungenData = response?.data || [];
       console.log('Aktualisierte Zeiterfassungen geladen:', zeiterfassungenData);
       setZeiterfassungen(Array.isArray(zeiterfassungenData) ? zeiterfassungenData : []);
       
@@ -265,7 +272,8 @@ export default function ZeiterfassungSystem() {
         }
         
         // Extract updated time entries
-        const zeiterfassungenData = response.data || [];
+        console.log('Aktualisierte Zeiterfassungen Response nach Löschen:', response);
+        const zeiterfassungenData = response?.data || [];
         console.log('Aktualisierte Zeiterfassungen nach Löschen:', zeiterfassungenData);
         setZeiterfassungen(Array.isArray(zeiterfassungenData) ? zeiterfassungenData : []);
                             
