@@ -152,6 +152,18 @@ const FahrzeugForm = () => {
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Check if file is too large (larger than 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('Das Bild ist zu groß. Maximalgröße ist 2MB.');
+        return;
+      }
+      
+      // Check if file is an image
+      if (!file.type.match('image.*')) {
+        toast.error('Nur Bilder sind erlaubt (JPG, PNG, GIF, WEBP).');
+        return;
+      }
+      
       setVehicleImage(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -174,10 +186,14 @@ const FahrzeugForm = () => {
         // Zahlen-Felder konvertieren
         baujahr: formData.baujahr ? Number(formData.baujahr) : undefined,
         kilometerstand: formData.kilometerstand ? Number(formData.kilometerstand) : undefined,
-        'kapazitaet.ladeflaeche.laenge': formData.kapazitaet.ladeflaeche.laenge ? Number(formData.kapazitaet.ladeflaeche.laenge) : undefined,
-        'kapazitaet.ladeflaeche.breite': formData.kapazitaet.ladeflaeche.breite ? Number(formData.kapazitaet.ladeflaeche.breite) : undefined,
-        'kapazitaet.ladeflaeche.hoehe': formData.kapazitaet.ladeflaeche.hoehe ? Number(formData.kapazitaet.ladeflaeche.hoehe) : undefined,
-        'kapazitaet.ladegewicht': formData.kapazitaet.ladegewicht ? Number(formData.kapazitaet.ladegewicht) : undefined
+        kapazitaet: {
+          ladeflaeche: {
+            laenge: formData.kapazitaet.ladeflaeche.laenge ? Number(formData.kapazitaet.ladeflaeche.laenge) : undefined,
+            breite: formData.kapazitaet.ladeflaeche.breite ? Number(formData.kapazitaet.ladeflaeche.breite) : undefined,
+            hoehe: formData.kapazitaet.ladeflaeche.hoehe ? Number(formData.kapazitaet.ladeflaeche.hoehe) : undefined
+          },
+          ladegewicht: formData.kapazitaet.ladegewicht ? Number(formData.kapazitaet.ladegewicht) : undefined
+        }
       };
       
       let response;
@@ -214,8 +230,25 @@ const FahrzeugForm = () => {
       navigate('/fahrzeuge');
     } catch (err) {
       console.error('Fehler beim Speichern des Fahrzeugs:', err);
-      setError(err.response?.data?.message || 'Das Fahrzeug konnte nicht gespeichert werden.');
-      toast.error('Fehler beim Speichern des Fahrzeugs');
+      
+      // Display detailed validation errors if available
+      if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
+        const validationErrors = err.response.data.errors.map(error => {
+          // Format field name for display
+          let fieldName = error.field;
+          if (fieldName === 'kennzeichen') fieldName = 'Kennzeichen';
+          if (fieldName === 'bezeichnung') fieldName = 'Bezeichnung';
+          
+          return `${fieldName}: ${error.message}`;
+        }).join('\n');
+        
+        setError(`Validierungsfehler:\n${validationErrors}`);
+        toast.error('Bitte korrigieren Sie die markierten Felder');
+      } else {
+        // Generic error message
+        setError(err.response?.data?.message || 'Das Fahrzeug konnte nicht gespeichert werden.');
+        toast.error('Fehler beim Speichern des Fahrzeugs');
+      }
     } finally {
       setSaving(false);
     }
@@ -243,7 +276,18 @@ const FahrzeugForm = () => {
       
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-          <p>{error}</p>
+          {error.includes('\n') ? (
+            <div>
+              <p className="font-semibold mb-2">Validierungsfehler:</p>
+              <ul className="list-disc pl-5">
+                {error.split('\n').filter(line => line && !line.startsWith('Validierungsfehler:')).map((line, idx) => (
+                  <li key={idx}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p>{error}</p>
+          )}
         </div>
       )}
       
