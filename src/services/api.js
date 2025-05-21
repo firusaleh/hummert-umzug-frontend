@@ -155,15 +155,43 @@ export const authService = {
   
   login: async (credentials) => {
     try {
+      console.log('Sending login request to API...');
       const response = await api.post('/auth/login', credentials);
+      console.log('Login response received:', { success: response.data.success, hasToken: !!response.data.token });
+      
       if (response.data.token) {
         tokenManager.setToken(response.data.token);
         tokenManager.setUser(response.data.user);
+        console.log('Auth data stored in localStorage');
+      } else {
+        console.warn('No token received in login response');
       }
+      
       return response.data;
     } catch (error) {
+      // Enhanced error logging
       logError('auth:login', error, { email: credentials.email });
-      throw formatApiError(error, 'Login fehlgeschlagen');
+      
+      // More specific error message based on the error
+      let errorMessage = 'Login fehlgeschlagen';
+      
+      if (error.response) {
+        const status = error.response.status;
+        
+        if (status === 401) {
+          errorMessage = 'Ungültige E-Mail oder Passwort';
+        } else if (status === 400) {
+          errorMessage = error.response.data?.message || 'Ungültige Eingabe';
+        } else if (status === 429) {
+          errorMessage = 'Zu viele Anmeldeversuche. Bitte versuchen Sie es später erneut.';
+        } else if (status >= 500) {
+          errorMessage = 'Serverfehler. Bitte versuchen Sie es später erneut.';
+        }
+      } else if (error.request) {
+        errorMessage = 'Keine Antwort vom Server erhalten. Bitte überprüfen Sie Ihre Internetverbindung.';
+      }
+      
+      throw formatApiError(error, errorMessage);
     }
   },
   
