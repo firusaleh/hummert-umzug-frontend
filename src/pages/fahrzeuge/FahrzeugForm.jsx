@@ -56,6 +56,7 @@ const FahrzeugForm = () => {
   const [vehicleImage, setVehicleImage] = useState(null);
   const [vehicleImagePreview, setVehicleImagePreview] = useState('');
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Daten beim Bearbeiten laden
   useEffect(() => {
@@ -173,19 +174,79 @@ const FahrzeugForm = () => {
     }
   };
 
+  // Client-side form validation
+  const validateForm = () => {
+    // Reset field errors
+    setFieldErrors({});
+    
+    const errors = {};
+    
+    // Required fields validation
+    if (!formData.kennzeichen.trim()) {
+      errors.kennzeichen = 'Kennzeichen ist erforderlich';
+    } else if (!/^[A-ZÄÖÜ]{1,3}-[A-ZÄÖÜ]{1,2} [0-9A-ZÄÖÜ]{1,6}$/.test(formData.kennzeichen.trim())) {
+      errors.kennzeichen = 'Ungültiges Kennzeichen-Format (z.B. M-AB 1234)';
+    }
+    
+    if (!formData.bezeichnung.trim()) {
+      errors.bezeichnung = 'Bezeichnung ist erforderlich';
+    }
+    
+    // If we have any errors
+    if (Object.keys(errors).length > 0) {
+      // Set field-specific errors for highlighting
+      setFieldErrors(errors);
+      
+      // Build error message for the error box
+      const errorMessages = Object.entries(errors)
+        .map(([field, message]) => {
+          const displayField = field === 'kennzeichen' ? 'Kennzeichen' : 
+                              field === 'bezeichnung' ? 'Bezeichnung' : field;
+          return `${displayField}: ${message}`;
+        })
+        .join('\n');
+      
+      setError(`Validierungsfehler:\n${errorMessages}`);
+      return false;
+    }
+    
+    return true;
+  };
+
   // Formular absenden
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
     
+    // Client-side validation
+    if (!validateForm()) {
+      setSaving(false);
+      return;
+    }
+    
     try {
       // API-Daten vorbereiten
+      // Create a clean copy without spreading the original to avoid unexpected properties
       const fahrzeugData = {
-        ...formData,
-        // Zahlen-Felder konvertieren
+        // Required fields
+        kennzeichen: formData.kennzeichen.trim(),
+        bezeichnung: formData.bezeichnung.trim(),
+        typ: formData.typ,
+        
+        // Optional fields with proper conversions
+        status: formData.status,
+        fuehrerscheinklasse: formData.fuehrerscheinklasse,
         baujahr: formData.baujahr ? Number(formData.baujahr) : undefined,
         kilometerstand: formData.kilometerstand ? Number(formData.kilometerstand) : undefined,
+        notizen: formData.notizen,
+        
+        // Date fields - ensure ISO strings for dates
+        anschaffungsdatum: formData.anschaffungsdatum || undefined,
+        tuev: formData.tuev || undefined,
+        naechsterService: formData.naechsterService || undefined,
+        
+        // Nested objects
         kapazitaet: {
           ladeflaeche: {
             laenge: formData.kapazitaet.ladeflaeche.laenge ? Number(formData.kapazitaet.ladeflaeche.laenge) : undefined,
@@ -193,8 +254,34 @@ const FahrzeugForm = () => {
             hoehe: formData.kapazitaet.ladeflaeche.hoehe ? Number(formData.kapazitaet.ladeflaeche.hoehe) : undefined
           },
           ladegewicht: formData.kapazitaet.ladegewicht ? Number(formData.kapazitaet.ladegewicht) : undefined
+        },
+        
+        // Versicherung with date conversion
+        versicherung: {
+          gesellschaft: formData.versicherung.gesellschaft || undefined,
+          vertragsnummer: formData.versicherung.vertragsnummer || undefined,
+          ablaufdatum: formData.versicherung.ablaufdatum || undefined
         }
       };
+      
+      // Remove undefined fields for cleaner request
+      Object.keys(fahrzeugData).forEach(key => {
+        if (fahrzeugData[key] === undefined) {
+          delete fahrzeugData[key];
+        } else if (typeof fahrzeugData[key] === 'object' && fahrzeugData[key] !== null) {
+          Object.keys(fahrzeugData[key]).forEach(nestedKey => {
+            if (fahrzeugData[key][nestedKey] === undefined) {
+              delete fahrzeugData[key][nestedKey];
+            } else if (typeof fahrzeugData[key][nestedKey] === 'object' && fahrzeugData[key][nestedKey] !== null) {
+              Object.keys(fahrzeugData[key][nestedKey]).forEach(deepKey => {
+                if (fahrzeugData[key][nestedKey][deepKey] === undefined) {
+                  delete fahrzeugData[key][nestedKey][deepKey];
+                }
+              });
+            }
+          });
+        }
+      });
       
       let response;
       
@@ -230,18 +317,43 @@ const FahrzeugForm = () => {
       navigate('/fahrzeuge');
     } catch (err) {
       console.error('Fehler beim Speichern des Fahrzeugs:', err);
+      // Log the actual request data for debugging
+      console.log('Fahrzeugdaten:', fahrzeugData);
+      
+      // More detailed error logging
+      if (err.response?.data) {
+        console.log('Server-Antwort:', err.response.data);
+      }
+      
+      // Reset field errors
+      setFieldErrors({});
       
       // Display detailed validation errors if available
       if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
+        // Create field errors map for input field highlighting
+        const fieldErrorsMap = {};
+        
         const validationErrors = err.response.data.errors.map(error => {
+          // Get field name
+          const field = error.field || error.param;
+          
+          // Store in field errors map for highlighting the input
+          if (field) {
+            fieldErrorsMap[field] = error.message || error.msg;
+          }
+          
           // Format field name for display
-          let fieldName = error.field;
+          let fieldName = field;
           if (fieldName === 'kennzeichen') fieldName = 'Kennzeichen';
           if (fieldName === 'bezeichnung') fieldName = 'Bezeichnung';
           
-          return `${fieldName}: ${error.message}`;
+          return `${fieldName}: ${error.message || error.msg}`;
         }).join('\n');
         
+        // Set errors for UI highlighting
+        setFieldErrors(fieldErrorsMap);
+        
+        // Set error message
         setError(`Validierungsfehler:\n${validationErrors}`);
         toast.error('Bitte korrigieren Sie die markierten Felder');
       } else {
@@ -407,10 +519,13 @@ const FahrzeugForm = () => {
                   name="kennzeichen"
                   value={formData.kennzeichen}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 border ${fieldErrors.kennzeichen ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   placeholder="z.B. M-AB 1234"
                   required
                 />
+                {fieldErrors.kennzeichen && (
+                  <p className="mt-1 text-sm text-red-500">{fieldErrors.kennzeichen}</p>
+                )}
               </div>
               
               <div>
@@ -420,10 +535,13 @@ const FahrzeugForm = () => {
                   name="bezeichnung"
                   value={formData.bezeichnung}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 border ${fieldErrors.bezeichnung ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   placeholder="z.B. Mercedes Sprinter"
                   required
                 />
+                {fieldErrors.bezeichnung && (
+                  <p className="mt-1 text-sm text-red-500">{fieldErrors.bezeichnung}</p>
+                )}
               </div>
               
               <div>
