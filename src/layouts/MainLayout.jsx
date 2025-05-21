@@ -16,7 +16,8 @@ import {
   DollarSign,
   ChevronDown,
   BarChart,
-  CreditCard
+  CreditCard,
+  Car
 } from 'lucide-react';
 
 const MainLayout = ({ children }) => {
@@ -51,6 +52,7 @@ const MainLayout = ({ children }) => {
     { name: 'Umzüge', icon: <TruckElectric size={20} />, path: '/umzuege' },
     { name: 'Aufnahmen', icon: <ClipboardList size={20} />, path: '/aufnahmen' },
     { name: 'Mitarbeiter', icon: <Users size={20} />, path: '/mitarbeiter' },
+    { name: 'Fahrzeuge', icon: <Car size={20} />, path: '/fahrzeuge' },
     { name: 'Zeiterfassung', icon: <Clock size={20} />, path: '/zeiterfassung' },
     { 
       name: 'Finanzen', 

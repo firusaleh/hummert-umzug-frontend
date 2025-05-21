@@ -27,6 +27,12 @@ import AufnahmeForm from './pages/aufnahmen/AufnahmeForm';
 import MitarbeiterList from './pages/mitarbeiter/MitarbeiterList';
 import MitarbeiterForm from './pages/mitarbeiter/MitarbeiterForm';
 
+// Fahrzeuge-Pages
+import FahrzeugeList from './pages/fahrzeuge/FahrzeugeList';
+import FahrzeugDetails from './pages/fahrzeuge/FahrzeugDetails';
+import FahrzeugForm from './pages/fahrzeuge/FahrzeugForm';
+import KilometerstandForm from './pages/fahrzeuge/KilometerstandForm';
+
 // Zeitachse
 import Zeitachse from './pages/zeitachse/Zeitachse';
 
@@ -327,6 +333,47 @@ const App = () => {
         <ProtectedRoute>
           <MainLayout>
             <ZeiterfassungSystem />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      {/* Fahrzeuge Routes */}
+      <Route path="/fahrzeuge" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <FahrzeugeList />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/fahrzeuge/neu" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <FahrzeugForm />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/fahrzeuge/:id" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <FahrzeugDetails />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/fahrzeuge/:id/bearbeiten" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <FahrzeugForm />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/fahrzeuge/:id/kilometerstand" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <KilometerstandForm />
           </MainLayout>
         </ProtectedRoute>
       } />
