@@ -317,8 +317,6 @@ const FahrzeugForm = () => {
       navigate('/fahrzeuge');
     } catch (err) {
       console.error('Fehler beim Speichern des Fahrzeugs:', err);
-      // Log the actual request data for debugging
-      console.log('Fahrzeugdaten:', fahrzeugData);
       
       // More detailed error logging
       if (err.response?.data) {
