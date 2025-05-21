@@ -759,11 +759,41 @@ export const zeiterfassungService = {
   // Get all available employees for time tracking
   getMitarbeiter: async () => {
     try {
-      // Using the correct endpoint from zeiterfassung.routes.js
-      const response = await api.get('/zeiterfassung/mitarbeiter');
+      console.log('Fetching mitarbeiter data for zeiterfassung...');
+      
+      // Try both endpoints - first try zeiterfassung specific endpoint
+      let response;
+      try {
+        response = await api.get('/zeiterfassung/mitarbeiter');
+        console.log('Successfully fetched from /zeiterfassung/mitarbeiter');
+      } catch (error) {
+        console.log('Failed to fetch from /zeiterfassung/mitarbeiter, trying fallback to /mitarbeiter');
+        // If that fails, try the general mitarbeiter endpoint
+        response = await api.get('/mitarbeiter');
+        console.log('Successfully fetched from /mitarbeiter');
+      }
+      
+      // Debug log raw response
+      console.log('Raw mitarbeiter API response:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        dataType: typeof response.data,
+        dataIsArray: Array.isArray(response.data),
+        dataLength: Array.isArray(response.data) ? response.data.length : 'not an array',
+        data: response.data
+      });
+      
       // Return the full response, including response.data which contains the actual data
       return { success: true, data: response.data };
     } catch (error) {
+      console.error('Fehler beim Laden der Mitarbeiter:', error);
+      console.error('Error details:', error.response ? {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      } : 'No response');
+      
       logError('zeiterfassung:getMitarbeiter', error);
       return formatApiError(error, 'Fehler beim Laden der Mitarbeiterdaten');
     }
@@ -772,11 +802,41 @@ export const zeiterfassungService = {
   // Get all available projects for time tracking
   getUmzugsprojekte: async () => {
     try {
-      // Using the correct endpoint from zeiterfassung.routes.js
-      const response = await api.get('/zeiterfassung/projekte');
+      console.log('Fetching projekt data for zeiterfassung...');
+      
+      // Try both endpoints - first try zeiterfassung specific endpoint
+      let response;
+      try {
+        response = await api.get('/zeiterfassung/projekte');
+        console.log('Successfully fetched from /zeiterfassung/projekte');
+      } catch (error) {
+        console.log('Failed to fetch from /zeiterfassung/projekte, trying fallback to /umzuege');
+        // If that fails, try the general umzuege endpoint
+        response = await api.get('/umzuege');
+        console.log('Successfully fetched from /umzuege');
+      }
+      
+      // Debug log raw response
+      console.log('Raw projekte API response:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        dataType: typeof response.data,
+        dataIsArray: Array.isArray(response.data),
+        dataLength: Array.isArray(response.data) ? response.data.length : 'not an array',
+        data: response.data
+      });
+      
       // Return the full response, including response.data which contains the actual data
       return { success: true, data: response.data };
     } catch (error) {
+      console.error('Fehler beim Laden der Projekte:', error);
+      console.error('Error details:', error.response ? {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      } : 'No response');
+      
       logError('zeiterfassung:getUmzugsprojekte', error);
       return formatApiError(error, 'Fehler beim Laden der Projektdaten');
     }

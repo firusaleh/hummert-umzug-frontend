@@ -52,14 +52,9 @@ export default function ZeiterfassungSystem() {
         
         console.log('Verarbeitete Mitarbeiterliste:', mitarbeiterListe);
         
-        // Fallback für Entwicklung, wenn keine Mitarbeiter geladen werden konnten
+        // Wenn keine Mitarbeiter geladen werden konnten
         if (mitarbeiterListe.length === 0) {
-          console.warn('Keine Mitarbeiter geladen - verwende Fallback-Daten');
-          mitarbeiterListe = [
-            { _id: 'mock1', vorname: 'Max', nachname: 'Mustermann', rolle: 'teamleiter' },
-            { _id: 'mock2', vorname: 'Erika', nachname: 'Musterfrau', rolle: 'fahrer' },
-            { _id: 'mock3', vorname: 'John', nachname: 'Doe', rolle: 'helfer' }
-          ];
+          console.warn('Keine Mitarbeiter vom Server geladen!');
         }
         
         setMitarbeiter(mitarbeiterListe);
@@ -87,21 +82,9 @@ export default function ZeiterfassungSystem() {
         
         console.log('Verarbeitete Projektliste:', projekteListe);
         
-        // Fallback für Entwicklung, wenn keine Projekte geladen werden konnten
+        // Wenn keine Projekte geladen werden konnten
         if (projekteListe.length === 0) {
-          console.warn('Keine Projekte geladen - verwende Fallback-Daten');
-          projekteListe = [
-            { 
-              _id: 'mock-projekt1', 
-              auftraggeber: { name: 'Firma ABC' }, 
-              startDatum: new Date().toISOString() 
-            },
-            { 
-              _id: 'mock-projekt2', 
-              auftraggeber: { name: 'Familie Schmidt' }, 
-              startDatum: new Date().toISOString() 
-            }
-          ];
+          console.warn('Keine Projekte vom Server geladen!');
         }
         
         setUmzugsprojekte(projekteListe);
@@ -410,13 +393,31 @@ export default function ZeiterfassungSystem() {
   console.log('Generierte projektOptionen:', projektOptionen);
   
   // Mitarbeiter-Dropdown-Optionen
-  const mitarbeiterOptionen = mitarbeiter.map(ma => {
-    console.log('Mitarbeiter für Option:', ma);
-    return {
-      id: ma._id || 'unknown',
-      label: ma.vorname && ma.nachname ? `${ma.vorname} ${ma.nachname}` : 'Unbekannter Mitarbeiter'
-    };
-  });
+  console.log('Erstelle Mitarbeiter-Dropdown-Optionen aus:', mitarbeiter);
+  const mitarbeiterOptionen = mitarbeiter
+    .filter(ma => ma && ma._id) // Filter out invalid entries
+    .map(ma => {
+      console.log('Mitarbeiter für Option:', ma);
+      let label = 'Unbekannter Mitarbeiter';
+      
+      // Handle different possible structures
+      if (ma.vorname && ma.nachname) {
+        label = `${ma.vorname} ${ma.nachname}`;
+      } else if (ma.name) {
+        label = ma.name;
+      } else if (ma.userId && typeof ma.userId === 'object') {
+        if (ma.userId.name) {
+          label = ma.userId.name;
+        } else if (ma.userId.firstName && ma.userId.lastName) {
+          label = `${ma.userId.firstName} ${ma.userId.lastName}`;
+        }
+      }
+      
+      return {
+        id: ma._id,
+        label: label
+      };
+    });
   
   console.log('Generierte mitarbeiterOptionen:', mitarbeiterOptionen);
   
