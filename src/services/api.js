@@ -80,7 +80,7 @@ const tokenManager = {
       try {
         // Try to refresh the token
         const response = await api.get('/auth/refresh');
-        if (response.data && response.data.token) {
+        if (response && response.data && response.data.token) {
           tokenManager.setToken(response.data.token);
           tokenManager.setTokenTimestamp();
           console.log('Token refreshed successfully');
@@ -145,27 +145,27 @@ api.interceptors.response.use(
     // Handle authentication errors
     if (error.response && error.response.status === 401) {
       // More comprehensive check for token issues
-      const isTokenExpired = error.response.data?.message?.includes('Token') ||
-                          error.response.data?.message?.includes('abgelaufen') ||
-                          error.response.data?.message?.includes('expired') ||
-                          error.response.data?.message?.includes('Sitzung') ||
-                          error.response.data?.message?.includes('session') ||
-                          error.response.data?.message?.includes('nicht authentifiziert') ||
-                          error.response.data?.message?.includes('not authenticated') ||
-                          error.response.data?.message?.includes('invalid token') ||
-                          error.response.data?.message?.includes('jwt') ||
-                          error.response.data?.message?.includes('unauthorized') ||
-                          error.response.data?.message?.includes('unautorisiert');
+      const isTokenExpired = error?.response?.data?.message?.includes('Token') ||
+                          error?.response?.data?.message?.includes('abgelaufen') ||
+                          error?.response?.data?.message?.includes('expired') ||
+                          error?.response?.data?.message?.includes('Sitzung') ||
+                          error?.response?.data?.message?.includes('session') ||
+                          error?.response?.data?.message?.includes('nicht authentifiziert') ||
+                          error?.response?.data?.message?.includes('not authenticated') ||
+                          error?.response?.data?.message?.includes('invalid token') ||
+                          error?.response?.data?.message?.includes('jwt') ||
+                          error?.response?.data?.message?.includes('unauthorized') ||
+                          error?.response?.data?.message?.includes('unautorisiert');
       
       // Also check for specific response codes used in some APIs
       const isAuthError = isTokenExpired || 
-                          error.response.data?.code === 'invalid_token' ||
-                          error.response.data?.code === 'token_expired' ||
-                          error.response.data?.status === 'unauthorized';
+                          error?.response?.data?.code === 'invalid_token' ||
+                          error?.response?.data?.code === 'token_expired' ||
+                          error?.response?.data?.status === 'unauthorized';
       
       if (isAuthError) {
         // Log the auth error for debugging
-        console.warn('Authentication error detected:', error.response.data?.message);
+        console.warn('Authentication error detected:', error?.response?.data?.message || 'Unknown auth error');
         
         // Clear auth data
         tokenManager.clearAuthData();
@@ -1101,6 +1101,16 @@ export const fileService = {
   
   uploadFile: async (fileData) => {
     try {
+      // Add null check for fileData itself
+      if (!fileData) {
+        console.error('uploadFile called with null or undefined fileData');
+        return {
+          success: false,
+          message: 'Keine Datei zum Hochladen angegeben',
+          errors: [{ field: 'file', message: 'Datei ist erforderlich' }]
+        };
+      }
+      
       const formData = new FormData();
       
       if (fileData.file) {
@@ -1126,7 +1136,7 @@ export const fileService = {
       
       if (fileData.tags) {
         if (Array.isArray(fileData.tags)) {
-          fileData.tags.forEach(tag => formData.append('tags[]', tag));
+          fileData.tags.forEach(tag => tag && formData.append('tags[]', tag));
         } else {
           formData.append('tags', fileData.tags);
         }
@@ -1137,7 +1147,7 @@ export const fileService = {
           'Content-Type': 'multipart/form-data'
         },
         onUploadProgress: progressEvent => {
-          if (fileData.onProgress && typeof fileData.onProgress === 'function') {
+          if (fileData.onProgress && typeof fileData.onProgress === 'function' && progressEvent?.total) {
             const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
             fileData.onProgress(percentCompleted);
           }
@@ -1155,15 +1165,15 @@ export const fileService = {
     try {
       const response = await api.get(`/files/download/${id}`, { responseType: 'blob' });
       
-      // Extract filename or use generic name
-      const contentDisposition = response.headers['content-disposition'];
+      // Extract filename or use generic name with null safety
+      const contentDisposition = response?.headers?.['content-disposition'];
       let filename = 'download';
       
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
         if (filenameMatch && filenameMatch[1]) {
           // Fix: Use global replace to remove all quotes
-          filename = filenameMatch[1].replace(/['"]/g, '');
+          filename = filenameMatch[1].replace(/['"\/\\:*?<>|]/g, '');
         }
       }
       

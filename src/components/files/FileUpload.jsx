@@ -37,11 +37,21 @@ const FileUpload = ({ projectId, taskId, onUploadSuccess }) => {
     }, 300);
 
     try {
+      // Create fileData with null-safety
       const fileData = {
         file,
-        project: projectId,
-        task: taskId
+        // Only include properties that have values
+        ...(projectId && { project: projectId }),
+        ...(taskId && { task: taskId })
       };
+
+      // Log upload data for debugging
+      console.log('Uploading file with data:', { 
+        fileName: file?.name,
+        fileSize: file?.size,
+        projectId,
+        taskId
+      });
 
       await fileService.uploadFile(fileData);
       

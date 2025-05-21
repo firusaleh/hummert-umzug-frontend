@@ -1,87 +1,129 @@
 import React from 'react';
-import { AlertTriangle, XCircle, Info } from 'lucide-react';
+import PropTypes from 'prop-types';
+import { AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 /**
- * Reusable error alert component for displaying error messages
- * Supports different severity levels with appropriate styling
+ * ErrorAlert Component zur Anzeige von Fehlermeldungen mit verschiedenen Schweregraden
  * 
- * @param {Object} props
- * @param {String|Array|null} props.error - Error message or array of messages
- * @param {String} props.severity - Error severity: 'error', 'warning', or 'info'
- * @param {Function} props.onDismiss - Optional callback for dismissing the error
- * @param {String} props.className - Additional CSS classes
+ * @param {Object} props - Die Komponenten-Props
+ * @param {string|Array} props.error - Fehlermeldung oder Array von Fehlermeldungen
+ * @param {string} props.severity - Schweregrad des Fehlers: 'error', 'warning', 'info' (Standard: 'error')
+ * @param {Function} props.onDismiss - Callback-Funktion zum Schließen der Fehlermeldung
+ * @param {string} props.className - Zusätzliche CSS-Klassen
+ * @param {boolean} props.dismissible - Ob die Fehlermeldung schließbar ist
+ * @param {number} props.autoDismissAfter - Zeit in ms, nach der die Meldung automatisch verschwindet (0 = deaktiviert)
  */
 const ErrorAlert = ({ 
   error, 
-  severity = 'error',
+  severity = 'error', 
   onDismiss, 
-  className = '' 
+  className = '',
+  dismissible = true,
+  autoDismissAfter = 0
 }) => {
-  // Return null if no error
-  if (!error) return null;
-  
-  // Convert error to array if it's a string
+  const [visible, setVisible] = React.useState(true);
+
+  React.useEffect(() => {
+    // Wenn keine Fehlermeldung, nichts tun
+    if (!error || error.length === 0 || !visible) {
+      return;
+    }
+    // Auto-dismiss Timer
+    let timer;
+    if (autoDismissAfter > 0) {
+      timer = setTimeout(() => {
+        setVisible(false);
+        if (onDismiss) onDismiss();
+      }, autoDismissAfter);
+    }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [autoDismissAfter, onDismiss, error, visible]);
+
+  // Fehler in Array umwandeln, wenn es kein Array ist
   const errorMessages = Array.isArray(error) ? error : [error];
-  
-  // Filter out empty messages
-  const messages = errorMessages.filter(msg => msg && msg.trim());
-  if (messages.length === 0) return null;
-  
-  // Configure styling based on severity
-  const styles = {
+
+  // Farben und Icons basierend auf dem Schweregrad
+  const colorConfig = {
     error: {
-      container: 'bg-red-50 border-l-4 border-red-500',
-      icon: <XCircle className="h-5 w-5 text-red-500" />,
-      text: 'text-red-700'
+      bg: 'bg-red-100',
+      border: 'border-red-400',
+      text: 'text-red-700',
+      icon: <AlertCircle className="h-5 w-5 text-red-500" />
     },
     warning: {
-      container: 'bg-yellow-50 border-l-4 border-yellow-500',
-      icon: <AlertTriangle className="h-5 w-5 text-yellow-500" />,
-      text: 'text-yellow-700'
+      bg: 'bg-yellow-100',
+      border: 'border-yellow-400',
+      text: 'text-yellow-700',
+      icon: <AlertTriangle className="h-5 w-5 text-yellow-500" />
     },
     info: {
-      container: 'bg-blue-50 border-l-4 border-blue-500',
-      icon: <Info className="h-5 w-5 text-blue-500" />,
-      text: 'text-blue-700'
+      bg: 'bg-blue-100',
+      border: 'border-blue-400',
+      text: 'text-blue-700',
+      icon: <Info className="h-5 w-5 text-blue-500" />
     }
   };
-  
-  const style = styles[severity] || styles.error;
-  
+
+  // Standard-Konfiguration verwenden, wenn der Schweregrad nicht gültig ist
+  const config = colorConfig[severity] || colorConfig.error;
+
+  const handleDismiss = () => {
+    setVisible(false);
+    if (onDismiss) onDismiss();
+  };
+
+  // Wenn keine Fehlermeldung oder nicht sichtbar, nichts anzeigen
+  if (!error || error.length === 0 || !visible) {
+    return null;
+  }
+
   return (
-    <div className={`p-4 rounded-md my-4 ${style.container} ${className}`} role="alert">
+    <div 
+      className={`${config.bg} ${config.border} ${config.text} px-4 py-3 rounded relative mb-4 ${className}`}
+      role="alert"
+    >
       <div className="flex">
-        <div className="flex-shrink-0">
-          {style.icon}
+        <div className="flex-shrink-0 mr-3">
+          {config.icon}
         </div>
-        <div className="ml-3 flex-1">
-          {messages.length === 1 ? (
-            <p className={`text-sm font-medium ${style.text}`}>{messages[0]}</p>
+        <div className="flex-grow">
+          {errorMessages.length === 1 ? (
+            <span className="block sm:inline">{errorMessages[0]}</span>
           ) : (
-            <div className={`text-sm ${style.text}`}>
-              <p className="font-medium mb-2">Es sind Fehler aufgetreten:</p>
-              <ul className="list-disc pl-5 space-y-1">
-                {messages.map((msg, index) => (
-                  <li key={index}>{msg}</li>
-                ))}
-              </ul>
-            </div>
+            <ul className="list-disc pl-5">
+              {errorMessages.map((msg, index) => (
+                <li key={index} className="mb-1 last:mb-0">{msg}</li>
+              ))}
+            </ul>
           )}
         </div>
-        {onDismiss && (
-          <div className="ml-auto pl-3">
-            <button
-              onClick={onDismiss}
-              className="inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-red-50 focus:ring-red-600"
-              aria-label="Schließen"
-            >
-              <XCircle className="h-5 w-5 text-gray-400 hover:text-gray-500" />
-            </button>
-          </div>
+        {dismissible && (
+          <button 
+            className="ml-auto -mx-1.5 -my-1.5 bg-transparent rounded-lg p-1.5 inline-flex h-8 w-8 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-red-50 focus:ring-red-600"
+            aria-label="Schließen"
+            onClick={handleDismiss}
+          >
+            <X className={`h-5 w-5 ${config.text}`} />
+          </button>
         )}
       </div>
     </div>
   );
+};
+
+ErrorAlert.propTypes = {
+  error: PropTypes.oneOfType([
+    PropTypes.string,
+    PropTypes.arrayOf(PropTypes.string)
+  ]),
+  severity: PropTypes.oneOf(['error', 'warning', 'info']),
+  onDismiss: PropTypes.func,
+  className: PropTypes.string,
+  dismissible: PropTypes.bool,
+  autoDismissAfter: PropTypes.number
 };
 
 export default ErrorAlert;

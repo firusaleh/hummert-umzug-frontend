@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, Check, Plus, Edit, Trash2, Search, User, Users, Briefcase } from 'lucide-react';
 import { zeiterfassungService } from '../../services/api';
 import { extractArrayData, isErrorResponse, getErrorMessage } from '../../utils/dataUtils';
+import useErrorHandler from '../../hooks/useErrorHandler';
+import ErrorAlert from '../../components/common/ErrorAlert';
 
 export default function ZeiterfassungSystem() {
   // State für Daten
@@ -23,74 +25,110 @@ export default function ZeiterfassungSystem() {
   const [bearbeitungId, setBearbeitungId] = useState(null);
   const [aktiverMitarbeiter, setAktiverMitarbeiter] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  
+  // Ersetze den einfachen error state mit dem erweiterten Error Handler
+  const { 
+    error, 
+    setError, 
+    handleApiError, 
+    clearErrors,
+    formErrors,
+    hasFieldError,
+    getFieldError
+  } = useErrorHandler({
+    clearErrorAfter: 8000, // Fehler nach 8 Sekunden automatisch löschen
+    captureNetwork: true,  // Netzwerkfehler abfangen
+    onAuthError: () => {
+      // Bei Auth-Fehlern zum Login weiterleiten
+      alert('Ihre Sitzung ist abgelaufen. Sie werden zur Anmeldeseite weitergeleitet.');
+      window.location.href = '/login?session=expired';
+    }
+  });
   
   // Lade Daten beim Komponenten-Mount
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      setError(null);
+      clearErrors(); // Alle vorherigen Fehler löschen
       
       try {
         // Lade Mitarbeiter mit der neuen utility Funktion
         const mitarbeiterResponse = await zeiterfassungService.getMitarbeiter();
         console.log('Mitarbeiter Response erhalten:', mitarbeiterResponse);
         
-        // Prüfe auf Fehler
+        // Prüfe auf Fehler mit dem Error Handler
         if (isErrorResponse(mitarbeiterResponse)) {
-          throw new Error(getErrorMessage(mitarbeiterResponse, 'Fehler beim Laden der Mitarbeiter'));
+          // Anstatt eine Exception zu werfen, verwende den Error Handler
+          handleApiError(
+            'zeiterfassung:getMitarbeiter', 
+            mitarbeiterResponse, 
+            'Fehler beim Laden der Mitarbeiter'
+          );
+          // Leere Liste verwenden, damit die Komponente nicht crashed
+          setMitarbeiter([]);
+        } else {
+          // Extrahiere Mitarbeiterdaten mit der utility Funktion
+          const mitarbeiterListe = extractArrayData(
+            mitarbeiterResponse, 
+            ['mitarbeiter', 'users'], 
+            []
+          );
+          
+          console.log('Extrahierte Mitarbeiterliste:', mitarbeiterListe);
+          
+          // Wenn keine Mitarbeiter geladen werden konnten
+          if (mitarbeiterListe.length === 0) {
+            console.warn('Keine Mitarbeiter vom Server geladen!');
+          }
+          
+          setMitarbeiter(mitarbeiterListe);
         }
-        
-        // Extrahiere Mitarbeiterdaten mit der utility Funktion
-        const mitarbeiterListe = extractArrayData(
-          mitarbeiterResponse, 
-          ['mitarbeiter', 'users'], 
-          []
-        );
-        
-        console.log('Extrahierte Mitarbeiterliste:', mitarbeiterListe);
-        
-        // Wenn keine Mitarbeiter geladen werden konnten
-        if (mitarbeiterListe.length === 0) {
-          console.warn('Keine Mitarbeiter vom Server geladen!');
-        }
-        
-        setMitarbeiter(mitarbeiterListe);
         
         // Lade Projekte mit der gleichen utility Funktion
         const projekteResponse = await zeiterfassungService.getUmzugsprojekte();
         console.log('Projekte Response erhalten:', projekteResponse);
         
-        // Prüfe auf Fehler
+        // Prüfe auf Fehler mit dem Error Handler
         if (isErrorResponse(projekteResponse)) {
-          throw new Error(getErrorMessage(projekteResponse, 'Fehler beim Laden der Projekte'));
+          // Anstatt eine Exception zu werfen, verwende den Error Handler
+          handleApiError(
+            'zeiterfassung:getUmzugsprojekte', 
+            projekteResponse, 
+            'Fehler beim Laden der Projekte'
+          );
+          // Leere Liste verwenden, damit die Komponente nicht crashed
+          setUmzugsprojekte([]);
+        } else {
+          // Extrahiere Projektdaten mit der utility Funktion
+          const projekteListe = extractArrayData(
+            projekteResponse, 
+            ['projekte', 'umzuege'], 
+            []
+          );
+          
+          console.log('Extrahierte Projektliste:', projekteListe);
+          
+          // Wenn keine Projekte geladen werden konnten
+          if (projekteListe.length === 0) {
+            console.warn('Keine Projekte vom Server geladen!');
+          }
+          
+          setUmzugsprojekte(projekteListe);
         }
-        
-        // Extrahiere Projektdaten mit der utility Funktion
-        const projekteListe = extractArrayData(
-          projekteResponse, 
-          ['projekte', 'umzuege'], 
-          []
-        );
-        
-        console.log('Extrahierte Projektliste:', projekteListe);
-        
-        // Wenn keine Projekte geladen werden konnten
-        if (projekteListe.length === 0) {
-          console.warn('Keine Projekte vom Server geladen!');
-        }
-        
-        setUmzugsprojekte(projekteListe);
       } catch (error) {
-        console.error('Fehler beim Laden der Daten:', error);
-        setError(`Fehler beim Laden der Mitarbeiter und Projekte: ${error.message}`);
+        // Verwende den Error Handler für unerwartete Fehler
+        handleApiError(
+          'zeiterfassung:fetchData', 
+          error, 
+          'Fehler beim Laden der Mitarbeiter und Projekte'
+        );
       } finally {
         setLoading(false);
       }
     };
     
     fetchData();
-  }, []);
+  }, [clearErrors, handleApiError]);
   
   // Lade Zeiterfassungen wenn ein Projekt ausgewählt wurde
   useEffect(() => {

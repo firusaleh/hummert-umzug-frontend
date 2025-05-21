@@ -3,6 +3,172 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api, { umzuegeService, mitarbeiterService, fahrzeugeService } from '../../services/api';
 import { toast } from 'react-toastify';
 import { extractApiData, ensureArray } from '../../utils/apiUtils';
+import useErrorHandler from '../../hooks/useErrorHandler';
+import ErrorAlert from '../../components/common/ErrorAlert';
+import { createValidationSchema, patterns, commonRules } from '../../utils/validationUtils';
+import Form from '../../components/common/Form';
+import FormField from '../../components/common/FormField';
+
+// Define validation schema for Umzug form
+const validationSchema = createValidationSchema({
+  'kundennummer': {
+    required: true,
+    minLength: 3,
+    errorMessages: {
+      required: 'Kundennummer ist erforderlich',
+      minLength: 'Kundennummer muss mindestens 3 Zeichen lang sein'
+    }
+  },
+  'status': {
+    required: true,
+    validate: (value) => {
+      return ['geplant', 'bestaetigt', 'in_bearbeitung', 'abgeschlossen', 'storniert'].includes(value) || 
+        'Status muss einen gültigen Wert haben';
+    },
+    errorMessages: {
+      required: 'Status ist erforderlich'
+    }
+  },
+  'auftraggeber.name': {
+    ...commonRules.name,
+    errorMessages: {
+      required: 'Name des Auftraggebers ist erforderlich',
+      minLength: 'Name muss mindestens 2 Zeichen lang sein'
+    }
+  },
+  'auftraggeber.telefon': {
+    ...commonRules.phone,
+    errorMessages: {
+      required: 'Telefonnummer des Auftraggebers ist erforderlich',
+      pattern: 'Telefonnummer hat ein ungültiges Format (erlaubt sind Zahlen, Leerzeichen, Klammern und Bindestriche)'
+    }
+  },
+  'auftraggeber.email': {
+    ...commonRules.email,
+    errorMessages: {
+      required: 'E-Mail des Auftraggebers ist erforderlich',
+      pattern: 'Bitte geben Sie eine gültige E-Mail-Adresse ein'
+    }
+  },
+  'auszugsadresse.strasse': {
+    required: true,
+    minLength: 2,
+    errorMessages: {
+      required: 'Straße der Auszugsadresse ist erforderlich',
+      minLength: 'Straße muss mindestens 2 Zeichen lang sein'
+    }
+  },
+  'auszugsadresse.hausnummer': {
+    required: true,
+    errorMessages: {
+      required: 'Hausnummer der Auszugsadresse ist erforderlich'
+    }
+  },
+  'auszugsadresse.plz': {
+    ...commonRules.postalCode,
+    errorMessages: {
+      required: 'PLZ der Auszugsadresse ist erforderlich',
+      pattern: 'PLZ muss aus 5 Ziffern bestehen'
+    }
+  },
+  'auszugsadresse.ort': {
+    required: true,
+    minLength: 2,
+    errorMessages: {
+      required: 'Ort der Auszugsadresse ist erforderlich',
+      minLength: 'Ort muss mindestens 2 Zeichen lang sein'
+    }
+  },
+  'einzugsadresse.strasse': {
+    required: true,
+    minLength: 2,
+    errorMessages: {
+      required: 'Straße der Einzugsadresse ist erforderlich',
+      minLength: 'Straße muss mindestens 2 Zeichen lang sein'
+    }
+  },
+  'einzugsadresse.hausnummer': {
+    required: true,
+    errorMessages: {
+      required: 'Hausnummer der Einzugsadresse ist erforderlich'
+    }
+  },
+  'einzugsadresse.plz': {
+    ...commonRules.postalCode,
+    errorMessages: {
+      required: 'PLZ der Einzugsadresse ist erforderlich',
+      pattern: 'PLZ muss aus 5 Ziffern bestehen'
+    }
+  },
+  'einzugsadresse.ort': {
+    required: true,
+    minLength: 2,
+    errorMessages: {
+      required: 'Ort der Einzugsadresse ist erforderlich',
+      minLength: 'Ort muss mindestens 2 Zeichen lang sein'
+    }
+  },
+  'startDatum': {
+    required: true,
+    validate: (value, data) => {
+      if (!value) return 'Startdatum ist erforderlich';
+      
+      // If endDatum is also set, check that startDatum is before endDatum
+      if (data.endDatum) {
+        const start = new Date(value);
+        const end = new Date(data.endDatum);
+        if (start > end) {
+          return 'Startdatum muss vor dem Enddatum liegen';
+        }
+      }
+      
+      return true;
+    },
+    errorMessages: {
+      required: 'Startdatum ist erforderlich'
+    }
+  },
+  'endDatum': {
+    required: true,
+    validate: (value, data) => {
+      if (!value) return 'Enddatum ist erforderlich';
+      
+      // Check that endDatum is after startDatum
+      if (data.startDatum) {
+        const start = new Date(data.startDatum);
+        const end = new Date(value);
+        if (end < start) {
+          return 'Enddatum muss nach dem Startdatum liegen';
+        }
+      }
+      
+      return true;
+    },
+    errorMessages: {
+      required: 'Enddatum ist erforderlich'
+    }
+  },
+  'preis.netto': {
+    required: true,
+    type: 'number',
+    min: 1,
+    errorMessages: {
+      required: 'Netto-Preis ist erforderlich',
+      type: 'Netto-Preis muss eine Zahl sein',
+      min: 'Netto-Preis muss positiv sein'
+    }
+  },
+  'preis.brutto': {
+    required: true,
+    type: 'number',
+    min: 1,
+    errorMessages: {
+      required: 'Brutto-Preis ist erforderlich',
+      type: 'Brutto-Preis muss eine Zahl sein',
+      min: 'Brutto-Preis muss positiv sein'
+    }
+  }
+});
 
 export default function UmzugForm() {
   const { id } = useParams();
@@ -10,7 +176,9 @@ export default function UmzugForm() {
   const isNeueModus = !id;
   
   const [loading, setLoading] = useState(!!id);
-  const [formData, setFormData] = useState({
+  
+  // Default form state
+  const initialFormData = {
     kundennummer: 'K-' + new Date().getFullYear() + '-' + Math.floor(Math.random() * 1000).toString().padStart(3, '0'), // Generate a default customer number
     auftraggeber: {
       name: '',
@@ -54,6 +222,34 @@ export default function UmzugForm() {
     fahrzeuge: [],
     mitarbeiter: [],
     extraLeistungen: []
+  };
+  
+  // Error handling with central hook and validation schema
+  const { 
+    error, 
+    setError, 
+    handleApiError, 
+    clearErrors,
+    formErrors,
+    setFieldError,
+    hasFieldError,
+    getFieldError,
+    updateField,
+    updateFields,
+    touchField,
+    validateForm,
+    data: formData,
+    resetForm
+  } = useErrorHandler({
+    clearErrorAfter: 8000, // Auto-clear errors after 8 seconds
+    captureNetwork: true,
+    validationSchema, // Use our validation schema
+    initialData: initialFormData,
+    validateOnChange: true, // Enable real-time validation as user types
+    onAuthError: () => {
+      toast.error('Ihre Sitzung ist abgelaufen. Sie werden zur Anmeldeseite weitergeleitet.');
+      navigate('/login?session=expired');
+    }
   });
   
   const [verfuegbareMitarbeiter, setVerfuegbareMitarbeiter] = useState([]);
@@ -223,7 +419,8 @@ export default function UmzugForm() {
             'Helfer': 'helfer'
           };
           
-          if (mitarbeiter.rolle && rolleMapping[mitarbeiter.rolle]) {
+          // Enhanced null-checking for rolle property
+          if (mitarbeiter?.rolle && typeof mitarbeiter.rolle === 'string' && rolleMapping[mitarbeiter.rolle]) {
             rolleValue = rolleMapping[mitarbeiter.rolle];
           }
           
@@ -288,6 +485,8 @@ export default function UmzugForm() {
       const fetchUmzug = async () => {
         try {
           setLoading(true);
+          clearErrors(); // Lösche vorherige Fehler
+          
           // API-Aufruf mit standardisierter Fehlerbehandlung
           const response = await umzuegeService.getById(id);
           const umzugData = extractApiData(response);
@@ -307,11 +506,10 @@ export default function UmzugForm() {
             umzugData.endDatum = endDate.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:MM
           }
           
-          setFormData(umzugData);
+          resetForm(umzugData);
           setLoading(false);
         } catch (error) {
-          console.error('Fehler beim Laden des Umzugs:', error);
-          toast.error('Der Umzug konnte nicht geladen werden: ' + (error.message || 'Unbekannter Fehler'));
+          handleApiError('Umzug laden', error, 'Der Umzug konnte nicht geladen werden');
           setLoading(false);
           navigate('/umzuege'); // Zurück zur Übersicht bei Fehler
         }
@@ -327,11 +525,10 @@ export default function UmzugForm() {
       const endTomorrow = new Date(tomorrow);
       endTomorrow.setHours(18, 0, 0, 0);
       
-      setFormData(prev => ({
-        ...prev,
+      updateFields({
         startDatum: tomorrow.toISOString().split('T')[0] + 'T08:00',
         endDatum: endTomorrow.toISOString().split('T')[0] + 'T18:00'
-      }));
+      });
     }
     
     // Mitarbeiter und Fahrzeuge parallel laden
@@ -364,8 +561,7 @@ export default function UmzugForm() {
             setVerfuegbareMitarbeiter([]);
           }
         } else {
-          console.error('Fehler beim Laden der Mitarbeiter:', mitarbeiterResponse.reason);
-          toast.error('Mitarbeiterdaten konnten nicht geladen werden');
+          handleApiError('Mitarbeiterdaten laden', mitarbeiterResponse.reason, 'Mitarbeiterdaten konnten nicht geladen werden');
           setVerfuegbareMitarbeiter([]);
         }
         
@@ -388,119 +584,81 @@ export default function UmzugForm() {
             setVerfuegbareFahrzeuge([]);
           }
         } else {
-          console.error('Fehler beim Laden der Fahrzeuge:', fahrzeugeResponse.reason);
-          toast.error('Fahrzeugdaten konnten nicht geladen werden');
+          handleApiError('Fahrzeugdaten laden', fahrzeugeResponse.reason, 'Fahrzeugdaten konnten nicht geladen werden');
           setVerfuegbareFahrzeuge([]);
         }
       } catch (error) {
-        console.error('Fehler beim Laden der Ressourcen:', error);
-        toast.error('Ressourcen konnten nicht geladen werden');
+        handleApiError('Ressourcen laden', error, 'Ressourcen konnten nicht geladen werden');
       }
     };
     
     fetchResources();
-  }, [id, navigate]);
+  }, [id, navigate, resetForm, handleApiError, updateFields]);
 
-  // Behandelt Änderungen in Input-Feldern
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    
-    if (name.includes('.')) {
-      // Für verschachtelte Objekte wie kunde.name
-      const [parent, child] = name.split('.');
-      setFormData(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent],
-          [child]: type === 'checkbox' ? checked : value
-        }
-      }));
-    } else {
-      // Für normale Felder
-      setFormData(prev => ({
-        ...prev,
-        [name]: type === 'checkbox' ? checked : value
-      }));
-    }
+  // Behandelt Änderungen in FormField-Komponenten
+  const handleInputChange = (name, value) => {
+    updateField(name, value);
   };
 
   // Behandelt Auswahl von Mitarbeitern
   const handleMitarbeiterToggle = (mitarbeiterId) => {
-    setFormData(prev => {
-      const mitarbeiterIndex = prev.mitarbeiter.findIndex(m => m.mitarbeiterId === mitarbeiterId);
-      let neueMitarbeiter = [...prev.mitarbeiter];
-      
-      if (mitarbeiterIndex !== -1) {
-        // Mitarbeiter entfernen
-        neueMitarbeiter.splice(mitarbeiterIndex, 1);
-      } else {
-        // Mitarbeiter hinzufügen mit korrekter Rolle für Backend
-        neueMitarbeiter.push({
-          mitarbeiterId: mitarbeiterId,
-          rolle: 'helfer' // Lowercase to match backend enum
-        });
-      }
-      
-      return {
-        ...prev,
-        mitarbeiter: neueMitarbeiter
-      };
-    });
+    const updatedMitarbeiter = [...formData.mitarbeiter];
+    const mitarbeiterIndex = updatedMitarbeiter.findIndex(m => m.mitarbeiterId === mitarbeiterId);
+    
+    if (mitarbeiterIndex !== -1) {
+      // Mitarbeiter entfernen
+      updatedMitarbeiter.splice(mitarbeiterIndex, 1);
+    } else {
+      // Mitarbeiter hinzufügen mit korrekter Rolle für Backend
+      updatedMitarbeiter.push({
+        mitarbeiterId: mitarbeiterId,
+        rolle: 'helfer' // Lowercase to match backend enum
+      });
+    }
+    
+    updateField('mitarbeiter', updatedMitarbeiter);
   };
 
   // Mitarbeiter-Rolle ändern
   const handleMitarbeiterRolleChange = (mitarbeiterId, neueRolle) => {
-    setFormData(prev => {
-      const neueMitarbeiter = prev.mitarbeiter.map(m => {
-        if (m.mitarbeiterId === mitarbeiterId) {
-          return { ...m, rolle: neueRolle };
-        }
-        return m;
-      });
-      
-      return {
-        ...prev,
-        mitarbeiter: neueMitarbeiter
-      };
+    const updatedMitarbeiter = formData.mitarbeiter.map(m => {
+      if (m.mitarbeiterId === mitarbeiterId) {
+        return { ...m, rolle: neueRolle };
+      }
+      return m;
     });
+    
+    updateField('mitarbeiter', updatedMitarbeiter);
   };
 
   // Behandelt Auswahl von Fahrzeugen
   const handleFahrzeugToggle = (fahrzeugId) => {
-    setFormData(prev => {
-      // Prüfen, ob das Fahrzeug bereits ausgewählt ist
-      const fahrzeugIndex = prev.fahrzeuge.findIndex(f => f._id === fahrzeugId);
-      let neueFahrzeuge = [...prev.fahrzeuge];
-      
-      if (fahrzeugIndex !== -1) {
-        // Fahrzeug entfernen
-        neueFahrzeuge.splice(fahrzeugIndex, 1);
-      } else {
-        // Fahrzeug finden und hinzufügen
-        const fahrzeug = verfuegbareFahrzeuge.find(f => f._id === fahrzeugId);
-        if (fahrzeug) {
-          neueFahrzeuge.push({
-            _id: fahrzeug._id,
-            typ: fahrzeug.typ,
-            kennzeichen: fahrzeug.kennzeichen
-          });
-        }
+    const updatedFahrzeuge = [...formData.fahrzeuge];
+    const fahrzeugIndex = updatedFahrzeuge.findIndex(f => f._id === fahrzeugId);
+    
+    if (fahrzeugIndex !== -1) {
+      // Fahrzeug entfernen
+      updatedFahrzeuge.splice(fahrzeugIndex, 1);
+    } else {
+      // Fahrzeug finden und hinzufügen
+      const fahrzeug = verfuegbareFahrzeuge.find(f => f._id === fahrzeugId);
+      if (fahrzeug) {
+        updatedFahrzeuge.push({
+          _id: fahrzeug._id,
+          typ: fahrzeug.typ,
+          kennzeichen: fahrzeug.kennzeichen
+        });
       }
-      
-      return {
-        ...prev,
-        fahrzeuge: neueFahrzeuge
-      };
-    });
+    }
+    
+    updateField('fahrzeuge', updatedFahrzeuge);
   };
 
   // Neuen Kontakt hinzufügen
   const handleAddKontakt = () => {
     if (neuerKontakt.name && neuerKontakt.telefon) {
-      setFormData(prev => ({
-        ...prev,
-        kontakte: [...prev.kontakte, { ...neuerKontakt }]
-      }));
+      const updatedKontakte = [...formData.kontakte, { ...neuerKontakt }];
+      updateField('kontakte', updatedKontakte);
       setNeuerKontakt({ name: '', telefon: '', email: '', isKunde: false });
       setShowKontaktForm(false);
     }
@@ -508,101 +666,22 @@ export default function UmzugForm() {
 
   // Kontakt entfernen
   const handleRemoveKontakt = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      kontakte: prev.kontakte.filter((_, i) => i !== index)
-    }));
+    const updatedKontakte = formData.kontakte.filter((_, i) => i !== index);
+    updateField('kontakte', updatedKontakte);
   };
 
   // Formular absenden - mit standardisierter Fehlerbehandlung und Datenformatierung
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    // Validate form before submission
+    const validationResult = validateForm({ markAllTouched: true });
+    if (!validationResult.isValid) {
+      // The Form component will handle displaying field errors
+      setError('Bitte korrigieren Sie die markierten Felder.');
+      return;
+    }
     
     // Anzeigen, dass die Anfrage verarbeitet wird
     toast.info('Verarbeite Anfrage...');
-    
-    // Erweiterte Validierung vor dem Senden
-    const requiredFields = [
-      'auftraggeber.name', 
-      'auftraggeber.telefon',
-      'auszugsadresse.strasse',
-      'auszugsadresse.hausnummer',
-      'auszugsadresse.plz',
-      'auszugsadresse.ort',
-      'einzugsadresse.strasse',
-      'einzugsadresse.hausnummer',
-      'einzugsadresse.plz',
-      'einzugsadresse.ort',
-      'startDatum',
-      'endDatum'
-    ];
-
-    const missingFields = [];
-    const validationErrors = [];
-    
-    // Prüfe verschachtelte Felder - striktere Validierung
-    requiredFields.forEach(field => {
-      if (field.includes('.')) {
-        const [parent, child] = field.split('.');
-        // Prüfen auf leere Strings und Whitespace
-        if (!formData[parent] || 
-            !formData[parent][child] || 
-            (typeof formData[parent][child] === 'string' && formData[parent][child].trim() === '')) {
-          missingFields.push(field);
-        }
-      } else if (!formData[field] || 
-                (typeof formData[field] === 'string' && formData[field].trim() === '')) {
-        missingFields.push(field);
-      }
-    });
-
-    // PLZ-Validierung (deutsches Format)
-    if (formData.auszugsadresse?.plz && !/^\d{5}$/.test(formData.auszugsadresse.plz)) {
-      validationErrors.push('Auszugsadresse: PLZ muss 5 Ziffern haben');
-    }
-    if (formData.einzugsadresse?.plz && !/^\d{5}$/.test(formData.einzugsadresse.plz)) {
-      validationErrors.push('Einzugsadresse: PLZ muss 5 Ziffern haben');
-    }
-    
-    // Telefonnummer-Validierung (basierend auf Backend-Validator-Pattern)
-    if (formData.auftraggeber?.telefon && !/^[+]?[0-9\s\-\(\)]{8,20}$/.test(formData.auftraggeber.telefon)) {
-      validationErrors.push('Telefonnummer hat ein ungültiges Format (erlaubt sind Zahlen, Leerzeichen, Klammern und Bindestriche)');
-    }
-
-    // Prüfen, ob das Startdatum vor dem Enddatum liegt
-    if (formData.startDatum && formData.endDatum) {
-      const startDate = new Date(formData.startDatum);
-      const endDate = new Date(formData.endDatum);
-      if (startDate > endDate) {
-        validationErrors.push('Startdatum muss vor dem Enddatum liegen');
-      }
-    }
-
-    // Status-Validierung gegen gültige Werte vom Backend
-    const validStatusValues = ['geplant', 'bestaetigt', 'in_bearbeitung', 'abgeschlossen', 'storniert'];
-    if (formData.status && !validStatusValues.includes(formData.status)) {
-      validationErrors.push('Ungültiger Status');
-    }
-
-    // Rollen-Validierung für Mitarbeiter gegen gültige Werte vom Backend
-    const validRollen = ['teamleiter', 'träger', 'fahrer', 'helfer']; // Case sensitive - must match backend enum values
-    if (formData.mitarbeiter?.length) {
-      const invalidRoles = formData.mitarbeiter.filter(m => m.rolle && !validRollen.includes(m.rolle));
-      if (invalidRoles.length > 0) {
-        validationErrors.push('Ungültige Mitarbeiterrolle festgestellt: ' + 
-          invalidRoles.map(m => m.rolle).join(', '));
-      }
-    }
-
-    if (missingFields.length > 0) {
-      toast.error(`Folgende Pflichtfelder fehlen oder sind ungültig: ${missingFields.join(', ')}`);
-      return;
-    }
-
-    if (validationErrors.length > 0) {
-      toast.error(`Validierungsfehler: ${validationErrors.join('; ')}`);
-      return;
-    }
     
     try {
       // Daten transformieren für API
@@ -617,70 +696,9 @@ export default function UmzugForm() {
         return;
       }
       
-      // Felder nochmals validieren
-      if (!transformedData.auftraggeber.name || transformedData.auftraggeber.name.trim() === '') {
-        toast.error('Der Name des Auftraggebers darf nicht leer sein');
-        return;
-      }
-      
-      if (!transformedData.auftraggeber.telefon || !/^[+]?[0-9\s\-\(\)]{8,20}$/.test(transformedData.auftraggeber.telefon)) {
-        toast.error('Die Telefonnummer des Auftraggebers ist ungültig');
-        return;
-      }
-      
-      if (!transformedData.auftraggeber.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(transformedData.auftraggeber.email)) {
-        toast.error('Eine gültige E-Mail-Adresse ist erforderlich');
-        return;
-      }
-      
-      if (!transformedData.kundennummer || transformedData.kundennummer.trim() === '') {
-        toast.error('Eine Kundennummer ist erforderlich');
-        return;
-      }
-      
-      if (!transformedData.auszugsadresse.plz || !/^\d{5}$/.test(transformedData.auszugsadresse.plz)) {
-        toast.error('Die PLZ der Auszugsadresse muss 5 Ziffern haben');
-        return;
-      }
-      
-      if (!transformedData.einzugsadresse.plz || !/^\d{5}$/.test(transformedData.einzugsadresse.plz)) {
-        toast.error('Die PLZ der Einzugsadresse muss 5 Ziffern haben');
-        return;
-      }
-      
-      // Check if price values are positive
-      if (typeof transformedData.preis.netto !== 'number' || transformedData.preis.netto <= 0) {
-        toast.error('Der Netto-Preis muss positiv sein');
-        return;
-      }
-      
-      if (typeof transformedData.preis.brutto !== 'number' || transformedData.preis.brutto <= 0) {
-        toast.error('Der Brutto-Preis muss positiv sein');
-        return;
-      }
-      
       if (isNeueModus) {
         // Neuen Umzug erstellen mit standardisierter API
         try {
-          // Log the exact data being sent to the API for debugging
-          console.log('Sending data to API:', JSON.stringify(transformedData, null, 2));
-          
-          // Special debug for mitarbeiter and fahrzeuge arrays which often cause issues
-          console.log('Mitarbeiter:', JSON.stringify(transformedData.mitarbeiter, null, 2));
-          // Extra validation check for roles to help debug
-          if (transformedData.mitarbeiter && transformedData.mitarbeiter.length > 0) {
-            console.log('Mitarbeiter roles check:');
-            transformedData.mitarbeiter.forEach((m, idx) => {
-              console.log(`Mitarbeiter ${idx}: role=${m.rolle}, valid=${['teamleiter', 'träger', 'fahrer', 'helfer'].includes(m.rolle)}`);
-            });
-          }
-          
-          console.log('Fahrzeuge:', JSON.stringify(transformedData.fahrzeuge, null, 2));
-          console.log('Adresses:', {
-            auszug: JSON.stringify(transformedData.auszugsadresse, null, 2),
-            einzug: JSON.stringify(transformedData.einzugsadresse, null, 2)
-          });
-          
           // Aktive Benutzerinformation während der Verarbeitung
           const toastId = toast.loading('Erstelle Umzug...');
           
@@ -703,6 +721,8 @@ export default function UmzugForm() {
               response.errors.forEach(err => {
                 if (err.field) {
                   errorsByField[err.field] = err.message;
+                  // Setzen von Feldfehlern für jedes fehlerhafte Feld
+                  setFieldError(err.field, err.message);
                 }
               });
               console.log('Grouped errors by field:', errorsByField);
@@ -712,10 +732,10 @@ export default function UmzugForm() {
                 `${field.replace(/\./g, ' > ')}: ${errorsByField[field]}`
               ).join('\n');
               
-              toast.error(`Validierungsfehler:\n${errorFieldsList}`);
+              setError(`Validierungsfehler:\n${errorFieldsList}`);
             } else {
               // Generic error message
-              toast.error(response.message || 'Ein Fehler ist aufgetreten');
+              setError(response.message || 'Ein Fehler ist aufgetreten');
             }
             return;
           }
@@ -727,39 +747,24 @@ export default function UmzugForm() {
           }
           
           toast.success('Umzug erfolgreich erstellt');
+          clearErrors(); // Löschen aller Fehler nach erfolgreicher Erstellung
           navigate('/umzuege');
         } catch (error) {
-          console.error('Fehler beim Erstellen des Umzugs:', error);
+          // Verwende den zentralen Error Handler für konsistente Fehlerbehandlung
+          handleApiError('Umzug erstellen', error, 'Der Umzug konnte nicht gespeichert werden');
           
-          // Detaillierte Fehlerbehandlung
-          let errorMessage = 'Der Umzug konnte nicht gespeichert werden.';
-          let errorDetails = [];
-          
-          // Behandlung verschiedener Fehlertypen
-          if (error.errors && Array.isArray(error.errors)) {
-            // Validierungsfehler aus dem formatApiError Format
-            errorDetails = error.errors.map(err => `${err.field || ''}: ${err.message}`);
-          } else if (error.response && error.response.data) {
-            // Direkte Response-Fehler
-            const data = error.response.data;
-            
-            if (data.message) {
-              errorMessage = data.message;
+          // Zusätzliche Behandlung von Validierungsfehlern aus der API-Antwort
+          if (error.response && error.response.data && error.response.data.errors) {
+            const errors = error.response.data.errors;
+            if (Array.isArray(errors)) {
+              errors.forEach(err => {
+                if (err.field || err.param) {
+                  const fieldName = err.field || err.param;
+                  const errorMessage = err.message || err.msg || 'Ungültige Eingabe';
+                  setFieldError(fieldName, errorMessage);
+                }
+              });
             }
-            
-            if (data.errors && Array.isArray(data.errors)) {
-              errorDetails = data.errors.map(err => 
-                `${err.field || err.param || ''}: ${err.message || err.msg || ''}`);
-            }
-          } else if (error.message) {
-            errorMessage = error.message;
-          }
-          
-          // Anzeigen der detaillierten Fehlermeldung
-          if (errorDetails.length > 0) {
-            toast.error(`${errorMessage}\n\nDetails:\n${errorDetails.join('\n')}`);
-          } else {
-            toast.error(errorMessage);
           }
           
           // Zusätzliche Hilfestellung für häufige Fehler
@@ -790,9 +795,16 @@ export default function UmzugForm() {
                 `${err.field || ''}: ${err.message || ''}`
               ).join('\n');
               
-              toast.error(`Fehler beim Aktualisieren:\n${errorMessage}`);
+              // Setze Fehler für betroffene Felder
+              response.errors.forEach(err => {
+                if (err.field) {
+                  setFieldError(err.field, err.message || 'Ungültige Eingabe');
+                }
+              });
+              
+              setError(`Fehler beim Aktualisieren:\n${errorMessage}`);
             } else {
-              toast.error(response.message || 'Ein Fehler ist aufgetreten');
+              setError(response.message || 'Ein Fehler ist aufgetreten');
             }
             return;
           }
@@ -803,35 +815,30 @@ export default function UmzugForm() {
           }
           
           toast.success('Umzug erfolgreich aktualisiert');
+          clearErrors(); // Löschen aller Fehler nach erfolgreicher Aktualisierung
           navigate('/umzuege');
         } catch (error) {
-          console.error('Fehler beim Aktualisieren des Umzugs:', error);
+          // Verwende den zentralen Error Handler für konsistente Fehlerbehandlung
+          handleApiError('Umzug aktualisieren', error, 'Der Umzug konnte nicht aktualisiert werden');
           
-          // Fehlermeldung mit Toast
-          let errorMessage = 'Der Umzug konnte nicht aktualisiert werden. ';
-          
-          if (error.response && error.response.data) {
-            if (error.response.data.message) {
-              errorMessage += error.response.data.message;
+          // Zusätzliche Behandlung von Validierungsfehlern aus der API-Antwort
+          if (error.response && error.response.data && error.response.data.errors) {
+            const errors = error.response.data.errors;
+            if (Array.isArray(errors)) {
+              errors.forEach(err => {
+                if (err.field || err.param) {
+                  const fieldName = err.field || err.param;
+                  const errorMessage = err.message || err.msg || 'Ungültige Eingabe';
+                  setFieldError(fieldName, errorMessage);
+                }
+              });
             }
-            
-            if (error.response.data.errors && Array.isArray(error.response.data.errors)) {
-              const details = error.response.data.errors.map(err => 
-                `${err.field || err.param || ''}: ${err.message || err.msg || ''}`
-              ).join('\n');
-              
-              errorMessage += `\n\nDetails:\n${details}`;
-            }
-          } else if (error.message) {
-            errorMessage += error.message;
           }
-          
-          toast.error(errorMessage);
         }
       }
     } catch (error) {
-      console.error('Fehler beim Speichern des Umzugs:', error);
-      toast.error('Es ist ein unerwarteter Fehler aufgetreten. Bitte versuchen Sie es später erneut.');
+      // Verwende den zentralen Error Handler auch für allgemeine unerwartete Fehler
+      handleApiError('Umzug speichern', error, 'Es ist ein unerwarteter Fehler aufgetreten. Bitte versuchen Sie es später erneut.');
     }
   };
 
@@ -853,107 +860,99 @@ export default function UmzugForm() {
         </h1>
       </div>
       
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <Form 
+        onSubmit={handleSubmit} 
+        error={error}
+        clearErrors={clearErrors}
+        loading={loading}
+        validateForm={validateForm}
+        validateOnSubmit={true}
+        submitLabel={isNeueModus ? 'Umzug erstellen' : 'Änderungen speichern'}
+        cancelLabel="Abbrechen"
+        onCancel={() => navigate('/umzuege')}
+        className="space-y-8"
+      >
         {/* Kundendaten */}
         <div className="bg-white p-6 rounded-lg shadow">
           <h2 className="text-xl font-semibold mb-4">Kundendaten</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Kundennummer *
-              </label>
-              <input
-                type="text"
-                name="kundennummer"
-                value={formData.kundennummer}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded focus:ring focus:ring-blue-200 focus:border-blue-500"
-                placeholder="z.B. U-2025-001"
-                required
-              />
-            </div>
+            <FormField
+              name="kundennummer"
+              label="Kundennummer"
+              value={formData.kundennummer}
+              onChange={handleInputChange}
+              onBlur={touchField}
+              error={getFieldError('kundennummer')}
+              required={true}
+              placeholder="z.B. U-2025-001"
+            />
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded focus:ring focus:ring-blue-200 focus:border-blue-500"
-              >
-                <option value="geplant">Geplant</option>
-                <option value="bestaetigt">Bestätigt</option>
-                <option value="in_bearbeitung">In Bearbeitung</option>
-                <option value="abgeschlossen">Abgeschlossen</option>
-                <option value="storniert">Storniert</option>
-              </select>
-            </div>
+            <FormField
+              name="status"
+              label="Status"
+              type="select"
+              value={formData.status}
+              onChange={handleInputChange}
+              onBlur={touchField}
+              error={getFieldError('status')}
+              inputProps={{
+                options: [
+                  { value: 'geplant', label: 'Geplant' },
+                  { value: 'bestaetigt', label: 'Bestätigt' },
+                  { value: 'in_bearbeitung', label: 'In Bearbeitung' },
+                  { value: 'abgeschlossen', label: 'Abgeschlossen' },
+                  { value: 'storniert', label: 'Storniert' }
+                ]
+              }}
+            />
           </div>
           
           <div className="mt-4 p-4 border rounded-lg bg-gray-50">
             <h3 className="text-lg font-medium mb-3">Auftraggeber</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Name *
-                </label>
-                <input
-                  type="text"
-                  name="auftraggeber.name"
-                  value={formData.auftraggeber.name}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded focus:ring focus:ring-blue-200 focus:border-blue-500"
-                  required
-                />
-              </div>
+              <FormField
+                name="auftraggeber.name"
+                label="Name"
+                value={formData.auftraggeber?.name || ''}
+                onChange={handleInputChange}
+                onBlur={touchField}
+                error={getFieldError('auftraggeber.name')}
+                required={true}
+              />
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Firma
-                </label>
-                <input
-                  type="text"
-                  name="auftraggeber.firma"
-                  value={formData.auftraggeber.firma}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded focus:ring focus:ring-blue-200 focus:border-blue-500"
-                />
-              </div>
+              <FormField
+                name="auftraggeber.firma"
+                label="Firma"
+                value={formData.auftraggeber?.firma || ''}
+                onChange={handleInputChange}
+              />
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Telefon *
-                </label>
-                <input
-                  type="text"
-                  name="auftraggeber.telefon"
-                  value={formData.auftraggeber.telefon}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded focus:ring focus:ring-blue-200 focus:border-blue-500"
-                  required
-                />
-              </div>
+              <FormField
+                name="auftraggeber.telefon"
+                label="Telefon"
+                value={formData.auftraggeber?.telefon || ''}
+                onChange={handleInputChange}
+                onBlur={touchField}
+                error={getFieldError('auftraggeber.telefon')}
+                required={true}
+                helpText="Format: +49 123 45678 oder 0123-456789"
+              />
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  E-Mail *
-                </label>
-                <input
-                  type="email"
-                  name="auftraggeber.email"
-                  value={formData.auftraggeber.email}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded focus:ring focus:ring-blue-200 focus:border-blue-500"
-                  required
-                  placeholder="kunde@example.com"
-                />
-              </div>
+              <FormField
+                name="auftraggeber.email"
+                label="E-Mail"
+                type="email"
+                value={formData.auftraggeber?.email || ''}
+                onChange={handleInputChange}
+                onBlur={touchField}
+                error={getFieldError('auftraggeber.email')}
+                required={true}
+                placeholder="kunde@example.com"
+              />
             </div>
           </div>
           
@@ -1084,106 +1083,76 @@ export default function UmzugForm() {
               <h3 className="text-lg font-medium mb-3">Auszugsadresse</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Straße *
-                  </label>
-                  <input
-                    type="text"
-                    name="auszugsadresse.strasse"
-                    value={formData.auszugsadresse.strasse}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                </div>
+                <FormField
+                  name="auszugsadresse.strasse"
+                  label="Straße"
+                  value={formData.auszugsadresse?.strasse || ''}
+                  onChange={handleInputChange}
+                  onBlur={touchField}
+                  error={getFieldError('auszugsadresse.strasse')}
+                  required={true}
+                />
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Hausnummer *
-                  </label>
-                  <input
-                    type="text"
-                    name="auszugsadresse.hausnummer"
-                    value={formData.auszugsadresse.hausnummer}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                </div>
+                <FormField
+                  name="auszugsadresse.hausnummer"
+                  label="Hausnummer"
+                  value={formData.auszugsadresse?.hausnummer || ''}
+                  onChange={handleInputChange}
+                  onBlur={touchField}
+                  error={getFieldError('auszugsadresse.hausnummer')}
+                  required={true}
+                />
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    PLZ *
-                  </label>
-                  <input
-                    type="text"
-                    name="auszugsadresse.plz"
-                    value={formData.auszugsadresse.plz}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                </div>
+                <FormField
+                  name="auszugsadresse.plz"
+                  label="PLZ"
+                  value={formData.auszugsadresse?.plz || ''}
+                  onChange={handleInputChange}
+                  onBlur={touchField}
+                  error={getFieldError('auszugsadresse.plz')}
+                  required={true}
+                  helpText="5-stellige PLZ"
+                />
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ort *
-                  </label>
-                  <input
-                    type="text"
-                    name="auszugsadresse.ort"
-                    value={formData.auszugsadresse.ort}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                </div>
+                <FormField
+                  name="auszugsadresse.ort"
+                  label="Ort"
+                  value={formData.auszugsadresse?.ort || ''}
+                  onChange={handleInputChange}
+                  onBlur={touchField}
+                  error={getFieldError('auszugsadresse.ort')}
+                  required={true}
+                />
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Etage
-                  </label>
-                  <input
-                    type="number"
-                    name="auszugsadresse.etage"
-                    value={formData.auszugsadresse.etage}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border rounded"
-                    min="0"
-                  />
-                </div>
+                <FormField
+                  name="auszugsadresse.etage"
+                  label="Etage"
+                  type="number"
+                  value={formData.auszugsadresse?.etage}
+                  onChange={handleInputChange}
+                  inputProps={{ min: "0" }}
+                />
                 
-                <div className="flex items-center pt-6">
-                  <input
-                    type="checkbox"
-                    name="auszugsadresse.aufzug"
-                    checked={formData.auszugsadresse.aufzug}
-                    onChange={handleInputChange}
-                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <label className="ml-2 block text-sm text-gray-700">
-                    Aufzug vorhanden
-                  </label>
-                </div>
+                <FormField
+                  name="auszugsadresse.aufzug"
+                  label="Aufzug vorhanden"
+                  type="checkbox"
+                  value={formData.auszugsadresse?.aufzug}
+                  onChange={handleInputChange}
+                />
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Entfernung zur Parkmöglichkeit (m)
-                  </label>
-                  <input
-                    type="number"
-                    name="auszugsadresse.entfernung"
-                    value={formData.auszugsadresse.entfernung}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border rounded"
-                    min="0"
-                  />
-                </div>
+                <FormField
+                  name="auszugsadresse.entfernung"
+                  label="Entfernung zur Parkmöglichkeit (m)"
+                  type="number"
+                  value={formData.auszugsadresse?.entfernung}
+                  onChange={handleInputChange}
+                  inputProps={{ min: "0" }}
+                />
               </div>
             </div>
             
@@ -1192,106 +1161,76 @@ export default function UmzugForm() {
               <h3 className="text-lg font-medium mb-3">Einzugsadresse</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Straße *
-                  </label>
-                  <input
-                    type="text"
-                    name="einzugsadresse.strasse"
-                    value={formData.einzugsadresse.strasse}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                </div>
+                <FormField
+                  name="einzugsadresse.strasse"
+                  label="Straße"
+                  value={formData.einzugsadresse?.strasse || ''}
+                  onChange={handleInputChange}
+                  onBlur={touchField}
+                  error={getFieldError('einzugsadresse.strasse')}
+                  required={true}
+                />
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Hausnummer *
-                  </label>
-                  <input
-                    type="text"
-                    name="einzugsadresse.hausnummer"
-                    value={formData.einzugsadresse.hausnummer}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                </div>
+                <FormField
+                  name="einzugsadresse.hausnummer"
+                  label="Hausnummer"
+                  value={formData.einzugsadresse?.hausnummer || ''}
+                  onChange={handleInputChange}
+                  onBlur={touchField}
+                  error={getFieldError('einzugsadresse.hausnummer')}
+                  required={true}
+                />
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    PLZ *
-                  </label>
-                  <input
-                    type="text"
-                    name="einzugsadresse.plz"
-                    value={formData.einzugsadresse.plz}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                </div>
+                <FormField
+                  name="einzugsadresse.plz"
+                  label="PLZ"
+                  value={formData.einzugsadresse?.plz || ''}
+                  onChange={handleInputChange}
+                  onBlur={touchField}
+                  error={getFieldError('einzugsadresse.plz')}
+                  required={true}
+                  helpText="5-stellige PLZ"
+                />
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ort *
-                  </label>
-                  <input
-                    type="text"
-                    name="einzugsadresse.ort"
-                    value={formData.einzugsadresse.ort}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                </div>
+                <FormField
+                  name="einzugsadresse.ort"
+                  label="Ort"
+                  value={formData.einzugsadresse?.ort || ''}
+                  onChange={handleInputChange}
+                  onBlur={touchField}
+                  error={getFieldError('einzugsadresse.ort')}
+                  required={true}
+                />
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Etage
-                  </label>
-                  <input
-                    type="number"
-                    name="einzugsadresse.etage"
-                    value={formData.einzugsadresse.etage}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border rounded"
-                    min="0"
-                  />
-                </div>
+                <FormField
+                  name="einzugsadresse.etage"
+                  label="Etage"
+                  type="number"
+                  value={formData.einzugsadresse?.etage}
+                  onChange={handleInputChange}
+                  inputProps={{ min: "0" }}
+                />
                 
-                <div className="flex items-center pt-6">
-                  <input
-                    type="checkbox"
-                    name="einzugsadresse.aufzug"
-                    checked={formData.einzugsadresse.aufzug}
-                    onChange={handleInputChange}
-                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <label className="ml-2 block text-sm text-gray-700">
-                    Aufzug vorhanden
-                  </label>
-                </div>
+                <FormField
+                  name="einzugsadresse.aufzug"
+                  label="Aufzug vorhanden"
+                  type="checkbox"
+                  value={formData.einzugsadresse?.aufzug}
+                  onChange={handleInputChange}
+                />
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Entfernung zur Parkmöglichkeit (m)
-                  </label>
-                  <input
-                    type="number"
-                    name="einzugsadresse.entfernung"
-                    value={formData.einzugsadresse.entfernung}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border rounded"
-                    min="0"
-                  />
-                </div>
+                <FormField
+                  name="einzugsadresse.entfernung"
+                  label="Entfernung zur Parkmöglichkeit (m)"
+                  type="number"
+                  value={formData.einzugsadresse?.entfernung}
+                  onChange={handleInputChange}
+                  inputProps={{ min: "0" }}
+                />
               </div>
             </div>
           </div>
@@ -1302,33 +1241,27 @@ export default function UmzugForm() {
           <h2 className="text-xl font-semibold mb-4">Datum und Zeit</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Startdatum und -zeit *
-              </label>
-              <input
-                type="datetime-local"
-                name="startDatum"
-                value={formData.startDatum}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded"
-                required
-              />
-            </div>
+            <FormField
+              name="startDatum"
+              label="Startdatum und -zeit"
+              type="datetime-local"
+              value={formData.startDatum || ''}
+              onChange={handleInputChange}
+              onBlur={touchField}
+              error={getFieldError('startDatum')}
+              required={true}
+            />
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Enddatum und -zeit *
-              </label>
-              <input
-                type="datetime-local"
-                name="endDatum"
-                value={formData.endDatum}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded"
-                required
-              />
-            </div>
+            <FormField
+              name="endDatum"
+              label="Enddatum und -zeit"
+              type="datetime-local"
+              value={formData.endDatum || ''}
+              onChange={handleInputChange}
+              onBlur={touchField}
+              error={getFieldError('endDatum')}
+              required={true}
+            />
           </div>
         </div>
         
@@ -1419,106 +1352,69 @@ export default function UmzugForm() {
           <h2 className="text-xl font-semibold mb-4">Preise</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Netto (€) *
-              </label>
-              <input
-                type="number"
-                name="preis.netto"
-                value={formData.preis.netto}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded"
-                min="1"
-                step="0.01"
-                required
-              />
-            </div>
+            <FormField
+              name="preis.netto"
+              label="Netto (€)"
+              type="number"
+              value={formData.preis?.netto}
+              onChange={handleInputChange}
+              onBlur={touchField}
+              error={getFieldError('preis.netto')}
+              required={true}
+              inputProps={{ min: "1", step: "0.01" }}
+            />
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                MwSt. (%)
-              </label>
-              <input
-                type="number"
-                name="preis.mwst"
-                value={formData.preis.mwst}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded"
-                min="0"
-                max="100"
-              />
-            </div>
+            <FormField
+              name="preis.mwst"
+              label="MwSt. (%)"
+              type="number"
+              value={formData.preis?.mwst}
+              onChange={handleInputChange}
+              inputProps={{ min: "0", max: "100" }}
+            />
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Brutto (€) *
-              </label>
-              <input
-                type="number"
-                name="preis.brutto"
-                value={formData.preis.brutto}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded"
-                min="1"
-                step="0.01"
-                required
-              />
-            </div>
+            <FormField
+              name="preis.brutto"
+              label="Brutto (€)"
+              type="number"
+              value={formData.preis?.brutto}
+              onChange={handleInputChange}
+              onBlur={touchField}
+              error={getFieldError('preis.brutto')}
+              required={true}
+              inputProps={{ min: "1", step: "0.01" }}
+            />
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Zahlungsart
-              </label>
-              <select
-                name="preis.zahlungsart"
-                value={formData.preis.zahlungsart}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded"
-              >
-                <option value="rechnung">Rechnung</option>
-                <option value="bar">Bar</option>
-                <option value="überweisung">Überweisung</option>
-                <option value="ec">EC-Karte</option>
-                <option value="kreditkarte">Kreditkarte</option>
-                <option value="paypal">PayPal</option>
-              </select>
-            </div>
+            <FormField
+              name="preis.zahlungsart"
+              label="Zahlungsart"
+              type="select"
+              value={formData.preis?.zahlungsart}
+              onChange={handleInputChange}
+              inputProps={{
+                options: [
+                  { value: 'rechnung', label: 'Rechnung' },
+                  { value: 'bar', label: 'Bar' },
+                  { value: 'überweisung', label: 'Überweisung' },
+                  { value: 'ec', label: 'EC-Karte' },
+                  { value: 'kreditkarte', label: 'Kreditkarte' },
+                  { value: 'paypal', label: 'PayPal' }
+                ]
+              }}
+            />
             
-            <div className="flex items-center pt-6">
-              <input
-                type="checkbox"
-                name="preis.bezahlt"
-                checked={formData.preis.bezahlt}
-                onChange={handleInputChange}
-                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <label className="ml-2 block text-sm text-gray-700">
-                Bezahlt
-              </label>
-            </div>
+            <FormField
+              name="preis.bezahlt"
+              label="Bezahlt"
+              type="checkbox"
+              value={formData.preis?.bezahlt}
+              onChange={handleInputChange}
+            />
           </div>
         </div>
-        
-        {/* Formular-Buttons */}
-        <div className="flex justify-end space-x-3">
-          <button 
-            type="button" 
-            onClick={() => navigate('/umzuege')} 
-            className="px-4 py-2 border rounded hover:bg-gray-50"
-          >
-            Abbrechen
-          </button>
-          <button 
-            type="submit" 
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 shadow"
-          >
-            {isNeueModus ? 'Umzug erstellen' : 'Änderungen speichern'}
-          </button>
-        </div>
-      </form>
+      </Form>
     </div>
   );
 }

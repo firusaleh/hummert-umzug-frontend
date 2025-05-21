@@ -137,9 +137,22 @@ export const AuthProvider = ({ children }) => {
         // Token und Benutzer im localStorage speichern
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('tokenTimestamp', Date.now().toString());
-        localStorage.setItem('user', JSON.stringify(response.data.user));
         
-        setUser(response.data.user);
+        // Ensure user data exists before storing
+        if (response.data.user) {
+          localStorage.setItem('user', JSON.stringify(response.data.user));
+          setUser(response.data.user);
+        } else {
+          console.warn('No user data in login response, creating minimal user object');
+          // Create minimal user object from the response
+          const minimalUser = { 
+            id: response.data.userId || 'unknown',
+            email: credentials?.email || 'unknown'
+          };
+          localStorage.setItem('user', JSON.stringify(minimalUser));
+          setUser(minimalUser);
+        }
+        
         setLoading(false);
         return { success: true };
       } else {
@@ -201,9 +214,23 @@ export const AuthProvider = ({ children }) => {
       if (response && response.data && response.data.token) {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('tokenTimestamp', Date.now().toString());
-        localStorage.setItem('user', JSON.stringify(response.data.user));
         
-        setUser(response.data.user);
+        // Ensure user data exists before storing
+        if (response.data.user) {
+          localStorage.setItem('user', JSON.stringify(response.data.user));
+          setUser(response.data.user);
+        } else {
+          console.warn('No user data in register response, creating minimal user object');
+          // Create minimal user object from the userData
+          const minimalUser = { 
+            id: response.data.userId || 'unknown',
+            email: userData?.email || 'unknown',
+            name: userData?.name || 'User'
+          };
+          localStorage.setItem('user', JSON.stringify(minimalUser));
+          setUser(minimalUser);
+        }
+        
         setLoading(false);
         return { success: true };
       } else {

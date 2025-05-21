@@ -36,6 +36,13 @@ const FileList = ({ projectId, taskId, refreshTrigger }) => {
 
   // Datei löschen
   const handleDeleteFile = async (fileId) => {
+    // Check if fileId exists
+    if (!fileId) {
+      console.error('handleDeleteFile called with null or undefined fileId');
+      setError('Fehler beim Löschen: Ungültige Datei-ID');
+      return;
+    }
+    
     if (!window.confirm('Möchtest du diese Datei wirklich löschen?')) {
       return;
     }
@@ -136,7 +143,7 @@ const FileList = ({ projectId, taskId, refreshTrigger }) => {
                       {file.originalName}
                     </div>
                     <div className="text-sm text-gray-500">
-                      {file.uploadedBy?.username || 'Unbekannter Benutzer'}
+                      {file?.uploadedBy?.username || 'Unbekannter Benutzer'}
                     </div>
                   </div>
                 </div>

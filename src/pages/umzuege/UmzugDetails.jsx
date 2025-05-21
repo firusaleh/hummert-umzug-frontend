@@ -79,6 +79,9 @@ const UmzugDetails = () => {
     
     if (!neueNotiz.trim()) return;
     
+    // Make sure umzug and aktivitaeten exist
+    if (!umzug || !umzug.aktivitaeten) return;
+    
     // In einer echten Anwendung würde hier ein API-Aufruf stattfinden
     const neueAktivitaet = {
       id: umzug.aktivitaeten.length + 1,
