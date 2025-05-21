@@ -31,33 +31,80 @@ export default function ZeiterfassungSystem() {
       setError(null);
       
       try {
-        // Laden der Mitarbeiter
+        // Lade Mitarbeiter
         const mitarbeiterResponse = await zeiterfassungService.getMitarbeiter();
+        console.log('Vollständige Mitarbeiter-Response:', mitarbeiterResponse);
+        
         if (mitarbeiterResponse.success === false) {
           throw new Error(mitarbeiterResponse.message || 'Fehler beim Laden der Mitarbeiter');
         }
         
-        // Extract mitarbeiter data from the response
-        // The response from api.get has the structure { data: [...] }
-        console.log('Mitarbeiter Response:', mitarbeiterResponse);
-        // Access the actual data in mitarbeiterResponse
-        const mitarbeiterData = mitarbeiterResponse?.data || [];
-        console.log('Mitarbeiter geladen:', mitarbeiterData);
-        setMitarbeiter(Array.isArray(mitarbeiterData) ? mitarbeiterData : []);
+        let mitarbeiterListe = [];
         
-        // Laden der Umzugsprojekte
+        // Robust handling of data structure
+        if (mitarbeiterResponse.data) {
+          if (Array.isArray(mitarbeiterResponse.data)) {
+            mitarbeiterListe = mitarbeiterResponse.data;
+          } else if (mitarbeiterResponse.data.mitarbeiter && Array.isArray(mitarbeiterResponse.data.mitarbeiter)) {
+            mitarbeiterListe = mitarbeiterResponse.data.mitarbeiter;
+          }
+        }
+        
+        console.log('Verarbeitete Mitarbeiterliste:', mitarbeiterListe);
+        
+        // Fallback für Entwicklung, wenn keine Mitarbeiter geladen werden konnten
+        if (mitarbeiterListe.length === 0) {
+          console.warn('Keine Mitarbeiter geladen - verwende Fallback-Daten');
+          mitarbeiterListe = [
+            { _id: 'mock1', vorname: 'Max', nachname: 'Mustermann', rolle: 'teamleiter' },
+            { _id: 'mock2', vorname: 'Erika', nachname: 'Musterfrau', rolle: 'fahrer' },
+            { _id: 'mock3', vorname: 'John', nachname: 'Doe', rolle: 'helfer' }
+          ];
+        }
+        
+        setMitarbeiter(mitarbeiterListe);
+        
+        // Lade Projekte
         const projekteResponse = await zeiterfassungService.getUmzugsprojekte();
+        console.log('Vollständige Projekt-Response:', projekteResponse);
+        
         if (projekteResponse.success === false) {
           throw new Error(projekteResponse.message || 'Fehler beim Laden der Projekte');
         }
         
-        // Extract umzuege data from the response
-        // The response from api.get has the structure { data: [...] }
-        console.log('Projekte Response:', projekteResponse);
-        // Access the actual data in projekteResponse
-        const projekteData = projekteResponse?.data || [];
-        console.log('Projekte geladen:', projekteData);
-        setUmzugsprojekte(Array.isArray(projekteData) ? projekteData : []);
+        let projekteListe = [];
+        
+        // Robust handling of data structure
+        if (projekteResponse.data) {
+          if (Array.isArray(projekteResponse.data)) {
+            projekteListe = projekteResponse.data;
+          } else if (projekteResponse.data.projekte && Array.isArray(projekteResponse.data.projekte)) {
+            projekteListe = projekteResponse.data.projekte;
+          } else if (projekteResponse.data.umzuege && Array.isArray(projekteResponse.data.umzuege)) {
+            projekteListe = projekteResponse.data.umzuege;
+          }
+        }
+        
+        console.log('Verarbeitete Projektliste:', projekteListe);
+        
+        // Fallback für Entwicklung, wenn keine Projekte geladen werden konnten
+        if (projekteListe.length === 0) {
+          console.warn('Keine Projekte geladen - verwende Fallback-Daten');
+          projekteListe = [
+            { 
+              _id: 'mock-projekt1', 
+              auftraggeber: { name: 'Firma ABC' }, 
+              startDatum: new Date().toISOString() 
+            },
+            { 
+              _id: 'mock-projekt2', 
+              auftraggeber: { name: 'Familie Schmidt' }, 
+              startDatum: new Date().toISOString() 
+            }
+          ];
+        }
+        
+        setUmzugsprojekte(projekteListe);
       } catch (error) {
         console.error('Fehler beim Laden der Daten:', error);
         setError(`Fehler beim Laden der Mitarbeiter und Projekte: ${error.message}`);
@@ -79,17 +126,56 @@ export default function ZeiterfassungSystem() {
       
       try {
         const zeiterfassungenResponse = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
+        console.log('Vollständige Zeiterfassungen Response:', zeiterfassungenResponse);
+        
         if (zeiterfassungenResponse.success === false) {
           throw new Error(zeiterfassungenResponse.message || 'Fehler beim Laden der Zeiterfassungen');
         }
         
-        // Extract time entries data from the response
-        // The response from api.get has the structure { data: [...] }
-        console.log('Zeiterfassungen Response:', zeiterfassungenResponse);
-        // Access the actual data in zeiterfassungenResponse
-        const zeiterfassungenData = zeiterfassungenResponse?.data || [];
-        console.log('Zeiterfassungen geladen:', zeiterfassungenData);
-        setZeiterfassungen(Array.isArray(zeiterfassungenData) ? zeiterfassungenData : []);
+        let zeiterfassungsListe = [];
+        
+        // Robust handling of data structure
+        if (zeiterfassungenResponse.data) {
+          if (Array.isArray(zeiterfassungenResponse.data)) {
+            zeiterfassungsListe = zeiterfassungenResponse.data;
+          } else if (zeiterfassungenResponse.data.eintraege && Array.isArray(zeiterfassungenResponse.data.eintraege)) {
+            zeiterfassungsListe = zeiterfassungenResponse.data.eintraege;
+          } else if (zeiterfassungenResponse.data.zeiterfassungen && Array.isArray(zeiterfassungenResponse.data.zeiterfassungen)) {
+            zeiterfassungsListe = zeiterfassungenResponse.data.zeiterfassungen;
+          }
+        }
+        
+        console.log('Verarbeitete Zeiterfassungsliste:', zeiterfassungsListe);
+        
+        // Ensure all entries have the required structure for rendering
+        zeiterfassungsListe = zeiterfassungsListe.map(entry => {
+          // Ensure mitarbeiterId is an object with _id, vorname and nachname
+          if (typeof entry.mitarbeiterId === 'string') {
+            // Find the corresponding mitarbeiter object
+            const mitarbeiterObj = mitarbeiter.find(m => m._id === entry.mitarbeiterId);
+            if (mitarbeiterObj) {
+              entry.mitarbeiterId = mitarbeiterObj;
+            } else {
+              // Create a placeholder if the mitarbeiter isn't found
+              entry.mitarbeiterId = {
+                _id: entry.mitarbeiterId,
+                vorname: 'Unbekannt',
+                nachname: ''
+              };
+            }
+          } else if (!entry.mitarbeiterId || !entry.mitarbeiterId._id) {
+            // Create a placeholder if mitarbeiterId is missing or invalid
+            entry.mitarbeiterId = {
+              _id: 'unknown',
+              vorname: 'Unbekannt',
+              nachname: ''
+            };
+          }
+          
+          return entry;
+        });
+        
+        setZeiterfassungen(zeiterfassungsListe);
       } catch (error) {
         console.error('Fehler beim Laden der Zeiterfassungen:', error);
         setError(`Die Zeiterfassungen konnten nicht geladen werden: ${error.message}`);
@@ -100,7 +186,7 @@ export default function ZeiterfassungSystem() {
     };
     
     fetchZeiterfassungen();
-  }, [aktuellesProjekt]);
+  }, [aktuellesProjekt, mitarbeiter]);
   
   // Berechne Arbeitsstunden
   const berechneArbeitsstunden = (start, end, pauseMinuten) => {
@@ -309,16 +395,30 @@ export default function ZeiterfassungSystem() {
   };
   
   // Projekt-Dropdown-Optionen
-  const projektOptionen = umzugsprojekte.map(projekt => ({
-    id: projekt._id,
-    label: `${projekt.auftraggeber?.name || 'Unbekannter Kunde'} (${new Date(projekt.startDatum).toLocaleDateString('de-DE')})`
-  }));
+  const projektOptionen = umzugsprojekte.map(projekt => {
+    console.log('Projekt für Option:', projekt);
+    return {
+      id: projekt._id || 'unknown',
+      label: `${projekt.auftraggeber?.name || 'Unbekannter Kunde'} (${
+        projekt.startDatum 
+          ? new Date(projekt.startDatum).toLocaleDateString('de-DE') 
+          : 'Kein Datum'
+      })`
+    };
+  });
+  
+  console.log('Generierte projektOptionen:', projektOptionen);
   
   // Mitarbeiter-Dropdown-Optionen
-  const mitarbeiterOptionen = mitarbeiter.map(ma => ({
-    id: ma._id,
-    label: `${ma.vorname} ${ma.nachname}`
-  }));
+  const mitarbeiterOptionen = mitarbeiter.map(ma => {
+    console.log('Mitarbeiter für Option:', ma);
+    return {
+      id: ma._id || 'unknown',
+      label: ma.vorname && ma.nachname ? `${ma.vorname} ${ma.nachname}` : 'Unbekannter Mitarbeiter'
+    };
+  });
+  
+  console.log('Generierte mitarbeiterOptionen:', mitarbeiterOptionen);
   
   // Render Funktion für Zeiterfassungstabelle
   const renderZeiterfassungen = () => {
