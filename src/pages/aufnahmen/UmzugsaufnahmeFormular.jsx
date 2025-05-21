@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 export default function UmzugsaufnahmeFormular({ initialData = {}, onSave, onCancel }) {
   const [formData, setFormData] = useState({
@@ -129,16 +129,236 @@ export default function UmzugsaufnahmeFormular({ initialData = {}, onSave, onCan
     }
   };
 
+  // Transformiert die Aufnahme-Daten für die API
+  const transformAufnahmeData = useCallback((data) => {
+    console.log('Transformiere Aufnahme-Daten für API:', data);
+    
+    // Kopie erstellen, um das Original nicht zu verändern
+    const transformed = { ...data };
+    
+    // Format required fields and convert date fields to ISO format
+    if (transformed.datum) {
+      try {
+        // Bei leerem Datum aktuelles Datum verwenden
+        if (transformed.datum === '') {
+          transformed.datum = new Date().toISOString();
+        } else {
+          const date = new Date(transformed.datum);
+          if (!isNaN(date.getTime())) {
+            transformed.datum = date.toISOString();
+            
+            // Wenn Uhrzeit vorhanden, diese kombinieren
+            if (transformed.uhrzeit) {
+              try {
+                const [hours, minutes] = transformed.uhrzeit.split(':');
+                const dateObj = new Date(date);
+                dateObj.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+                transformed.datum = dateObj.toISOString();
+              } catch (uhrzeitError) {
+                console.error('Fehler beim Kombinieren von Datum und Uhrzeit:', uhrzeitError);
+              }
+            }
+            
+            console.log('Formatiertes Datum:', transformed.datum);
+          } else {
+            console.warn('Ungültiges Datumsformat, verwende aktuelles Datum');
+            transformed.datum = new Date().toISOString();
+          }
+        }
+      } catch (error) {
+        console.error('Fehler beim Formatieren des Datums:', error);
+        transformed.datum = new Date().toISOString();
+      }
+    } else {
+      // Wenn kein Datum vorhanden, aktuelles Datum verwenden
+      transformed.datum = new Date().toISOString();
+    }
+    
+    // Numerische Werte korrekt formatieren
+    if (transformed.angebotspreis) {
+      transformed.angebotspreis = {
+        netto: parseFloat(transformed.angebotspreis.netto || 0),
+        brutto: parseFloat(transformed.angebotspreis.brutto || 0),
+        mwst: parseFloat(transformed.angebotspreis.mwst || 19)
+      };
+      
+      // Sicherstellen, dass netto und brutto vernünftige Werte haben
+      if (isNaN(transformed.angebotspreis.netto)) transformed.angebotspreis.netto = 0;
+      if (isNaN(transformed.angebotspreis.brutto)) transformed.angebotspreis.brutto = 0;
+      if (isNaN(transformed.angebotspreis.mwst)) transformed.angebotspreis.mwst = 19;
+      
+      // Brutto aus Netto berechnen, falls nicht vorhanden
+      if (transformed.angebotspreis.netto > 0 && transformed.angebotspreis.brutto === 0) {
+        transformed.angebotspreis.brutto = transformed.angebotspreis.netto * (1 + transformed.angebotspreis.mwst / 100);
+        transformed.angebotspreis.brutto = Math.round(transformed.angebotspreis.brutto * 100) / 100;
+      }
+      
+      console.log('Formatierte Preise:', transformed.angebotspreis);
+    }
+    
+    // Umzugsvolumen als Zahl formatieren
+    if (transformed.umzugsvolumen || transformed.umzugsvolumen === 0 || transformed.umzugsvolumen === '') {
+      const volume = parseFloat(transformed.umzugsvolumen);
+      transformed.umzugsvolumen = isNaN(volume) ? 0 : volume;
+      
+      // Sicherstellen, dass das Volumen nicht negativ ist
+      if (transformed.umzugsvolumen < 0) transformed.umzugsvolumen = 0;
+      
+      console.log('Formatiertes Umzugsvolumen:', transformed.umzugsvolumen);
+    }
+    
+    // Validiere Bewertung (1-5)
+    if (transformed.bewertung) {
+      transformed.bewertung = parseInt(transformed.bewertung);
+      if (isNaN(transformed.bewertung) || transformed.bewertung < 1 || transformed.bewertung > 5) {
+        transformed.bewertung = 3; // Default wenn ungültig
+      }
+    }
+    
+    // Adressen als eingebettete Objekte übergeben
+    if (transformed.auszugsadresse) {
+      transformed.auszugsadresse = {
+        ...transformed.auszugsadresse,
+        // Zahlen korrekt konvertieren und auf sinnvolle Werte prüfen
+        etage: parseInt(transformed.auszugsadresse.etage || 0),
+        entfernung: parseInt(transformed.auszugsadresse.entfernung || 0),
+        aufzug: Boolean(transformed.auszugsadresse.aufzug),
+        // Sicherstellen, dass PLZ, Strasse, etc. keine führenden/nachfolgenden Leerzeichen haben
+        strasse: transformed.auszugsadresse.strasse?.trim() || '',
+        hausnummer: transformed.auszugsadresse.hausnummer?.trim() || '',
+        plz: transformed.auszugsadresse.plz?.trim() || '',
+        ort: transformed.auszugsadresse.ort?.trim() || '',
+        land: transformed.auszugsadresse.land?.trim() || 'Deutschland'
+      };
+      
+      // Sicherstellen, dass etage und entfernung keine negativen Werte sind
+      if (transformed.auszugsadresse.etage < 0) transformed.auszugsadresse.etage = 0;
+      if (transformed.auszugsadresse.entfernung < 0) transformed.auszugsadresse.entfernung = 0;
+      
+      console.log('Formatierte Auszugsadresse:', transformed.auszugsadresse);
+    }
+    
+    if (transformed.einzugsadresse) {
+      transformed.einzugsadresse = {
+        ...transformed.einzugsadresse,
+        // Zahlen korrekt konvertieren und auf sinnvolle Werte prüfen
+        etage: parseInt(transformed.einzugsadresse.etage || 0),
+        entfernung: parseInt(transformed.einzugsadresse.entfernung || 0),
+        aufzug: Boolean(transformed.einzugsadresse.aufzug),
+        // Sicherstellen, dass PLZ, Strasse, etc. keine führenden/nachfolgenden Leerzeichen haben
+        strasse: transformed.einzugsadresse.strasse?.trim() || '',
+        hausnummer: transformed.einzugsadresse.hausnummer?.trim() || '',
+        plz: transformed.einzugsadresse.plz?.trim() || '',
+        ort: transformed.einzugsadresse.ort?.trim() || '',
+        land: transformed.einzugsadresse.land?.trim() || 'Deutschland'
+      };
+      
+      // Sicherstellen, dass etage und entfernung keine negativen Werte sind
+      if (transformed.einzugsadresse.etage < 0) transformed.einzugsadresse.etage = 0;
+      if (transformed.einzugsadresse.entfernung < 0) transformed.einzugsadresse.entfernung = 0;
+      
+      console.log('Formatierte Einzugsadresse:', transformed.einzugsadresse);
+    }
+    
+    // Kontaktdaten formatieren
+    if (transformed.kontaktperson) {
+      transformed.kontaktperson = transformed.kontaktperson.trim();
+    }
+    
+    if (transformed.kundenName) {
+      transformed.kundenName = transformed.kundenName.trim();
+    }
+    
+    if (transformed.telefon) {
+      transformed.telefon = transformed.telefon.trim();
+      // Deutsche Telefonnummer validieren
+      const phoneRegex = /^(\+49|0)[0-9\s\/-]{6,20}$/;
+      if (!phoneRegex.test(transformed.telefon)) {
+        console.warn('Ungültiges Telefonformat');
+      }
+    }
+    
+    if (transformed.email) {
+      transformed.email = transformed.email.trim();
+      // E-Mail-Format validieren
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(transformed.email)) {
+        console.warn('Ungültiges E-Mail-Format');
+      }
+    }
+    
+    // Status setzen, falls nicht vorhanden
+    if (!transformed.status) {
+      transformed.status = 'in_bearbeitung';
+    }
+    
+    // Notizen und Besonderheiten trimmen, falls vorhanden
+    if (transformed.notizen) {
+      transformed.notizen = transformed.notizen.trim();
+    }
+    
+    if (transformed.besonderheiten) {
+      transformed.besonderheiten = transformed.besonderheiten.trim();
+    }
+    
+    // uhrzeit-Feld entfernen, da wir es bereits ins Datum integriert haben
+    delete transformed.uhrzeit;
+    
+    console.log('Transformierte Daten für API:', transformed);
+    return transformed;
+  }, []);
+
   // Formular absenden
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Validierung 
-    if (formData.kundenName && formData.auszugsadresse.strasse && formData.einzugsadresse.strasse) {
-      onSave(formData);
-    } else {
-      alert('Bitte füllen Sie alle erforderlichen Felder aus.');
+    // Erweiterte Validierung
+    let validationErrors = [];
+    
+    // Prüfe Pflichtfelder
+    if (!formData.kundenName) validationErrors.push('Kundenname ist erforderlich');
+    if (!formData.auszugsadresse.strasse) validationErrors.push('Auszugsadresse: Straße ist erforderlich');
+    if (!formData.auszugsadresse.hausnummer) validationErrors.push('Auszugsadresse: Hausnummer ist erforderlich');
+    if (!formData.auszugsadresse.plz) validationErrors.push('Auszugsadresse: PLZ ist erforderlich');
+    if (!formData.auszugsadresse.ort) validationErrors.push('Auszugsadresse: Ort ist erforderlich');
+    if (!formData.einzugsadresse.strasse) validationErrors.push('Einzugsadresse: Straße ist erforderlich');
+    if (!formData.einzugsadresse.hausnummer) validationErrors.push('Einzugsadresse: Hausnummer ist erforderlich');
+    if (!formData.einzugsadresse.plz) validationErrors.push('Einzugsadresse: PLZ ist erforderlich');
+    if (!formData.einzugsadresse.ort) validationErrors.push('Einzugsadresse: Ort ist erforderlich');
+    
+    // Prüfe PLZ-Format
+    const plzRegex = /^[0-9]{5}$/;
+    if (formData.auszugsadresse.plz && !plzRegex.test(formData.auszugsadresse.plz)) {
+      validationErrors.push('Auszugsadresse: PLZ muss aus 5 Ziffern bestehen');
     }
+    if (formData.einzugsadresse.plz && !plzRegex.test(formData.einzugsadresse.plz)) {
+      validationErrors.push('Einzugsadresse: PLZ muss aus 5 Ziffern bestehen');
+    }
+    
+    // Prüfe Telefonnummer (wenn vorhanden)
+    if (formData.telefon) {
+      const phoneRegex = /^(\+49|0)[0-9\s\/-]{6,20}$/;
+      if (!phoneRegex.test(formData.telefon)) {
+        validationErrors.push('Bitte geben Sie eine gültige deutsche Telefonnummer ein');
+      }
+    }
+    
+    // Prüfe E-Mail (wenn vorhanden)
+    if (formData.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        validationErrors.push('Bitte geben Sie eine gültige E-Mail-Adresse ein');
+      }
+    }
+    
+    if (validationErrors.length > 0) {
+      alert('Bitte korrigieren Sie folgende Fehler:\n' + validationErrors.join('\n'));
+      return;
+    }
+    
+    // Daten transformieren und senden
+    const transformedData = transformAufnahmeData(formData);
+    onSave(transformedData);
   };
 
   // Vorschau der Adressdaten

@@ -15,10 +15,37 @@ const AufnahmenList = () => {
     setLoading(true);
     try {
       const response = await aufnahmenService.getAll();
-      console.log('Geladene Aufnahmen:', response.data);
+      console.log('API Response für Aufnahmen:', response);
       
-      // Sicherstellen, dass wir ein Array haben, auch wenn die API nichts zurückgibt
-      const aufnahmenData = Array.isArray(response.data) ? response.data : [];
+      // Extrahiere die Aufnahmen aus der Antwort
+      // Die Antwort kann entweder direkt ein Array sein, oder in response.aufnahmen oder response.data enthalten sein
+      let aufnahmenData = [];
+      
+      if (response && response.success !== false) {
+        if (Array.isArray(response)) {
+          // Direkt ein Array
+          aufnahmenData = response;
+        } else if (response.aufnahmen && Array.isArray(response.aufnahmen)) {
+          // In aufnahmen-Feld
+          aufnahmenData = response.aufnahmen;
+        } else if (response.data && Array.isArray(response.data)) {
+          // In data-Feld
+          aufnahmenData = response.data;
+        } else if (response.data && response.data.aufnahmen && Array.isArray(response.data.aufnahmen)) {
+          // Verschachtelt in data.aufnahmen
+          aufnahmenData = response.data.aufnahmen;
+        } else if (typeof response === 'object') {
+          // Vielleicht ein Objekt mit _id-Feldern (Aufnahmen-Objekte)
+          const possibleAufnahmen = Object.values(response).filter(item => 
+            item && typeof item === 'object' && item._id
+          );
+          if (possibleAufnahmen.length > 0) {
+            aufnahmenData = possibleAufnahmen;
+          }
+        }
+      }
+      
+      console.log('Extrahierte Aufnahmen:', aufnahmenData);
       setAufnahmen(aufnahmenData);
     } catch (error) {
       console.error('Fehler beim Laden der Aufnahmen:', error);
