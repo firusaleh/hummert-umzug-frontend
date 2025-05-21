@@ -1,5 +1,5 @@
 // src/pages/fahrzeuge/FahrzeugForm.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { fahrzeugeService } from '../../services/api';
 import { toast } from 'react-toastify';
+import { extractApiData } from '../../utils/apiUtils';
 
 const FahrzeugForm = () => {
   const { id } = useParams();
@@ -174,7 +175,167 @@ const FahrzeugForm = () => {
     }
   };
 
-  // Client-side form validation
+  // Data transformation function for proper API submission
+  const transformFahrzeugData = useCallback((data) => {
+    // Create a clean copy to avoid modifying the original
+    const transformed = { ...data };
+    
+    // Format required fields
+    transformed.kennzeichen = transformed.kennzeichen?.trim() || '';
+    transformed.bezeichnung = transformed.bezeichnung?.trim() || '';
+    transformed.typ = transformed.typ || 'Transporter';
+    
+    // Convert date fields to ISO format
+    if (transformed.anschaffungsdatum) {
+      try {
+        const date = new Date(transformed.anschaffungsdatum);
+        if (!isNaN(date.getTime())) {
+          transformed.anschaffungsdatum = date.toISOString();
+        } else {
+          delete transformed.anschaffungsdatum;
+        }
+      } catch (error) {
+        console.error('Fehler beim Formatieren des Anschaffungsdatums:', error);
+        delete transformed.anschaffungsdatum;
+      }
+    }
+    
+    if (transformed.tuev) {
+      try {
+        const date = new Date(transformed.tuev);
+        if (!isNaN(date.getTime())) {
+          transformed.tuev = date.toISOString();
+        } else {
+          delete transformed.tuev;
+        }
+      } catch (error) {
+        console.error('Fehler beim Formatieren des TÜV-Datums:', error);
+        delete transformed.tuev;
+      }
+    }
+    
+    if (transformed.naechsterService) {
+      try {
+        const date = new Date(transformed.naechsterService);
+        if (!isNaN(date.getTime())) {
+          transformed.naechsterService = date.toISOString();
+        } else {
+          delete transformed.naechsterService;
+        }
+      } catch (error) {
+        console.error('Fehler beim Formatieren des Service-Datums:', error);
+        delete transformed.naechsterService;
+      }
+    }
+    
+    // Ensure numeric values are actually numbers
+    if (transformed.baujahr) {
+      transformed.baujahr = parseInt(transformed.baujahr);
+      if (isNaN(transformed.baujahr)) delete transformed.baujahr;
+    }
+    
+    if (transformed.kilometerstand) {
+      transformed.kilometerstand = parseInt(transformed.kilometerstand);
+      if (isNaN(transformed.kilometerstand)) delete transformed.kilometerstand;
+    }
+    
+    // Handle nested kapazitaet object
+    if (transformed.kapazitaet) {
+      // Handle ladeflaeche dimensions
+      if (transformed.kapazitaet.ladeflaeche) {
+        // Convert each dimension to a number or remove it if invalid
+        ['laenge', 'breite', 'hoehe'].forEach(dim => {
+          if (transformed.kapazitaet.ladeflaeche[dim]) {
+            transformed.kapazitaet.ladeflaeche[dim] = parseFloat(transformed.kapazitaet.ladeflaeche[dim]);
+            if (isNaN(transformed.kapazitaet.ladeflaeche[dim])) {
+              delete transformed.kapazitaet.ladeflaeche[dim];
+            }
+          }
+        });
+        
+        // If ladeflaeche is empty after removing invalid values, remove it entirely
+        if (Object.keys(transformed.kapazitaet.ladeflaeche).length === 0) {
+          delete transformed.kapazitaet.ladeflaeche;
+        }
+      }
+      
+      // Handle ladegewicht
+      if (transformed.kapazitaet.ladegewicht) {
+        transformed.kapazitaet.ladegewicht = parseFloat(transformed.kapazitaet.ladegewicht);
+        if (isNaN(transformed.kapazitaet.ladegewicht)) {
+          delete transformed.kapazitaet.ladegewicht;
+        }
+      }
+      
+      // If kapazitaet is now empty, remove it entirely
+      if (Object.keys(transformed.kapazitaet).length === 0) {
+        delete transformed.kapazitaet;
+      }
+    }
+    
+    // Handle versicherung object
+    if (transformed.versicherung) {
+      // Trim string fields
+      if (transformed.versicherung.gesellschaft) {
+        transformed.versicherung.gesellschaft = transformed.versicherung.gesellschaft.trim();
+      }
+      
+      if (transformed.versicherung.vertragsnummer) {
+        transformed.versicherung.vertragsnummer = transformed.versicherung.vertragsnummer.trim();
+      }
+      
+      // Convert ablaufdatum to ISO string
+      if (transformed.versicherung.ablaufdatum) {
+        try {
+          const date = new Date(transformed.versicherung.ablaufdatum);
+          if (!isNaN(date.getTime())) {
+            transformed.versicherung.ablaufdatum = date.toISOString();
+          } else {
+            delete transformed.versicherung.ablaufdatum;
+          }
+        } catch (error) {
+          console.error('Fehler beim Formatieren des Ablaufdatums:', error);
+          delete transformed.versicherung.ablaufdatum;
+        }
+      }
+      
+      // If versicherung is now empty, remove it entirely
+      if (Object.keys(transformed.versicherung).length === 0) {
+        delete transformed.versicherung;
+      }
+    }
+    
+    // Clean up notizen field
+    if (transformed.notizen) {
+      transformed.notizen = transformed.notizen.trim();
+      if (transformed.notizen === '') {
+        delete transformed.notizen;
+      }
+    }
+    
+    // Validate status against allowed values
+    const validStatusValues = ['Verfügbar', 'Im Einsatz', 'In Wartung', 'Defekt', 'Außer Dienst'];
+    if (!validStatusValues.includes(transformed.status)) {
+      transformed.status = 'Verfügbar';
+    }
+    
+    // Validate typ against allowed values
+    const validTypValues = ['LKW', 'Transporter', 'PKW', 'Anhänger', 'Sonstige'];
+    if (!validTypValues.includes(transformed.typ)) {
+      transformed.typ = 'Transporter';
+    }
+    
+    // Remove undefined and null properties
+    Object.keys(transformed).forEach(key => {
+      if (transformed[key] === undefined || transformed[key] === null) {
+        delete transformed[key];
+      }
+    });
+    
+    return transformed;
+  }, []);
+
+  // Enhanced client-side form validation
   const validateForm = () => {
     // Reset field errors
     setFieldErrors({});
@@ -184,12 +345,51 @@ const FahrzeugForm = () => {
     // Required fields validation
     if (!formData.kennzeichen.trim()) {
       errors.kennzeichen = 'Kennzeichen ist erforderlich';
-    } else if (!/^[A-ZÄÖÜ]{1,3}-[A-ZÄÖÜ]{1,2} [0-9A-ZÄÖÜ]{1,6}$/.test(formData.kennzeichen.trim())) {
-      errors.kennzeichen = 'Ungültiges Kennzeichen-Format (z.B. M-AB 1234)';
+    } else {
+      // More forgiving regex for German license plates
+      const kennzeichenRegex = /^[A-ZÄÖÜa-zäöü]{1,3}[-\s]?[A-ZÄÖÜa-zäöü]{1,2}[-\s]?[0-9A-ZÄÖÜa-zäöü]{1,6}$/;
+      if (!kennzeichenRegex.test(formData.kennzeichen.trim())) {
+        errors.kennzeichen = 'Ungültiges Kennzeichen-Format (z.B. M-AB 1234)';
+      }
     }
     
     if (!formData.bezeichnung.trim()) {
       errors.bezeichnung = 'Bezeichnung ist erforderlich';
+    }
+    
+    if (!formData.typ) {
+      errors.typ = 'Typ ist erforderlich';
+    }
+    
+    // Date validation
+    if (formData.anschaffungsdatum) {
+      const date = new Date(formData.anschaffungsdatum);
+      if (isNaN(date.getTime())) {
+        errors.anschaffungsdatum = 'Ungültiges Datum';
+      }
+    }
+    
+    if (formData.tuev) {
+      const date = new Date(formData.tuev);
+      if (isNaN(date.getTime())) {
+        errors.tuev = 'Ungültiges Datum';
+      }
+    }
+    
+    if (formData.naechsterService) {
+      const date = new Date(formData.naechsterService);
+      if (isNaN(date.getTime())) {
+        errors.naechsterService = 'Ungültiges Datum';
+      }
+    }
+    
+    // Numeric field validation
+    if (formData.baujahr && (isNaN(parseInt(formData.baujahr)) || parseInt(formData.baujahr) < 1900)) {
+      errors.baujahr = 'Ungültiges Baujahr';
+    }
+    
+    if (formData.kilometerstand && isNaN(parseInt(formData.kilometerstand))) {
+      errors.kilometerstand = 'Ungültiger Kilometerstand';
     }
     
     // If we have any errors
@@ -200,8 +400,18 @@ const FahrzeugForm = () => {
       // Build error message for the error box
       const errorMessages = Object.entries(errors)
         .map(([field, message]) => {
-          const displayField = field === 'kennzeichen' ? 'Kennzeichen' : 
-                              field === 'bezeichnung' ? 'Bezeichnung' : field;
+          // Format field names for display
+          const displayField = {
+            'kennzeichen': 'Kennzeichen',
+            'bezeichnung': 'Bezeichnung',
+            'typ': 'Fahrzeugtyp',
+            'anschaffungsdatum': 'Anschaffungsdatum',
+            'tuev': 'TÜV',
+            'naechsterService': 'Nächster Service',
+            'baujahr': 'Baujahr',
+            'kilometerstand': 'Kilometerstand'
+          }[field] || field;
+          
           return `${displayField}: ${message}`;
         })
         .join('\n');
@@ -213,11 +423,14 @@ const FahrzeugForm = () => {
     return true;
   };
 
-  // Formular absenden
+  // Formular absenden - mit verbesserter Fehlerbehandlung und Datenformatierung
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    
+    // Anzeigen, dass die Anfrage verarbeitet wird
+    toast.info('Verarbeite Anfrage...');
     
     // Client-side validation
     if (!validateForm()) {
@@ -226,142 +439,201 @@ const FahrzeugForm = () => {
     }
     
     try {
-      // API-Daten vorbereiten
-      // Create a clean copy without spreading the original to avoid unexpected properties
-      const fahrzeugData = {
-        // Required fields
-        kennzeichen: formData.kennzeichen.trim(),
-        bezeichnung: formData.bezeichnung.trim(),
-        typ: formData.typ,
-        
-        // Optional fields with proper conversions
-        status: formData.status,
-        fuehrerscheinklasse: formData.fuehrerscheinklasse,
-        baujahr: formData.baujahr ? Number(formData.baujahr) : undefined,
-        kilometerstand: formData.kilometerstand ? Number(formData.kilometerstand) : undefined,
-        notizen: formData.notizen,
-        
-        // Date fields - ensure ISO strings for dates
-        anschaffungsdatum: formData.anschaffungsdatum || undefined,
-        tuev: formData.tuev || undefined,
-        naechsterService: formData.naechsterService || undefined,
-        
-        // Nested objects
-        kapazitaet: {
-          ladeflaeche: {
-            laenge: formData.kapazitaet.ladeflaeche.laenge ? Number(formData.kapazitaet.ladeflaeche.laenge) : undefined,
-            breite: formData.kapazitaet.ladeflaeche.breite ? Number(formData.kapazitaet.ladeflaeche.breite) : undefined,
-            hoehe: formData.kapazitaet.ladeflaeche.hoehe ? Number(formData.kapazitaet.ladeflaeche.hoehe) : undefined
-          },
-          ladegewicht: formData.kapazitaet.ladegewicht ? Number(formData.kapazitaet.ladegewicht) : undefined
-        },
-        
-        // Versicherung with date conversion
-        versicherung: {
-          gesellschaft: formData.versicherung.gesellschaft || undefined,
-          vertragsnummer: formData.versicherung.vertragsnummer || undefined,
-          ablaufdatum: formData.versicherung.ablaufdatum || undefined
-        }
-      };
+      // Daten transformieren für API mit der neuen Transformationsfunktion
+      const transformedData = transformFahrzeugData(formData);
       
-      // Remove undefined fields for cleaner request
-      Object.keys(fahrzeugData).forEach(key => {
-        if (fahrzeugData[key] === undefined) {
-          delete fahrzeugData[key];
-        } else if (typeof fahrzeugData[key] === 'object' && fahrzeugData[key] !== null) {
-          Object.keys(fahrzeugData[key]).forEach(nestedKey => {
-            if (fahrzeugData[key][nestedKey] === undefined) {
-              delete fahrzeugData[key][nestedKey];
-            } else if (typeof fahrzeugData[key][nestedKey] === 'object' && fahrzeugData[key][nestedKey] !== null) {
-              Object.keys(fahrzeugData[key][nestedKey]).forEach(deepKey => {
-                if (fahrzeugData[key][nestedKey][deepKey] === undefined) {
-                  delete fahrzeugData[key][nestedKey][deepKey];
-                }
-              });
-            }
-          });
-        }
-      });
+      // Detailliertes Logging für Debugging
+      console.log('Transformierte Daten zum Speichern:', JSON.stringify(transformedData, null, 2));
       
       let response;
+      let fahrzeugId = id;
       
       if (isNeueModus) {
-        // Neues Fahrzeug erstellen
-        response = await fahrzeugeService.create(fahrzeugData);
-        
-        // Bild hochladen, wenn vorhanden
-        if (vehicleImage && response.data && response.data._id) {
-          const imageFormData = new FormData();
-          imageFormData.append('file', vehicleImage);
+        // Neues Fahrzeug erstellen mit standardisierter API
+        try {
+          // Aktive Benutzerinformation während der Verarbeitung
+          const toastId = toast.loading('Erstelle Fahrzeug...');
           
-          await fahrzeugeService.uploadImage(response.data._id, imageFormData);
+          response = await fahrzeugeService.create(transformedData);
+          console.log('API Antwort:', response);
+          
+          // Update den loading toast
+          toast.dismiss(toastId);
+          
+          // Check if response indicates an error
+          if (response && !response.success) {
+            console.error('API returned error:', response.message, response.errors);
+            
+            // Extract and show detailed validation errors
+            if (response.errors && Array.isArray(response.errors)) {
+              console.table(response.errors); // Better display of errors
+              
+              // Group errors by field for easier debugging
+              const errorsByField = {};
+              response.errors.forEach(err => {
+                if (err.field) {
+                  errorsByField[err.field] = err.message;
+                }
+              });
+              console.log('Grouped errors by field:', errorsByField);
+              
+              // Generate a more user-friendly error message for display
+              const errorFieldsList = Object.keys(errorsByField).map(field => 
+                `${field.replace(/\./g, ' > ')}: ${errorsByField[field]}`
+              ).join('\n');
+              
+              setFieldErrors(errorsByField);
+              setError(`Validierungsfehler:\n${errorFieldsList}`);
+              toast.error('Fehler bei der Erstellung des Fahrzeugs');
+              return;
+            } else {
+              // Generic error message
+              toast.error(response.message || 'Ein Fehler ist aufgetreten');
+              setError(response.message || 'Ein Fehler ist aufgetreten');
+              return;
+            }
+          }
+          
+          // Extract data and ID from successful response
+          const responseData = extractApiData(response);
+          if (!responseData) {
+            throw new Error('Keine gültige Antwort vom Server erhalten');
+          }
+          
+          // Get the new vehicle ID for image upload
+          fahrzeugId = responseData._id;
+          
+          toast.success('Fahrzeug wurde erfolgreich erstellt!');
+        } catch (error) {
+          console.error('Fehler beim Erstellen des Fahrzeugs:', error);
+          handleApiError(error, 'Das Fahrzeug konnte nicht erstellt werden');
+          return;
         }
-        
-        toast.success('Fahrzeug wurde erfolgreich angelegt!');
       } else {
         // Bestehendes Fahrzeug aktualisieren
-        response = await fahrzeugeService.update(id, fahrzeugData);
-        
-        // Bild hochladen, wenn vorhanden
-        if (vehicleImage) {
+        try {
+          // Aktive Benutzerinformation während der Verarbeitung
+          const toastId = toast.loading('Aktualisiere Fahrzeug...');
+          
+          response = await fahrzeugeService.update(id, transformedData);
+          
+          // Update den loading toast
+          toast.dismiss(toastId);
+          
+          // Check if response indicates an error
+          if (response && !response.success) {
+            console.error('API error on update:', response.message, response.errors);
+            
+            if (response.errors && Array.isArray(response.errors)) {
+              // Generate a more user-friendly error message
+              const errorMessage = response.errors.map(err => 
+                `${err.field || ''}: ${err.message || ''}`
+              ).join('\n');
+              
+              setError(`Fehler beim Aktualisieren:\n${errorMessage}`);
+              
+              // Create field errors map for highlighting
+              const fieldErrorsMap = {};
+              response.errors.forEach(err => {
+                if (err.field) fieldErrorsMap[err.field] = err.message;
+              });
+              setFieldErrors(fieldErrorsMap);
+              
+              toast.error('Fehler beim Aktualisieren des Fahrzeugs');
+              return;
+            } else {
+              toast.error(response.message || 'Ein Fehler ist aufgetreten');
+              setError(response.message || 'Ein Fehler ist aufgetreten');
+              return;
+            }
+          }
+          
+          toast.success('Fahrzeug wurde erfolgreich aktualisiert!');
+        } catch (error) {
+          console.error('Fehler beim Aktualisieren des Fahrzeugs:', error);
+          handleApiError(error, 'Das Fahrzeug konnte nicht aktualisiert werden');
+          return;
+        }
+      }
+      
+      // Wenn ein neues Bild hochgeladen wurde und wir eine Fahrzeug-ID haben, Bild hochladen
+      if (vehicleImage && fahrzeugId) {
+        try {
+          const uploadToastId = toast.loading('Lade Bild hoch...');
+          
           const imageFormData = new FormData();
           imageFormData.append('file', vehicleImage);
           
-          await fahrzeugeService.uploadImage(id, imageFormData);
+          await fahrzeugeService.uploadImage(fahrzeugId, imageFormData);
+          
+          toast.dismiss(uploadToastId);
+          toast.success('Bild erfolgreich hochgeladen');
+        } catch (error) {
+          console.error('Fehler beim Hochladen des Bildes:', error);
+          toast.error('Das Bild konnte nicht hochgeladen werden, Fahrzeug wurde aber gespeichert');
         }
-        
-        toast.success('Fahrzeug wurde erfolgreich aktualisiert!');
       }
       
       // Zurück zur Übersicht navigieren
       navigate('/fahrzeuge');
     } catch (err) {
       console.error('Fehler beim Speichern des Fahrzeugs:', err);
-      
-      // More detailed error logging
-      if (err.response?.data) {
-        console.log('Server-Antwort:', err.response.data);
-      }
-      
-      // Reset field errors
-      setFieldErrors({});
-      
-      // Display detailed validation errors if available
-      if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
-        // Create field errors map for input field highlighting
-        const fieldErrorsMap = {};
-        
-        const validationErrors = err.response.data.errors.map(error => {
-          // Get field name
-          const field = error.field || error.param;
-          
-          // Store in field errors map for highlighting the input
-          if (field) {
-            fieldErrorsMap[field] = error.message || error.msg;
-          }
-          
-          // Format field name for display
-          let fieldName = field;
-          if (fieldName === 'kennzeichen') fieldName = 'Kennzeichen';
-          if (fieldName === 'bezeichnung') fieldName = 'Bezeichnung';
-          
-          return `${fieldName}: ${error.message || error.msg}`;
-        }).join('\n');
-        
-        // Set errors for UI highlighting
-        setFieldErrors(fieldErrorsMap);
-        
-        // Set error message
-        setError(`Validierungsfehler:\n${validationErrors}`);
-        toast.error('Bitte korrigieren Sie die markierten Felder');
-      } else {
-        // Generic error message
-        setError(err.response?.data?.message || 'Das Fahrzeug konnte nicht gespeichert werden.');
-        toast.error('Fehler beim Speichern des Fahrzeugs');
-      }
+      handleApiError(err, 'Es ist ein unerwarteter Fehler aufgetreten');
     } finally {
       setSaving(false);
     }
+  };
+  
+  // Helper function to handle API errors
+  const handleApiError = (error, defaultMessage) => {
+    // Detailed error logging
+    console.group('API Error Details:');
+    console.error('Error object:', error);
+    
+    if (error.response) {
+      console.log('Status:', error.response.status);
+      console.log('Data:', error.response.data);
+    }
+    console.groupEnd();
+    
+    // Reset field errors
+    setFieldErrors({});
+    
+    let errorMessage = defaultMessage;
+    
+    // Handle different error formats
+    if (error.errors && Array.isArray(error.errors)) {
+      const fieldErrorsMap = {};
+      const errorDetails = error.errors.map(err => {
+        const field = err.field || err.param || '';
+        const message = err.message || err.msg || '';
+        
+        if (field) fieldErrorsMap[field] = message;
+        
+        return `${field}: ${message}`;
+      }).join('\n');
+      
+      setFieldErrors(fieldErrorsMap);
+      errorMessage += `\n\nDetails:\n${errorDetails}`;
+    } else if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+      const fieldErrorsMap = {};
+      const errorDetails = error.response.data.errors.map(err => {
+        const field = err.field || err.param || '';
+        const message = err.message || err.msg || '';
+        
+        if (field) fieldErrorsMap[field] = message;
+        
+        return `${field}: ${message}`;
+      }).join('\n');
+      
+      setFieldErrors(fieldErrorsMap);
+      errorMessage += `\n\nDetails:\n${errorDetails}`;
+    } else if (error.message) {
+      errorMessage += `: ${error.message}`;
+    }
+    
+    setError(errorMessage);
+    toast.error(errorMessage.split('\n')[0]); // Only show first line in toast
   };
 
   if (loading) {

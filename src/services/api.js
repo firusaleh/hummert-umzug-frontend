@@ -25,6 +25,7 @@ const tokenManager = {
   getToken: () => localStorage.getItem('token'),
   setToken: (token) => localStorage.setItem('token', token),
   removeToken: () => localStorage.removeItem('token'),
+  
   getUser: () => {
     try {
       const user = localStorage.getItem('user');
@@ -33,22 +34,105 @@ const tokenManager = {
       return null;
     }
   },
+  
   setUser: (user) => localStorage.setItem('user', JSON.stringify(user)),
   removeUser: () => localStorage.removeItem('user'),
+  
+  getTokenTimestamp: () => {
+    const timestamp = localStorage.getItem('tokenTimestamp');
+    return timestamp ? parseInt(timestamp, 10) : null;
+  },
+  
+  setTokenTimestamp: () => localStorage.setItem('tokenTimestamp', Date.now().toString()),
+  
   clearAuthData: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('tokenTimestamp');
+  },
+  
+  isTokenExpired: () => {
+    const timestamp = tokenManager.getTokenTimestamp();
+    if (!timestamp) return true;
+    
+    // Token lifetime in milliseconds (e.g., 2 hours)
+    const tokenLifetime = 2 * 60 * 60 * 1000; 
+    
+    // Check if token is expired
+    return Date.now() - timestamp > tokenLifetime;
+  },
+  
+  isTokenExpiringSoon: () => {
+    const timestamp = tokenManager.getTokenTimestamp();
+    if (!timestamp) return true;
+    
+    // Token lifetime in milliseconds (e.g., 2 hours)
+    const tokenLifetime = 2 * 60 * 60 * 1000;
+    
+    // Check if token will expire in the next 10 minutes
+    const expirationBuffer = 10 * 60 * 1000; // 10 minutes
+    return Date.now() - timestamp > tokenLifetime - expirationBuffer;
+  },
+  
+  refreshTokenIfNeeded: async () => {
+    // Check if token is about to expire
+    if (tokenManager.isTokenExpiringSoon() && !tokenManager.isTokenExpired()) {
+      try {
+        // Try to refresh the token
+        const response = await api.get('/auth/refresh');
+        if (response.data && response.data.token) {
+          tokenManager.setToken(response.data.token);
+          tokenManager.setTokenTimestamp();
+          console.log('Token refreshed successfully');
+          return true;
+        }
+      } catch (error) {
+        console.warn('Failed to refresh token:', error);
+        // Don't clear auth data here, let the interceptor handle actual expiration
+      }
+    }
+    return false;
   }
 };
 
-// Request interceptor - no logging of sensitive data
+// Request interceptor with token refresh capability
 api.interceptors.request.use(
-  (config) => {
-    const token = tokenManager.getToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    // Skip token handling for auth endpoints
+    const isAuthEndpoint = config.url && (
+      config.url.includes('/auth/login') || 
+      config.url.includes('/auth/register') ||
+      config.url.includes('/auth/refresh')
+    );
+    
+    if (isAuthEndpoint) {
+      return config;
     }
+    
+    // For non-auth endpoints, handle token
+    const token = tokenManager.getToken();
+    
+    if (token) {
+      // Check if token needs refreshing before making the request
+      if (tokenManager.isTokenExpiringSoon() && !tokenManager.isTokenExpired()) {
+        try {
+          await tokenManager.refreshTokenIfNeeded();
+          // Get the fresh token after refresh
+          const freshToken = tokenManager.getToken();
+          if (freshToken) {
+            config.headers.Authorization = `Bearer ${freshToken}`;
+          }
+        } catch (error) {
+          console.warn('Token refresh failed in request interceptor:', error);
+          // Use the existing token as fallback
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+      } else {
+        // Use existing token
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    
     return config;
   },
   (error) => Promise.reject(error)
@@ -60,18 +144,50 @@ api.interceptors.response.use(
   (error) => {
     // Handle authentication errors
     if (error.response && error.response.status === 401) {
+      // More comprehensive check for token issues
       const isTokenExpired = error.response.data?.message?.includes('Token') ||
-                           error.response.data?.message?.includes('abgelaufen') ||
-                           error.response.data?.message?.includes('Sitzung') ||
-                           error.response.data?.message?.includes('nicht authentifiziert');
+                          error.response.data?.message?.includes('abgelaufen') ||
+                          error.response.data?.message?.includes('expired') ||
+                          error.response.data?.message?.includes('Sitzung') ||
+                          error.response.data?.message?.includes('session') ||
+                          error.response.data?.message?.includes('nicht authentifiziert') ||
+                          error.response.data?.message?.includes('not authenticated') ||
+                          error.response.data?.message?.includes('invalid token') ||
+                          error.response.data?.message?.includes('jwt') ||
+                          error.response.data?.message?.includes('unauthorized') ||
+                          error.response.data?.message?.includes('unautorisiert');
       
-      if (isTokenExpired) {
+      // Also check for specific response codes used in some APIs
+      const isAuthError = isTokenExpired || 
+                          error.response.data?.code === 'invalid_token' ||
+                          error.response.data?.code === 'token_expired' ||
+                          error.response.data?.status === 'unauthorized';
+      
+      if (isAuthError) {
+        // Log the auth error for debugging
+        console.warn('Authentication error detected:', error.response.data?.message);
+        
         // Clear auth data
         tokenManager.clearAuthData();
         
-        // Only redirect to login if we're not already on the login page
-        if (!window.location.pathname.includes('/login')) {
-          window.location.replace('/login?session=expired');
+        // Store the attempted URL to redirect back after login
+        const currentPath = window.location.pathname + window.location.search;
+        if (!currentPath.includes('/login')) {
+          try {
+            localStorage.setItem('auth_redirect', currentPath);
+          } catch (e) {
+            console.error('Error storing auth redirect path:', e);
+          }
+        }
+        
+        // Only redirect to login if we're not already on the login page or other public pages
+        const publicPaths = ['/login', '/register', '/forgot-password', '/reset-password'];
+        const isPublicPath = publicPaths.some(path => window.location.pathname.includes(path));
+        
+        if (!isPublicPath) {
+          // Add a query parameter to indicate session expiration
+          window.location.href = `/login?session=expired&redirect=${encodeURIComponent(currentPath)}`;
+          
           // Return an empty promise that never resolves to prevent further error handling
           return new Promise(() => {});
         }
@@ -107,20 +223,99 @@ const createService = (basePath) => {
     
     create: async (data) => {
       try {
-        // Detailed logging for debugging validation errors
+        // Enhanced logging for debugging validation errors
         console.log(`Sending POST to ${basePath} with data:`, JSON.stringify(data, null, 2));
+        
+        // Special validation logging for complex data structures that often cause issues
+        if (basePath.includes('umzuege')) {
+          console.group('Pre-validation check for Umzug data:');
+          // Check required fields
+          const requiredFields = [
+            'auftraggeber.name', 'auftraggeber.telefon', 
+            'auszugsadresse.strasse', 'auszugsadresse.hausnummer', 'auszugsadresse.plz', 'auszugsadresse.ort',
+            'einzugsadresse.strasse', 'einzugsadresse.hausnummer', 'einzugsadresse.plz', 'einzugsadresse.ort',
+            'startDatum', 'endDatum'
+          ];
+          
+          const missingFields = [];
+          for (const field of requiredFields) {
+            const [parent, child] = field.includes('.') ? field.split('.') : [field, null];
+            if (child) {
+              if (!data[parent] || !data[parent][child] || data[parent][child] === '') {
+                missingFields.push(field);
+              }
+            } else if (!data[parent] || data[parent] === '') {
+              missingFields.push(field);
+            }
+          }
+          
+          if (missingFields.length > 0) {
+            console.warn('Missing required fields:', missingFields);
+          }
+          
+          // Log specific properties that often cause issues
+          console.log('auftraggeber:', data.auftraggeber);
+          console.log('auszugsadresse:', data.auszugsadresse);
+          console.log('einzugsadresse:', data.einzugsadresse);
+          console.log('mitarbeiter:', data.mitarbeiter);
+          console.log('fahrzeuge:', data.fahrzeuge);
+          console.log('dates:', {
+            startDatum: data.startDatum,
+            endDatum: data.endDatum,
+            isStartValid: data.startDatum && !isNaN(new Date(data.startDatum).getTime()),
+            isEndValid: data.endDatum && !isNaN(new Date(data.endDatum).getTime())
+          });
+          console.groupEnd();
+        }
+        
         const response = await api.post(basePath, data);
         return response.data;
       } catch (error) {
         logError(`create ${basePath}`, error);
+        
         // Log full error response for debugging
-        console.error('Complete error response:', error.response);
-        if (error.response && error.response.data) {
-          console.error('Server response data:', error.response.data);
-          if (error.response.data.errors) {
-            console.error('Validation errors:', error.response.data.errors);
+        console.group('API Error Details:');
+        console.error('Complete error response:', error);
+        
+        if (error.response) {
+          console.log('Status:', error.response.status);
+          console.log('Status Text:', error.response.statusText);
+          
+          if (error.response.data) {
+            console.log('Server response data:', error.response.data);
+            
+            // Handle validation errors
+            if (error.response.data.errors) {
+              console.group('Validation Errors:');
+              console.table(error.response.data.errors);
+              
+              // Group errors by field for easier debugging
+              const errorsByField = {};
+              if (Array.isArray(error.response.data.errors)) {
+                error.response.data.errors.forEach(err => {
+                  if (err.field || err.param) {
+                    const fieldName = err.field || err.param;
+                    errorsByField[fieldName] = err.message || err.msg;
+                  }
+                });
+                console.log('Grouped by field:', errorsByField);
+              }
+              console.groupEnd();
+            }
+            
+            // Check for message property
+            if (error.response.data.message) {
+              console.error('Error message:', error.response.data.message);
+            }
           }
+        } else if (error.request) {
+          console.error('No response received. Network issue?');
+        } else {
+          console.error('Error before request completion:', error.message);
         }
+        
+        console.groupEnd();
+        
         return formatApiError(error, `Fehler beim Erstellen`);
       }
     },
@@ -167,14 +362,25 @@ export const authService = {
     try {
       console.log('Sending login request to API...');
       const response = await api.post('/auth/login', credentials);
-      console.log('Login response received:', { success: response.data.success, hasToken: !!response.data.token });
+      console.log('Login response received:', { success: !!response.data.success, hasToken: !!response.data.token });
       
       if (response.data.token) {
+        // Store token with proper timestamp
         tokenManager.setToken(response.data.token);
+        tokenManager.setTokenTimestamp(); // Set current timestamp
         tokenManager.setUser(response.data.user);
         console.log('Auth data stored in localStorage');
       } else {
         console.warn('No token received in login response');
+      }
+      
+      // Check for redirect info from previous session expiration
+      const redirectUrl = localStorage.getItem('auth_redirect');
+      if (redirectUrl) {
+        // Store redirect URL in the response for the component to handle
+        response.data.redirectUrl = redirectUrl;
+        // Clear after retrieval
+        localStorage.removeItem('auth_redirect');
       }
       
       return response.data;
@@ -192,6 +398,8 @@ export const authService = {
           errorMessage = 'Ungültige E-Mail oder Passwort';
         } else if (status === 400) {
           errorMessage = error.response.data?.message || 'Ungültige Eingabe';
+        } else if (status === 403) {
+          errorMessage = 'Ihr Konto wurde gesperrt. Bitte kontaktieren Sie den Administrator.';
         } else if (status === 429) {
           errorMessage = 'Zu viele Anmeldeversuche. Bitte versuchen Sie es später erneut.';
         } else if (status >= 500) {

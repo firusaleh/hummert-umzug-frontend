@@ -12,14 +12,38 @@
  */
 export const extractApiData = (response, dataPath = null, defaultValue = null) => {
   try {
+    // Check for error response
+    if (response && response.success === false) {
+      console.warn('API Fehlerantwort erkannt:', response.message);
+      return response; // Return the error response for proper handling
+    }
+    
     // Sicherstellen, dass eine response mit data-Feld vorhanden ist
-    if (!response || !response.data) return defaultValue;
+    if (!response) {
+      console.warn('Leere API-Antwort erhalten');
+      return defaultValue;
+    }
+    
+    // Handle direct data object (when returned from our service functions)
+    if (!response.data && typeof response === 'object') {
+      // If no specific path is requested, return the whole response
+      if (!dataPath) return response;
+      
+      // Otherwise, try to extract the requested path
+      return response[dataPath] !== undefined ? response[dataPath] : defaultValue;
+    }
+    
+    // Handle response with data field (from axios directly)
+    if (!response.data) {
+      console.warn('API-Antwort enthält kein data-Feld');
+      return defaultValue;
+    }
     
     // Wenn kein spezifischer Pfad angegeben ist, gib response.data zurück
     if (!dataPath) return response.data;
     
     // Daten aus verschachteltem Objekt extrahieren
-    return response.data[dataPath] || response.data || defaultValue;
+    return response.data[dataPath] !== undefined ? response.data[dataPath] : response.data;
   } catch (error) {
     console.error('Fehler beim Extrahieren der API-Daten:', error);
     return defaultValue;

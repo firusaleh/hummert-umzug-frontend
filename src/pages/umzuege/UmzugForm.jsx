@@ -22,7 +22,7 @@ export default function UmzugForm() {
     auszugsadresse: {
       strasse: '',
       hausnummer: '',
-      plz: '',
+      plz: '00000', // Default to a valid 5-digit code
       ort: '',
       land: 'Deutschland',
       etage: 0,
@@ -32,7 +32,7 @@ export default function UmzugForm() {
     einzugsadresse: {
       strasse: '',
       hausnummer: '',
-      plz: '',
+      plz: '00000', // Default to a valid 5-digit code
       ort: '',
       land: 'Deutschland',
       etage: 0,
@@ -42,15 +42,15 @@ export default function UmzugForm() {
     zwischenstopps: [],
     startDatum: '',
     endDatum: '',
-    status: 'geplant',
+    status: 'geplant', // Using a valid status from backend validation
     preis: {
-      netto: '',
-      brutto: '',
+      netto: 0, // Use numbers instead of empty strings
+      brutto: 0, // Use numbers instead of empty strings
       mwst: 19,
       bezahlt: false,
       zahlungsart: 'rechnung'
     },
-    aufnahmeId: '',
+    aufnahmeId: null, // Use null instead of empty string for IDs
     fahrzeuge: [],
     mitarbeiter: [],
     extraLeistungen: []
@@ -73,12 +73,18 @@ export default function UmzugForm() {
         const date = new Date(transformed.startDatum);
         if (isNaN(date.getTime())) {
           console.error('Ungültiges Startdatum:', transformed.startDatum);
+          // Provide a valid default date if the startDatum is invalid
+          transformed.startDatum = new Date().toISOString();
         } else {
           transformed.startDatum = date.toISOString();
         }
       } catch (error) {
         console.error('Fehler beim Formatieren des Startdatums:', error);
+        transformed.startDatum = new Date().toISOString();
       }
+    } else {
+      // Ensure startDatum is never undefined or empty
+      transformed.startDatum = new Date().toISOString();
     }
     
     if (transformed.endDatum) {
@@ -87,72 +93,155 @@ export default function UmzugForm() {
         const date = new Date(transformed.endDatum);
         if (isNaN(date.getTime())) {
           console.error('Ungültiges Enddatum:', transformed.endDatum);
+          // Provide a valid default end date (1 day after start)
+          const defaultEnd = new Date(transformed.startDatum);
+          defaultEnd.setDate(defaultEnd.getDate() + 1);
+          transformed.endDatum = defaultEnd.toISOString();
         } else {
           transformed.endDatum = date.toISOString();
         }
       } catch (error) {
         console.error('Fehler beim Formatieren des Enddatums:', error);
+        // Provide a valid default end date (1 day after start)
+        const defaultEnd = new Date(transformed.startDatum);
+        defaultEnd.setDate(defaultEnd.getDate() + 1);
+        transformed.endDatum = defaultEnd.toISOString();
       }
+    } else {
+      // Ensure endDatum is never undefined or empty
+      const defaultEnd = new Date(transformed.startDatum);
+      defaultEnd.setDate(defaultEnd.getDate() + 1);
+      transformed.endDatum = defaultEnd.toISOString();
     }
     
     // Sicherstellen, dass numerische Werte auch wirklich als Zahlen gespeichert werden
-    if (transformed.preis) {
-      transformed.preis = {
-        ...transformed.preis,
-        netto: transformed.preis.netto ? parseFloat(transformed.preis.netto) : 0,
-        brutto: transformed.preis.brutto ? parseFloat(transformed.preis.brutto) : 0,
-        mwst: transformed.preis.mwst ? parseFloat(transformed.preis.mwst) : 19
-      };
-    }
+    transformed.preis = {
+      netto: typeof transformed.preis?.netto === 'number' || parseFloat(transformed.preis?.netto) >= 0 
+        ? parseFloat(transformed.preis?.netto) : 0,
+      brutto: typeof transformed.preis?.brutto === 'number' || parseFloat(transformed.preis?.brutto) >= 0 
+        ? parseFloat(transformed.preis?.brutto) : 0,
+      mwst: typeof transformed.preis?.mwst === 'number' || parseFloat(transformed.preis?.mwst) >= 0 
+        ? parseFloat(transformed.preis?.mwst) : 19,
+      bezahlt: Boolean(transformed.preis?.bezahlt),
+      zahlungsart: ['rechnung', 'bar', 'ueberweisung', 'paypal', 'kreditkarte', 'ec'].includes(transformed.preis?.zahlungsart) 
+        ? transformed.preis?.zahlungsart : 'rechnung'
+    };
     
-    // Sicherstellen, dass Auftraggeber alle erforderlichen Felder hat
-    if (transformed.auftraggeber) {
-      transformed.auftraggeber = {
-        ...transformed.auftraggeber,
-        // Sicherstellen, dass firma immer vorhanden ist, auch wenn leer
-        firma: transformed.auftraggeber.firma || ''
-      };
+    // Sicherstellen, dass Auftraggeber alle erforderlichen Felder hat und nicht leer ist
+    transformed.auftraggeber = {
+      name: transformed.auftraggeber?.name?.trim() || 'Unbekannt',
+      telefon: transformed.auftraggeber?.telefon?.trim() || '00000000000',
+      email: transformed.auftraggeber?.email?.trim() || '',
+      firma: transformed.auftraggeber?.firma?.trim() || ''
+    };
+    
+    // Überprüfe, ob die Telefonnummer dem Backend-Pattern entspricht
+    const phoneRegex = /^[+]?[0-9\s\-\(\)]{8,20}$/;
+    if (!phoneRegex.test(transformed.auftraggeber.telefon)) {
+      console.warn('Telefonnummer entspricht nicht dem erwarteten Format, korrigiere...');
+      // Bereinigen und formatieren der Telefonnummer
+      let phone = transformed.auftraggeber.telefon.replace(/[^\d+\s\-()]/g, '');
+      if (phone.length < 8) phone = '00000000'; // Mindestlänge sicherstellen
+      if (phone.length > 20) phone = phone.substring(0, 20); // Maximallänge sicherstellen
+      transformed.auftraggeber.telefon = phone;
     }
     
     // Sicherstellen, dass auszugsadresse und einzugsadresse korrekt formatiert sind
-    if (transformed.auszugsadresse) {
-      transformed.auszugsadresse = {
-        ...transformed.auszugsadresse,
-        etage: parseInt(transformed.auszugsadresse.etage) || 0,
-        entfernung: parseInt(transformed.auszugsadresse.entfernung) || 0,
-        aufzug: Boolean(transformed.auszugsadresse.aufzug),
-        // Sicherstellen, dass PLZ 5 Ziffern hat
-        plz: transformed.auszugsadresse.plz.trim().padStart(5, '0')
-      };
-    }
+    // und alle erforderlichen Felder enthalten
+    transformed.auszugsadresse = {
+      strasse: transformed.auszugsadresse?.strasse?.trim() || 'Unbekannt',
+      hausnummer: transformed.auszugsadresse?.hausnummer?.trim() || '1',
+      plz: transformed.auszugsadresse?.plz 
+        ? transformed.auszugsadresse.plz.toString().trim().replace(/\D/g, '').padStart(5, '0').substring(0, 5) 
+        : '00000',
+      ort: transformed.auszugsadresse?.ort?.trim() || 'Unbekannt',
+      land: transformed.auszugsadresse?.land?.trim() || 'Deutschland',
+      etage: typeof transformed.auszugsadresse?.etage === 'number' 
+        ? transformed.auszugsadresse.etage 
+        : parseInt(transformed.auszugsadresse?.etage) || 0,
+      entfernung: typeof transformed.auszugsadresse?.entfernung === 'number'
+        ? transformed.auszugsadresse.entfernung
+        : parseInt(transformed.auszugsadresse?.entfernung) || 0,
+      aufzug: Boolean(transformed.auszugsadresse?.aufzug),
+      zusatz: transformed.auszugsadresse?.zusatz?.trim() || ''
+    };
     
-    if (transformed.einzugsadresse) {
-      transformed.einzugsadresse = {
-        ...transformed.einzugsadresse,
-        etage: parseInt(transformed.einzugsadresse.etage) || 0,
-        entfernung: parseInt(transformed.einzugsadresse.entfernung) || 0,
-        aufzug: Boolean(transformed.einzugsadresse.aufzug),
-        // Sicherstellen, dass PLZ 5 Ziffern hat
-        plz: transformed.einzugsadresse.plz.trim().padStart(5, '0')
-      };
-    }
+    transformed.einzugsadresse = {
+      strasse: transformed.einzugsadresse?.strasse?.trim() || 'Unbekannt',
+      hausnummer: transformed.einzugsadresse?.hausnummer?.trim() || '1',
+      plz: transformed.einzugsadresse?.plz 
+        ? transformed.einzugsadresse.plz.toString().trim().replace(/\D/g, '').padStart(5, '0').substring(0, 5) 
+        : '00000',
+      ort: transformed.einzugsadresse?.ort?.trim() || 'Unbekannt',
+      land: transformed.einzugsadresse?.land?.trim() || 'Deutschland',
+      etage: typeof transformed.einzugsadresse?.etage === 'number'
+        ? transformed.einzugsadresse.etage
+        : parseInt(transformed.einzugsadresse?.etage) || 0,
+      entfernung: typeof transformed.einzugsadresse?.entfernung === 'number'
+        ? transformed.einzugsadresse.entfernung
+        : parseInt(transformed.einzugsadresse?.entfernung) || 0,
+      aufzug: Boolean(transformed.einzugsadresse?.aufzug),
+      zusatz: transformed.einzugsadresse?.zusatz?.trim() || ''
+    };
+    
+    // Stellen sicher, dass Arrays korrekt initialisiert sind
+    transformed.zwischenstopps = Array.isArray(transformed.zwischenstopps) ? transformed.zwischenstopps : [];
+    transformed.kontakte = Array.isArray(transformed.kontakte) ? transformed.kontakte : [];
+    transformed.extraLeistungen = Array.isArray(transformed.extraLeistungen) ? transformed.extraLeistungen : [];
     
     // Verarbeiten jedes Mitarbeiterobjekts um sicherzustellen, dass alle erforderlichen Felder vorhanden sind
     if (Array.isArray(transformed.mitarbeiter)) {
-      transformed.mitarbeiter = transformed.mitarbeiter.map(mitarbeiter => ({
-        mitarbeiterId: mitarbeiter.mitarbeiterId,
-        rolle: mitarbeiter.rolle || 'Helfer'
-      }));
+      transformed.mitarbeiter = transformed.mitarbeiter
+        .filter(m => m && m.mitarbeiterId) // Filter out invalid entries
+        .map(mitarbeiter => ({
+          mitarbeiterId: mitarbeiter.mitarbeiterId,
+          // Ensure rolle is one of the allowed backend values
+          rolle: ['Teamleiter', 'Fahrer', 'Träger', 'Helfer'].includes(mitarbeiter.rolle) 
+            ? mitarbeiter.rolle : 'Helfer'
+        }));
+    } else {
+      transformed.mitarbeiter = [];
     }
 
     // Stellen sicher, dass Fahrzeuge die erforderlichen Felder haben
     if (Array.isArray(transformed.fahrzeuge)) {
-      transformed.fahrzeuge = transformed.fahrzeuge.map(fahrzeug => {
-        // Entfernen _id um Konflikte zu vermeiden
-        const { _id, ...rest } = fahrzeug;
-        return rest;
-      });
+      transformed.fahrzeuge = transformed.fahrzeuge
+        .filter(f => f && (f.typ || f.kennzeichen)) // Filter out empty entries
+        .map(fahrzeug => {
+          // Entfernen _id und andere nicht benötigte Felder um Konflikte zu vermeiden
+          const { _id, __v, createdAt, updatedAt, ...usableFields } = fahrzeug;
+          // Nur die erforderlichen Felder behalten
+          return {
+            typ: usableFields.typ || 'Unbekannt',
+            kennzeichen: usableFields.kennzeichen || ''
+          };
+        });
+    } else {
+      transformed.fahrzeuge = [];
     }
+    
+    // Kunde-ID-Feld behandeln (falls es als ObjectId formatiert werden muss)
+    if (transformed.kundennummer === undefined || transformed.kundennummer === null) {
+      transformed.kundennummer = '';
+    }
+    
+    // Aufnahme-ID-Feld behandeln (falls es als ObjectId formatiert werden muss)
+    if (transformed.aufnahmeId === undefined || transformed.aufnahmeId === null || transformed.aufnahmeId === '') {
+      // Entferne das Feld komplett, wenn es keine gültige ID ist
+      delete transformed.aufnahmeId;
+    }
+    
+    // Set appropriate status value from backend's allowed list
+    if (!['geplant', 'bestaetigt', 'in_bearbeitung', 'abgeschlossen', 'storniert'].includes(transformed.status)) {
+      transformed.status = 'geplant'; // Default status if invalid
+    }
+    
+    // Entferne alle undefined/null properties aus dem Objekt, um Validierungsfehler zu vermeiden
+    Object.keys(transformed).forEach(key => {
+      if (transformed[key] === undefined || transformed[key] === null) {
+        delete transformed[key];
+      }
+    });
     
     return transformed;
   }, []);
@@ -394,6 +483,9 @@ export default function UmzugForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Anzeigen, dass die Anfrage verarbeitet wird
+    toast.info('Verarbeite Anfrage...');
+    
     // Erweiterte Validierung vor dem Senden
     const requiredFields = [
       'auftraggeber.name', 
@@ -413,14 +505,18 @@ export default function UmzugForm() {
     const missingFields = [];
     const validationErrors = [];
     
-    // Prüfe verschachtelte Felder
+    // Prüfe verschachtelte Felder - striktere Validierung
     requiredFields.forEach(field => {
       if (field.includes('.')) {
         const [parent, child] = field.split('.');
-        if (!formData[parent] || !formData[parent][child]) {
+        // Prüfen auf leere Strings und Whitespace
+        if (!formData[parent] || 
+            !formData[parent][child] || 
+            (typeof formData[parent][child] === 'string' && formData[parent][child].trim() === '')) {
           missingFields.push(field);
         }
-      } else if (!formData[field]) {
+      } else if (!formData[field] || 
+                (typeof formData[field] === 'string' && formData[field].trim() === '')) {
         missingFields.push(field);
       }
     });
@@ -474,10 +570,37 @@ export default function UmzugForm() {
     
     try {
       // Daten transformieren für API
-      const transformedData = transformUmzugData(formData);
+      let transformedData;
+      try {
+        transformedData = transformUmzugData(formData);
+        // Detailliertes Logging für Debugging
+        console.log('Transformierte Daten zum Speichern:', JSON.stringify(transformedData, null, 2));
+      } catch (transformError) {
+        console.error('Fehler bei der Datentransformation:', transformError);
+        toast.error('Fehler bei der Vorbereitung der Daten: ' + transformError.message);
+        return;
+      }
       
-      // Detailliertes Logging für Debugging
-      console.log('Transformierte Daten zum Speichern:', JSON.stringify(transformedData, null, 2));
+      // Felder nochmals validieren
+      if (!transformedData.auftraggeber.name || transformedData.auftraggeber.name.trim() === '') {
+        toast.error('Der Name des Auftraggebers darf nicht leer sein');
+        return;
+      }
+      
+      if (!transformedData.auftraggeber.telefon || !/^[+]?[0-9\s\-\(\)]{8,20}$/.test(transformedData.auftraggeber.telefon)) {
+        toast.error('Die Telefonnummer des Auftraggebers ist ungültig');
+        return;
+      }
+      
+      if (!transformedData.auszugsadresse.plz || !/^\d{5}$/.test(transformedData.auszugsadresse.plz)) {
+        toast.error('Die PLZ der Auszugsadresse muss 5 Ziffern haben');
+        return;
+      }
+      
+      if (!transformedData.einzugsadresse.plz || !/^\d{5}$/.test(transformedData.einzugsadresse.plz)) {
+        toast.error('Die PLZ der Einzugsadresse muss 5 Ziffern haben');
+        return;
+      }
       
       if (isNeueModus) {
         // Neuen Umzug erstellen mit standardisierter API
@@ -485,20 +608,50 @@ export default function UmzugForm() {
           // Log the exact data being sent to the API for debugging
           console.log('Sending data to API:', JSON.stringify(transformedData, null, 2));
           
+          // Special debug for mitarbeiter and fahrzeuge arrays which often cause issues
+          console.log('Mitarbeiter:', JSON.stringify(transformedData.mitarbeiter, null, 2));
+          console.log('Fahrzeuge:', JSON.stringify(transformedData.fahrzeuge, null, 2));
+          console.log('Adresses:', {
+            auszug: JSON.stringify(transformedData.auszugsadresse, null, 2),
+            einzug: JSON.stringify(transformedData.einzugsadresse, null, 2)
+          });
+          
+          // Aktive Benutzerinformation während der Verarbeitung
+          const toastId = toast.loading('Erstelle Umzug...');
+          
           const response = await umzuegeService.create(transformedData);
           console.log('API response:', response);
+          
+          // Update the loading toast
+          toast.dismiss(toastId);
           
           // Check if response indicates an error
           if (response && !response.success) {
             console.error('API returned error:', response.message, response.errors);
             
-            let errorMsg = response.message || 'Unbekannter Fehler vom Server';
+            // Extract and show detailed validation errors
             if (response.errors && Array.isArray(response.errors)) {
-              const errorDetails = response.errors.map(err => `${err.field || ''}: ${err.message}`).join('; ');
-              errorMsg += `. Details: ${errorDetails}`;
+              console.table(response.errors); // Better display of errors
+              
+              // Group errors by field for easier debugging
+              const errorsByField = {};
+              response.errors.forEach(err => {
+                if (err.field) {
+                  errorsByField[err.field] = err.message;
+                }
+              });
+              console.log('Grouped errors by field:', errorsByField);
+              
+              // Generate a more user-friendly error message for display
+              const errorFieldsList = Object.keys(errorsByField).map(field => 
+                `${field.replace(/\./g, ' > ')}: ${errorsByField[field]}`
+              ).join('\n');
+              
+              toast.error(`Validierungsfehler:\n${errorFieldsList}`);
+            } else {
+              // Generic error message
+              toast.error(response.message || 'Ein Fehler ist aufgetreten');
             }
-            
-            toast.error(errorMsg);
             return;
           }
           
@@ -515,34 +668,71 @@ export default function UmzugForm() {
           
           // Detaillierte Fehlerbehandlung
           let errorMessage = 'Der Umzug konnte nicht gespeichert werden.';
+          let errorDetails = [];
           
-          // Prüfen auf API-Fehlerantwort mit formatApiError Format
+          // Behandlung verschiedener Fehlertypen
           if (error.errors && Array.isArray(error.errors)) {
-            // Validierungsfehler anzeigen
-            const errorDetails = error.errors.map(err => `${err.field || ''}: ${err.message}`).join('; ');
-            errorMessage += ` Validierungsfehler: ${errorDetails}`;
+            // Validierungsfehler aus dem formatApiError Format
+            errorDetails = error.errors.map(err => `${err.field || ''}: ${err.message}`);
           } else if (error.response && error.response.data) {
-            // Direct response error
+            // Direkte Response-Fehler
             const data = error.response.data;
-            if (data.message) errorMessage += ` ${data.message}`;
+            
+            if (data.message) {
+              errorMessage = data.message;
+            }
             
             if (data.errors && Array.isArray(data.errors)) {
-              const errorDetails = data.errors.map(err => 
-                `${err.field || err.param || ''}: ${err.message || err.msg || ''}`).join('; ');
-              errorMessage += `. Details: ${errorDetails}`;
+              errorDetails = data.errors.map(err => 
+                `${err.field || err.param || ''}: ${err.message || err.msg || ''}`);
             }
           } else if (error.message) {
-            errorMessage += ` ${error.message}`;
+            errorMessage = error.message;
           }
           
-          toast.error(errorMessage);
+          // Anzeigen der detaillierten Fehlermeldung
+          if (errorDetails.length > 0) {
+            toast.error(`${errorMessage}\n\nDetails:\n${errorDetails.join('\n')}`);
+          } else {
+            toast.error(errorMessage);
+          }
+          
+          // Zusätzliche Hilfestellung für häufige Fehler
+          if (error.response && error.response.status === 400) {
+            toast.info('Tipp: Überprüfen Sie die Pflichtfelder sowie das Format von PLZ und Telefonnummer');
+          } else if (!error.response) {
+            toast.info('Tipp: Überprüfen Sie Ihre Internetverbindung');
+          }
         }
       } else {
         // Bestehenden Umzug aktualisieren mit standardisierter API
         try {
-          const response = await umzuegeService.update(id, transformedData);
-          const responseData = extractApiData(response);
+          // Aktive Benutzerinformation während der Verarbeitung
+          const toastId = toast.loading('Aktualisiere Umzug...');
           
+          const response = await umzuegeService.update(id, transformedData);
+          
+          // Update the loading toast
+          toast.dismiss(toastId);
+          
+          // Check if response indicates an error
+          if (response && !response.success) {
+            console.error('API error on update:', response.message, response.errors);
+            
+            if (response.errors && Array.isArray(response.errors)) {
+              // Generate a more user-friendly error message
+              const errorMessage = response.errors.map(err => 
+                `${err.field || ''}: ${err.message || ''}`
+              ).join('\n');
+              
+              toast.error(`Fehler beim Aktualisieren:\n${errorMessage}`);
+            } else {
+              toast.error(response.message || 'Ein Fehler ist aufgetreten');
+            }
+            return;
+          }
+          
+          const responseData = extractApiData(response);
           if (!responseData) {
             throw new Error('Keine gültige Antwort vom Server erhalten');
           }
@@ -552,9 +742,22 @@ export default function UmzugForm() {
         } catch (error) {
           console.error('Fehler beim Aktualisieren des Umzugs:', error);
           
-          // Fehlermeldung mit Toast statt Alert
+          // Fehlermeldung mit Toast
           let errorMessage = 'Der Umzug konnte nicht aktualisiert werden. ';
-          if (error.message) {
+          
+          if (error.response && error.response.data) {
+            if (error.response.data.message) {
+              errorMessage += error.response.data.message;
+            }
+            
+            if (error.response.data.errors && Array.isArray(error.response.data.errors)) {
+              const details = error.response.data.errors.map(err => 
+                `${err.field || err.param || ''}: ${err.message || err.msg || ''}`
+              ).join('\n');
+              
+              errorMessage += `\n\nDetails:\n${details}`;
+            }
+          } else if (error.message) {
             errorMessage += error.message;
           }
           
