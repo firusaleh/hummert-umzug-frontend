@@ -48,6 +48,13 @@ export const logError = (operation, error, context = {}) => {
  * @returns {Object} - Standardized error object
  */
 export const formatApiError = (error, defaultMessage = 'Ein Fehler ist aufgetreten') => {
+  // Log the complete error object for debugging
+  console.error('Complete error object:', error);
+  if (error.response) {
+    console.error('Response data:', error.response.data);
+    console.error('Response status:', error.response.status);
+  }
+
   // Default error response
   const formattedError = {
     success: false,
@@ -66,6 +73,14 @@ export const formatApiError = (error, defaultMessage = 'Ein Fehler ist aufgetret
     if (status === 400) {
       formattedError.message = data?.message || 'Ungültige Anfrage';
       formattedError.errors = data?.errors || null;
+      
+      // For debugging validation errors
+      console.error('400 Bad Request Details:', {
+        message: data?.message,
+        errors: data?.errors,
+        validationError: data?.validationError,
+        fullData: data
+      });
     } else if (status === 401) {
       formattedError.message = 'Sitzung abgelaufen oder nicht angemeldet';
       // Don't pass auth errors back to component

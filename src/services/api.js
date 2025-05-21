@@ -107,10 +107,20 @@ const createService = (basePath) => {
     
     create: async (data) => {
       try {
+        // Detailed logging for debugging validation errors
+        console.log(`Sending POST to ${basePath} with data:`, JSON.stringify(data, null, 2));
         const response = await api.post(basePath, data);
         return response.data;
       } catch (error) {
         logError(`create ${basePath}`, error);
+        // Log full error response for debugging
+        console.error('Complete error response:', error.response);
+        if (error.response && error.response.data) {
+          console.error('Server response data:', error.response.data);
+          if (error.response.data.errors) {
+            console.error('Validation errors:', error.response.data.errors);
+          }
+        }
         return formatApiError(error, `Fehler beim Erstellen`);
       }
     },

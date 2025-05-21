@@ -15,7 +15,8 @@ export default function UmzugForm() {
     auftraggeber: {
       name: '',
       telefon: '',
-      email: ''
+      email: '',
+      firma: '' // Adding firma field which is in the validator schema
     },
     kontakte: [],
     auszugsadresse: {
@@ -41,7 +42,7 @@ export default function UmzugForm() {
     zwischenstopps: [],
     startDatum: '',
     endDatum: '',
-    status: 'angefragt',
+    status: 'geplant',
     preis: {
       netto: '',
       brutto: '',
@@ -68,7 +69,13 @@ export default function UmzugForm() {
     // Datumsfelder korrekt formatieren
     if (transformed.startDatum) {
       try {
-        transformed.startDatum = new Date(transformed.startDatum).toISOString();
+        // Make sure the date is valid before converting
+        const date = new Date(transformed.startDatum);
+        if (isNaN(date.getTime())) {
+          console.error('Ungültiges Startdatum:', transformed.startDatum);
+        } else {
+          transformed.startDatum = date.toISOString();
+        }
       } catch (error) {
         console.error('Fehler beim Formatieren des Startdatums:', error);
       }
@@ -76,7 +83,13 @@ export default function UmzugForm() {
     
     if (transformed.endDatum) {
       try {
-        transformed.endDatum = new Date(transformed.endDatum).toISOString();
+        // Make sure the date is valid before converting
+        const date = new Date(transformed.endDatum);
+        if (isNaN(date.getTime())) {
+          console.error('Ungültiges Enddatum:', transformed.endDatum);
+        } else {
+          transformed.endDatum = date.toISOString();
+        }
       } catch (error) {
         console.error('Fehler beim Formatieren des Enddatums:', error);
       }
@@ -92,12 +105,24 @@ export default function UmzugForm() {
       };
     }
     
+    // Sicherstellen, dass Auftraggeber alle erforderlichen Felder hat
+    if (transformed.auftraggeber) {
+      transformed.auftraggeber = {
+        ...transformed.auftraggeber,
+        // Sicherstellen, dass firma immer vorhanden ist, auch wenn leer
+        firma: transformed.auftraggeber.firma || ''
+      };
+    }
+    
     // Sicherstellen, dass auszugsadresse und einzugsadresse korrekt formatiert sind
     if (transformed.auszugsadresse) {
       transformed.auszugsadresse = {
         ...transformed.auszugsadresse,
         etage: parseInt(transformed.auszugsadresse.etage) || 0,
-        entfernung: parseInt(transformed.auszugsadresse.entfernung) || 0
+        entfernung: parseInt(transformed.auszugsadresse.entfernung) || 0,
+        aufzug: Boolean(transformed.auszugsadresse.aufzug),
+        // Sicherstellen, dass PLZ 5 Ziffern hat
+        plz: transformed.auszugsadresse.plz.trim().padStart(5, '0')
       };
     }
     
@@ -105,8 +130,28 @@ export default function UmzugForm() {
       transformed.einzugsadresse = {
         ...transformed.einzugsadresse,
         etage: parseInt(transformed.einzugsadresse.etage) || 0,
-        entfernung: parseInt(transformed.einzugsadresse.entfernung) || 0
+        entfernung: parseInt(transformed.einzugsadresse.entfernung) || 0,
+        aufzug: Boolean(transformed.einzugsadresse.aufzug),
+        // Sicherstellen, dass PLZ 5 Ziffern hat
+        plz: transformed.einzugsadresse.plz.trim().padStart(5, '0')
       };
+    }
+    
+    // Verarbeiten jedes Mitarbeiterobjekts um sicherzustellen, dass alle erforderlichen Felder vorhanden sind
+    if (Array.isArray(transformed.mitarbeiter)) {
+      transformed.mitarbeiter = transformed.mitarbeiter.map(mitarbeiter => ({
+        mitarbeiterId: mitarbeiter.mitarbeiterId,
+        rolle: mitarbeiter.rolle || 'Helfer'
+      }));
+    }
+
+    // Stellen sicher, dass Fahrzeuge die erforderlichen Felder haben
+    if (Array.isArray(transformed.fahrzeuge)) {
+      transformed.fahrzeuge = transformed.fahrzeuge.map(fahrzeug => {
+        // Entfernen _id um Konflikte zu vermeiden
+        const { _id, ...rest } = fahrzeug;
+        return rest;
+      });
     }
     
     return transformed;
@@ -268,7 +313,7 @@ export default function UmzugForm() {
         // Mitarbeiter hinzufügen
         neueMitarbeiter.push({
           mitarbeiterId: mitarbeiterId,
-          rolle: 'helfer'
+          rolle: 'Helfer'
         });
       }
       
@@ -349,7 +394,7 @@ export default function UmzugForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Grundlegende Validierung vor dem Senden
+    // Erweiterte Validierung vor dem Senden
     const requiredFields = [
       'auftraggeber.name', 
       'auftraggeber.telefon',
@@ -366,6 +411,7 @@ export default function UmzugForm() {
     ];
 
     const missingFields = [];
+    const validationErrors = [];
     
     // Prüfe verschachtelte Felder
     requiredFields.forEach(field => {
@@ -379,8 +425,50 @@ export default function UmzugForm() {
       }
     });
 
+    // PLZ-Validierung (deutsches Format)
+    if (formData.auszugsadresse?.plz && !/^\d{5}$/.test(formData.auszugsadresse.plz)) {
+      validationErrors.push('Auszugsadresse: PLZ muss 5 Ziffern haben');
+    }
+    if (formData.einzugsadresse?.plz && !/^\d{5}$/.test(formData.einzugsadresse.plz)) {
+      validationErrors.push('Einzugsadresse: PLZ muss 5 Ziffern haben');
+    }
+    
+    // Telefonnummer-Validierung (basierend auf Backend-Validator-Pattern)
+    if (formData.auftraggeber?.telefon && !/^[+]?[0-9\s\-\(\)]{8,20}$/.test(formData.auftraggeber.telefon)) {
+      validationErrors.push('Telefonnummer hat ein ungültiges Format (erlaubt sind Zahlen, Leerzeichen, Klammern und Bindestriche)');
+    }
+
+    // Prüfen, ob das Startdatum vor dem Enddatum liegt
+    if (formData.startDatum && formData.endDatum) {
+      const startDate = new Date(formData.startDatum);
+      const endDate = new Date(formData.endDatum);
+      if (startDate > endDate) {
+        validationErrors.push('Startdatum muss vor dem Enddatum liegen');
+      }
+    }
+
+    // Status-Validierung gegen gültige Werte vom Backend
+    const validStatusValues = ['geplant', 'bestaetigt', 'in_bearbeitung', 'abgeschlossen', 'storniert'];
+    if (formData.status && !validStatusValues.includes(formData.status)) {
+      validationErrors.push('Ungültiger Status');
+    }
+
+    // Rollen-Validierung für Mitarbeiter gegen gültige Werte vom Backend
+    const validRollen = ['Teamleiter', 'Träger', 'Fahrer', 'Helfer'];
+    if (formData.mitarbeiter?.length) {
+      const invalidRoles = formData.mitarbeiter.filter(m => m.rolle && !validRollen.includes(m.rolle));
+      if (invalidRoles.length > 0) {
+        validationErrors.push('Ungültige Mitarbeiterrolle festgestellt');
+      }
+    }
+
     if (missingFields.length > 0) {
       toast.error(`Folgende Pflichtfelder fehlen oder sind ungültig: ${missingFields.join(', ')}`);
+      return;
+    }
+
+    if (validationErrors.length > 0) {
+      toast.error(`Validierungsfehler: ${validationErrors.join('; ')}`);
       return;
     }
     
@@ -388,16 +476,34 @@ export default function UmzugForm() {
       // Daten transformieren für API
       const transformedData = transformUmzugData(formData);
       
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('Transformierte Daten zum Speichern:', transformedData);
-      }
+      // Detailliertes Logging für Debugging
+      console.log('Transformierte Daten zum Speichern:', JSON.stringify(transformedData, null, 2));}
       
       if (isNeueModus) {
         // Neuen Umzug erstellen mit standardisierter API
         try {
-          const response = await umzuegeService.create(transformedData);
-          const responseData = extractApiData(response);
+          // Log the exact data being sent to the API for debugging
+          console.log('Sending data to API:', JSON.stringify(transformedData, null, 2));
           
+          const response = await umzuegeService.create(transformedData);
+          console.log('API response:', response);
+          
+          // Check if response indicates an error
+          if (response && !response.success) {
+            console.error('API returned error:', response.message, response.errors);
+            
+            let errorMsg = response.message || 'Unbekannter Fehler vom Server';
+            if (response.errors && Array.isArray(response.errors)) {
+              const errorDetails = response.errors.map(err => `${err.field || ''}: ${err.message}`).join('; ');
+              errorMsg += `. Details: ${errorDetails}`;
+            }
+            
+            toast.error(errorMsg);
+            return;
+          }
+          
+          // Extract data from successful response
+          const responseData = extractApiData(response);
           if (!responseData) {
             throw new Error('Keine gültige Antwort vom Server erhalten');
           }
@@ -407,10 +513,26 @@ export default function UmzugForm() {
         } catch (error) {
           console.error('Fehler beim Erstellen des Umzugs:', error);
           
-          // Fehlermeldung mit Toast statt Alert
-          let errorMessage = 'Der Umzug konnte nicht gespeichert werden. ';
-          if (error.message) {
-            errorMessage += error.message;
+          // Detaillierte Fehlerbehandlung
+          let errorMessage = 'Der Umzug konnte nicht gespeichert werden.';
+          
+          // Prüfen auf API-Fehlerantwort mit formatApiError Format
+          if (error.errors && Array.isArray(error.errors)) {
+            // Validierungsfehler anzeigen
+            const errorDetails = error.errors.map(err => `${err.field || ''}: ${err.message}`).join('; ');
+            errorMessage += ` Validierungsfehler: ${errorDetails}`;
+          } else if (error.response && error.response.data) {
+            // Direct response error
+            const data = error.response.data;
+            if (data.message) errorMessage += ` ${data.message}`;
+            
+            if (data.errors && Array.isArray(data.errors)) {
+              const errorDetails = data.errors.map(err => 
+                `${err.field || err.param || ''}: ${err.message || err.msg || ''}`).join('; ');
+              errorMessage += `. Details: ${errorDetails}`;
+            }
+          } else if (error.message) {
+            errorMessage += ` ${error.message}`;
           }
           
           toast.error(errorMessage);
@@ -493,9 +615,8 @@ export default function UmzugForm() {
                 onChange={handleInputChange}
                 className="w-full p-2 border rounded focus:ring focus:ring-blue-200 focus:border-blue-500"
               >
-                <option value="angefragt">Angefragt</option>
-                <option value="angebot">Angebot</option>
                 <option value="geplant">Geplant</option>
+                <option value="bestaetigt">Bestätigt</option>
                 <option value="in_bearbeitung">In Bearbeitung</option>
                 <option value="abgeschlossen">Abgeschlossen</option>
                 <option value="storniert">Storniert</option>
@@ -506,7 +627,7 @@ export default function UmzugForm() {
           <div className="mt-4 p-4 border rounded-lg bg-gray-50">
             <h3 className="text-lg font-medium mb-3">Auftraggeber</h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Name *
@@ -521,6 +642,21 @@ export default function UmzugForm() {
                 />
               </div>
               
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Firma
+                </label>
+                <input
+                  type="text"
+                  name="auftraggeber.firma"
+                  value={formData.auftraggeber.firma}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded focus:ring focus:ring-blue-200 focus:border-blue-500"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Telefon *
@@ -966,9 +1102,10 @@ export default function UmzugForm() {
                           onClick={(e) => e.stopPropagation()}
                           className="text-sm border-gray-300 rounded"
                         >
-                          <option value="fahrer">Fahrer</option>
-                          <option value="helfer">Helfer</option>
-                          <option value="projektleiter">Projektleiter</option>
+                          <option value="Fahrer">Fahrer</option>
+                          <option value="Helfer">Helfer</option>
+                          <option value="Teamleiter">Teamleiter</option>
+                          <option value="Träger">Träger</option>
                         </select>
                       )}
                     </div>
