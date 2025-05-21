@@ -206,12 +206,32 @@ export default function UmzugForm() {
     if (Array.isArray(transformed.mitarbeiter)) {
       transformed.mitarbeiter = transformed.mitarbeiter
         .filter(m => m && m.mitarbeiterId) // Filter out invalid entries
-        .map(mitarbeiter => ({
-          mitarbeiterId: mitarbeiter.mitarbeiterId,
-          // Ensure rolle is one of the allowed backend values
-          rolle: ['Teamleiter', 'Fahrer', 'Träger', 'Helfer'].includes(mitarbeiter.rolle) 
-            ? mitarbeiter.rolle : 'Helfer'
-        }));
+        .map(mitarbeiter => {
+          // Get the role and map it to the correct case-sensitive value expected by the backend
+          let rolleValue = 'helfer'; // Default role
+          
+          // Role mapping - convert to the exact case expected by the backend
+          const rolleMapping = {
+            'teamleiter': 'teamleiter',
+            'Teamleiter': 'teamleiter',
+            'fahrer': 'fahrer',
+            'Fahrer': 'fahrer',
+            'träger': 'träger',
+            'Träger': 'träger',
+            'traeger': 'träger',
+            'helfer': 'helfer',
+            'Helfer': 'helfer'
+          };
+          
+          if (mitarbeiter.rolle && rolleMapping[mitarbeiter.rolle]) {
+            rolleValue = rolleMapping[mitarbeiter.rolle];
+          }
+          
+          return {
+            mitarbeiterId: mitarbeiter.mitarbeiterId,
+            rolle: rolleValue
+          };
+        });
     } else {
       transformed.mitarbeiter = [];
     }
@@ -414,10 +434,10 @@ export default function UmzugForm() {
         // Mitarbeiter entfernen
         neueMitarbeiter.splice(mitarbeiterIndex, 1);
       } else {
-        // Mitarbeiter hinzufügen
+        // Mitarbeiter hinzufügen mit korrekter Rolle für Backend
         neueMitarbeiter.push({
           mitarbeiterId: mitarbeiterId,
-          rolle: 'Helfer'
+          rolle: 'helfer' // Lowercase to match backend enum
         });
       }
       
@@ -565,11 +585,12 @@ export default function UmzugForm() {
     }
 
     // Rollen-Validierung für Mitarbeiter gegen gültige Werte vom Backend
-    const validRollen = ['Teamleiter', 'Träger', 'Fahrer', 'Helfer'];
+    const validRollen = ['teamleiter', 'träger', 'fahrer', 'helfer']; // Case sensitive - must match backend enum values
     if (formData.mitarbeiter?.length) {
       const invalidRoles = formData.mitarbeiter.filter(m => m.rolle && !validRollen.includes(m.rolle));
       if (invalidRoles.length > 0) {
-        validationErrors.push('Ungültige Mitarbeiterrolle festgestellt');
+        validationErrors.push('Ungültige Mitarbeiterrolle festgestellt: ' + 
+          invalidRoles.map(m => m.rolle).join(', '));
       }
     }
 
@@ -646,6 +667,14 @@ export default function UmzugForm() {
           
           // Special debug for mitarbeiter and fahrzeuge arrays which often cause issues
           console.log('Mitarbeiter:', JSON.stringify(transformedData.mitarbeiter, null, 2));
+          // Extra validation check for roles to help debug
+          if (transformedData.mitarbeiter && transformedData.mitarbeiter.length > 0) {
+            console.log('Mitarbeiter roles check:');
+            transformedData.mitarbeiter.forEach((m, idx) => {
+              console.log(`Mitarbeiter ${idx}: role=${m.rolle}, valid=${['teamleiter', 'träger', 'fahrer', 'helfer'].includes(m.rolle)}`);
+            });
+          }
+          
           console.log('Fahrzeuge:', JSON.stringify(transformedData.fahrzeuge, null, 2));
           console.log('Adresses:', {
             auszug: JSON.stringify(transformedData.auszugsadresse, null, 2),
@@ -1336,7 +1365,7 @@ export default function UmzugForm() {
                       
                       {isSelected && (
                         <select
-                          value={selectedMitarbeiter?.rolle || 'Helfer'}
+                          value={selectedMitarbeiter?.rolle || 'helfer'}
                           onChange={(e) => {
                             e.stopPropagation();
                             handleMitarbeiterRolleChange(mitarbeiter._id, e.target.value);
@@ -1344,10 +1373,10 @@ export default function UmzugForm() {
                           onClick={(e) => e.stopPropagation()}
                           className="text-sm border-gray-300 rounded"
                         >
-                          <option value="Fahrer">Fahrer</option>
-                          <option value="Helfer">Helfer</option>
-                          <option value="Teamleiter">Teamleiter</option>
-                          <option value="Träger">Träger</option>
+                          <option value="fahrer">Fahrer</option>
+                          <option value="helfer">Helfer</option>
+                          <option value="teamleiter">Teamleiter</option>
+                          <option value="träger">Träger</option>
                         </select>
                       )}
                     </div>
