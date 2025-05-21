@@ -756,6 +756,77 @@ export const finanzenService = {
 export const zeiterfassungService = {
   ...createService('/zeiterfassung'),
   
+  // Get all available employees for time tracking
+  getMitarbeiter: async () => {
+    try {
+      // Using the correct endpoint from zeiterfassung.routes.js
+      const response = await api.get('/zeiterfassung/mitarbeiter');
+      return response;
+    } catch (error) {
+      logError('zeiterfassung:getMitarbeiter', error);
+      return formatApiError(error, 'Fehler beim Laden der Mitarbeiterdaten');
+    }
+  },
+  
+  // Get all available projects for time tracking
+  getUmzugsprojekte: async () => {
+    try {
+      // Using the correct endpoint from zeiterfassung.routes.js
+      const response = await api.get('/zeiterfassung/projekte');
+      return response;
+    } catch (error) {
+      logError('zeiterfassung:getUmzugsprojekte', error);
+      return formatApiError(error, 'Fehler beim Laden der Projektdaten');
+    }
+  },
+  
+  // Get time entries for a specific project
+  getZeiterfassungen: async (projektId) => {
+    try {
+      const response = await api.get(`/zeiterfassung/projekt/${projektId}`);
+      return response;
+    } catch (error) {
+      logError(`zeiterfassung:getZeiterfassungen/${projektId}`, error);
+      return formatApiError(error, 'Fehler beim Laden der Zeiterfassungen für das Projekt');
+    }
+  },
+  
+  // Add a new time entry
+  addZeiterfassung: async (data) => {
+    try {
+      // Using the correct endpoint from zeiterfassung.routes.js
+      const response = await api.post('/zeiterfassung', data);
+      return response;
+    } catch (error) {
+      logError('zeiterfassung:addZeiterfassung', error);
+      return formatApiError(error, 'Fehler beim Hinzufügen der Zeiterfassung');
+    }
+  },
+  
+  // Update an existing time entry
+  updateZeiterfassung: async (id, data) => {
+    try {
+      // Using the correct endpoint from zeiterfassung.routes.js
+      const response = await api.put(`/zeiterfassung/${id}`, data);
+      return response;
+    } catch (error) {
+      logError(`zeiterfassung:updateZeiterfassung/${id}`, error);
+      return formatApiError(error, 'Fehler beim Aktualisieren der Zeiterfassung');
+    }
+  },
+  
+  // Delete a time entry
+  deleteZeiterfassung: async (id) => {
+    try {
+      // Using the correct endpoint from zeiterfassung.routes.js
+      const response = await api.delete(`/zeiterfassung/${id}`);
+      return response;
+    } catch (error) {
+      logError(`zeiterfassung:deleteZeiterfassung/${id}`, error);
+      return formatApiError(error, 'Fehler beim Löschen der Zeiterfassung');
+    }
+  },
+  
   getEintraege: async (params) => {
     try {
       const response = await api.get('/zeiterfassung/eintraege', { params });

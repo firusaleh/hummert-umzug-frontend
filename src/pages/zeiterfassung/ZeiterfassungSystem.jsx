@@ -33,13 +33,30 @@ export default function ZeiterfassungSystem() {
       try {
         // Laden der Mitarbeiter
         const mitarbeiterResponse = await zeiterfassungService.getMitarbeiter();
-        setMitarbeiter(mitarbeiterResponse.data);
+        if (mitarbeiterResponse.success === false) {
+          throw new Error(mitarbeiterResponse.message || 'Fehler beim Laden der Mitarbeiter');
+        }
+        
+        // Extract mitarbeiter data from the response
+        // Backend route /zeiterfassung/mitarbeiter returns the data directly in response.data
+        const mitarbeiterData = mitarbeiterResponse.data || [];
+        console.log('Mitarbeiter geladen:', mitarbeiterData);
+        setMitarbeiter(Array.isArray(mitarbeiterData) ? mitarbeiterData : []);
         
         // Laden der Umzugsprojekte
         const projekteResponse = await zeiterfassungService.getUmzugsprojekte();
-        setUmzugsprojekte(projekteResponse.data);
+        if (projekteResponse.success === false) {
+          throw new Error(projekteResponse.message || 'Fehler beim Laden der Projekte');
+        }
+        
+        // Extract umzuege data from the response
+        // Backend route /zeiterfassung/projekte returns the data directly in response.data
+        const projekteData = projekteResponse.data || [];
+        console.log('Projekte geladen:', projekteData);
+        setUmzugsprojekte(Array.isArray(projekteData) ? projekteData : []);
       } catch (error) {
-        setError('Fehler beim Laden der Mitarbeiter und Projekte.');
+        console.error('Fehler beim Laden der Daten:', error);
+        setError(`Fehler beim Laden der Mitarbeiter und Projekte: ${error.message}`);
       } finally {
         setLoading(false);
       }
@@ -58,9 +75,18 @@ export default function ZeiterfassungSystem() {
       
       try {
         const zeiterfassungenResponse = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
-        setZeiterfassungen(zeiterfassungenResponse.data);
+        if (zeiterfassungenResponse.success === false) {
+          throw new Error(zeiterfassungenResponse.message || 'Fehler beim Laden der Zeiterfassungen');
+        }
+        
+        // Extract time entries data from the response
+        // Backend route /zeiterfassung/projekt/:projektId returns the data directly in response.data
+        const zeiterfassungenData = zeiterfassungenResponse.data || [];
+        console.log('Zeiterfassungen geladen:', zeiterfassungenData);
+        setZeiterfassungen(Array.isArray(zeiterfassungenData) ? zeiterfassungenData : []);
       } catch (error) {
-        setError('Die Zeiterfassungen konnten nicht geladen werden.');
+        console.error('Fehler beim Laden der Zeiterfassungen:', error);
+        setError(`Die Zeiterfassungen konnten nicht geladen werden: ${error.message}`);
         setZeiterfassungen([]);
       } finally {
         setLoading(false);
@@ -93,6 +119,7 @@ export default function ZeiterfassungSystem() {
   const resetForm = () => {
     setFormular({
       mitarbeiterId: '',
+      // Always set projektId to the current selected project
       projektId: aktuellesProjekt,
       datum: new Date().toISOString().split('T')[0],
       startzeit: '',
@@ -133,41 +160,85 @@ export default function ZeiterfassungSystem() {
     e.preventDefault();
     
     try {
+      // Validate form before submission
+      if (!formular.mitarbeiterId) {
+        throw new Error('Bitte wählen Sie einen Mitarbeiter aus');
+      }
+      
+      if (!formular.startzeit || !formular.endzeit) {
+        throw new Error('Bitte geben Sie Start- und Endzeit an');
+      }
+      
+      if (!formular.taetigkeit) {
+        throw new Error('Bitte geben Sie eine Tätigkeit an');
+      }
+      
+      if (!aktuellesProjekt) {
+        throw new Error('Bitte wählen Sie zuerst ein Projekt aus');
+      }
+      
       const arbeitsstunden = berechneArbeitsstunden(
         formular.startzeit,
         formular.endzeit,
         parseInt(formular.pause, 10)
       );
       
+      // Check if the calculated hours make sense
+      if (arbeitsstunden <= 0) {
+        throw new Error('Die Arbeitszeit muss größer als 0 sein. Bitte prüfen Sie Start- und Endzeit sowie Pause.');
+      }
+      
+      // Ensure projektId is set to the current project
       const zeiterfassungDaten = {
         ...formular,
+        projektId: aktuellesProjekt, // Make sure this is set correctly
         pause: parseInt(formular.pause, 10),
         arbeitsstunden
       };
       
+      console.log('Speichere Zeiterfassung:', zeiterfassungDaten);
+      
       setLoading(true);
       setError(null);
       
+      let submitResponse;
+      
       if (bearbeitungId) {
         // Update einer bestehenden Zeiterfassung
-        await zeiterfassungService.updateZeiterfassung(bearbeitungId, zeiterfassungDaten);
-        
-        // Lade aktualisierte Daten vom Server
-        const response = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
-        setZeiterfassungen(response.data);
+        submitResponse = await zeiterfassungService.updateZeiterfassung(bearbeitungId, zeiterfassungDaten);
+        if (submitResponse.success === false) {
+          throw new Error(submitResponse.message || 'Fehler beim Aktualisieren der Zeiterfassung');
+        }
+        console.log('Zeiterfassung aktualisiert:', submitResponse);
       } else {
         // Erstellen einer neuen Zeiterfassung
-        await zeiterfassungService.addZeiterfassung(zeiterfassungDaten);
-        
-        // Lade aktualisierte Daten vom Server
-        const response = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
-        setZeiterfassungen(response.data);
+        submitResponse = await zeiterfassungService.addZeiterfassung(zeiterfassungDaten);
+        if (submitResponse.success === false) {
+          throw new Error(submitResponse.message || 'Fehler beim Erstellen der Zeiterfassung');
+        }
+        console.log('Zeiterfassung erstellt:', submitResponse);
       }
+      
+      // Lade aktualisierte Daten vom Server
+      // Make sure we reload the data from the server after adding/updating
+      const response = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
+      if (response.success === false) {
+        throw new Error(response.message || 'Fehler beim Laden der aktualisierten Zeiterfassungen');
+      }
+      
+      // Extract updated time entries - the backend returns the list directly
+      const zeiterfassungenData = response.data || [];
+      console.log('Aktualisierte Zeiterfassungen geladen:', zeiterfassungenData);
+      setZeiterfassungen(Array.isArray(zeiterfassungenData) ? zeiterfassungenData : []);
       
       // Formular zurücksetzen
       resetForm();
+      
+      // Erfolgsbenachrichtigung
+      alert(bearbeitungId ? 'Zeiterfassung erfolgreich aktualisiert!' : 'Zeiterfassung erfolgreich gespeichert!');
     } catch (error) {
-      setError(`Die Zeiterfassung konnte nicht gespeichert werden.`);
+      console.error('Fehler beim Speichern der Zeiterfassung:', error);
+      setError(`Die Zeiterfassung konnte nicht gespeichert werden: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -180,13 +251,29 @@ export default function ZeiterfassungSystem() {
       setError(null);
       
       try {
-        await zeiterfassungService.deleteZeiterfassung(id);
+        const deleteResponse = await zeiterfassungService.deleteZeiterfassung(id);
+        if (deleteResponse.success === false) {
+          throw new Error(deleteResponse.message || 'Fehler beim Löschen der Zeiterfassung');
+        }
+        
+        console.log('Zeiterfassung gelöscht:', deleteResponse);
         
         // Lade aktualisierte Daten vom Server
         const response = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
-        setZeiterfassungen(response.data);
+        if (response.success === false) {
+          throw new Error(response.message || 'Fehler beim Laden der aktualisierten Zeiterfassungen');
+        }
+        
+        // Extract updated time entries
+        const zeiterfassungenData = response.data || [];
+        console.log('Aktualisierte Zeiterfassungen nach Löschen:', zeiterfassungenData);
+        setZeiterfassungen(Array.isArray(zeiterfassungenData) ? zeiterfassungenData : []);
+                            
+        // Erfolgsbenachrichtigung
+        alert('Zeiterfassung erfolgreich gelöscht!');
       } catch (error) {
-        setError(`Die Zeiterfassung konnte nicht gelöscht werden.`);
+        console.error('Fehler beim Löschen der Zeiterfassung:', error);
+        setError(`Die Zeiterfassung konnte nicht gelöscht werden: ${error.message}`);
       } finally {
         setLoading(false);
       }
