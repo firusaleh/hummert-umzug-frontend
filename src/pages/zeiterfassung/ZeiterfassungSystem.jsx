@@ -54,7 +54,7 @@ export default function ZeiterfassungSystem() {
       try {
         // Lade Mitarbeiter mit der neuen utility Funktion
         const mitarbeiterResponse = await zeiterfassungService.getMitarbeiter();
-        console.log('Mitarbeiter Response erhalten:', mitarbeiterResponse);
+        // Mitarbeiter Response erhalten
         
         // Prüfe auf Fehler mit dem Error Handler
         if (isErrorResponse(mitarbeiterResponse)) {
@@ -74,11 +74,11 @@ export default function ZeiterfassungSystem() {
             []
           );
           
-          console.log('Extrahierte Mitarbeiterliste:', mitarbeiterListe);
+          // Mitarbeiterliste erfolgreich extrahiert
           
           // Wenn keine Mitarbeiter geladen werden konnten
           if (mitarbeiterListe.length === 0) {
-            console.warn('Keine Mitarbeiter vom Server geladen!');
+            // Warnung: Keine Mitarbeiter vom Server geladen
           }
           
           setMitarbeiter(mitarbeiterListe);
@@ -86,7 +86,7 @@ export default function ZeiterfassungSystem() {
         
         // Lade Projekte mit der gleichen utility Funktion
         const projekteResponse = await zeiterfassungService.getUmzugsprojekte();
-        console.log('Projekte Response erhalten:', projekteResponse);
+        // Projekte Response erhalten
         
         // Prüfe auf Fehler mit dem Error Handler
         if (isErrorResponse(projekteResponse)) {
@@ -106,11 +106,11 @@ export default function ZeiterfassungSystem() {
             []
           );
           
-          console.log('Extrahierte Projektliste:', projekteListe);
+          // Projektliste erfolgreich extrahiert
           
           // Wenn keine Projekte geladen werden konnten
           if (projekteListe.length === 0) {
-            console.warn('Keine Projekte vom Server geladen!');
+            // Warnung: Keine Projekte vom Server geladen
           }
           
           setUmzugsprojekte(projekteListe);
@@ -140,7 +140,7 @@ export default function ZeiterfassungSystem() {
       
       try {
         const zeiterfassungenResponse = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
-        console.log('Zeiterfassungen Response erhalten:', zeiterfassungenResponse);
+        // Zeiterfassungen Response erhalten
         
         // Prüfe auf Fehler
         if (isErrorResponse(zeiterfassungenResponse)) {
@@ -154,7 +154,7 @@ export default function ZeiterfassungSystem() {
           []
         );
         
-        console.log('Extrahierte Zeiterfassungsliste:', zeiterfassungsListe);
+        // Zeiterfassungsliste erfolgreich extrahiert
         
         // Normalisiere die Mitarbeiter-Referenzen in den Zeiterfassungen
         const normalizedEntries = zeiterfassungsListe.map(entry => {
@@ -189,7 +189,7 @@ export default function ZeiterfassungSystem() {
         
         setZeiterfassungen(normalizedEntries);
       } catch (error) {
-        console.error('Fehler beim Laden der Zeiterfassungen:', error);
+        // Fehler beim Laden der Zeiterfassungen aufgetreten
         setError(`Die Zeiterfassungen konnten nicht geladen werden: ${error.message}`);
         setZeiterfassungen([]);
       } finally {
@@ -300,7 +300,7 @@ export default function ZeiterfassungSystem() {
         arbeitsstunden
       };
       
-      console.log('Speichere Zeiterfassung:', zeiterfassungDaten);
+      // Speichere Zeiterfassung mit validierten Daten
       
       setLoading(true);
       setError(null);
@@ -316,7 +316,7 @@ export default function ZeiterfassungSystem() {
           throw new Error(getErrorMessage(submitResponse, 'Fehler beim Aktualisieren der Zeiterfassung'));
         }
         
-        console.log('Zeiterfassung aktualisiert:', submitResponse);
+        // Zeiterfassung erfolgreich aktualisiert
       } else {
         // Erstellen einer neuen Zeiterfassung
         submitResponse = await zeiterfassungService.addZeiterfassung(zeiterfassungDaten);
@@ -326,7 +326,7 @@ export default function ZeiterfassungSystem() {
           throw new Error(getErrorMessage(submitResponse, 'Fehler beim Erstellen der Zeiterfassung'));
         }
         
-        console.log('Zeiterfassung erstellt:', submitResponse);
+        // Zeiterfassung erfolgreich erstellt
       }
       
       // Lade aktualisierte Daten vom Server
@@ -337,7 +337,7 @@ export default function ZeiterfassungSystem() {
         throw new Error(getErrorMessage(response, 'Fehler beim Laden der aktualisierten Zeiterfassungen'));
       }
       
-      console.log('Aktualisierte Zeiterfassungen Response:', response);
+      // Aktualisierte Zeiterfassungen vom Server geladen
       
       // Extrahiere Zeiterfassungsdaten mit der utility Funktion
       const zeiterfassungsListe = extractArrayData(
@@ -346,7 +346,7 @@ export default function ZeiterfassungSystem() {
         []
       );
       
-      console.log('Aktualisierte Zeiterfassungen extrahiert:', zeiterfassungsListe);
+      // Zeiterfassungen erfolgreich aktualisiert und extrahiert
       
       // Normalisiere Mitarbeiter-Referenzen
       const normalizedEntries = zeiterfassungsListe.map(entry => {
@@ -376,7 +376,7 @@ export default function ZeiterfassungSystem() {
       // Erfolgsbenachrichtigung
       alert(bearbeitungId ? 'Zeiterfassung erfolgreich aktualisiert!' : 'Zeiterfassung erfolgreich gespeichert!');
     } catch (error) {
-      console.error('Fehler beim Speichern der Zeiterfassung:', error);
+      // Fehler beim Speichern der Zeiterfassung aufgetreten
       setError(`Die Zeiterfassung konnte nicht gespeichert werden: ${error.message}`);
     } finally {
       setLoading(false);
@@ -397,7 +397,7 @@ export default function ZeiterfassungSystem() {
           throw new Error(getErrorMessage(deleteResponse, 'Fehler beim Löschen der Zeiterfassung'));
         }
         
-        console.log('Zeiterfassung gelöscht:', deleteResponse);
+        // Zeiterfassung erfolgreich gelöscht
         
         // Lade aktualisierte Daten vom Server
         const response = await zeiterfassungService.getZeiterfassungen(aktuellesProjekt);
@@ -407,7 +407,7 @@ export default function ZeiterfassungSystem() {
           throw new Error(getErrorMessage(response, 'Fehler beim Laden der aktualisierten Zeiterfassungen'));
         }
         
-        console.log('Aktualisierte Zeiterfassungen Response nach Löschen:', response);
+        // Zeiterfassungen nach Löschen aktualisiert
         
         // Extrahiere Zeiterfassungsdaten mit der utility Funktion
         const zeiterfassungsListe = extractArrayData(
@@ -416,7 +416,7 @@ export default function ZeiterfassungSystem() {
           []
         );
         
-        console.log('Aktualisierte Zeiterfassungen nach Löschen:', zeiterfassungsListe);
+        // Zeiterfassungsliste nach Löschen aktualisiert
         
         // Normalisiere Mitarbeiter-Referenzen
         const normalizedEntries = zeiterfassungsListe.map(entry => {
@@ -443,7 +443,7 @@ export default function ZeiterfassungSystem() {
         // Erfolgsbenachrichtigung
         alert('Zeiterfassung erfolgreich gelöscht!');
       } catch (error) {
-        console.error('Fehler beim Löschen der Zeiterfassung:', error);
+        // Fehler beim Löschen der Zeiterfassung aufgetreten
         setError(`Die Zeiterfassung konnte nicht gelöscht werden: ${error.message}`);
       } finally {
         setLoading(false);
@@ -473,7 +473,7 @@ export default function ZeiterfassungSystem() {
   
   // Projekt-Dropdown-Optionen
   const projektOptionen = umzugsprojekte.map(projekt => {
-    console.log('Projekt für Option:', projekt);
+    // Verarbeite Projekt für Dropdown-Option
     return {
       id: projekt._id || 'unknown',
       label: `${projekt.auftraggeber?.name || 'Unbekannter Kunde'} (${
@@ -484,14 +484,14 @@ export default function ZeiterfassungSystem() {
     };
   });
   
-  console.log('Generierte projektOptionen:', projektOptionen);
+  // Projekt-Dropdown-Optionen generiert
   
   // Mitarbeiter-Dropdown-Optionen
-  console.log('Erstelle Mitarbeiter-Dropdown-Optionen aus:', mitarbeiter);
+  // Erstelle Mitarbeiter-Dropdown-Optionen
   const mitarbeiterOptionen = mitarbeiter
     .filter(ma => ma && ma._id) // Filter out invalid entries
     .map(ma => {
-      console.log('Mitarbeiter für Option:', ma);
+      // Verarbeite Mitarbeiter für Dropdown-Option
       let label = 'Unbekannter Mitarbeiter';
       
       // Handle different possible structures
@@ -513,7 +513,7 @@ export default function ZeiterfassungSystem() {
       };
     });
   
-  console.log('Generierte mitarbeiterOptionen:', mitarbeiterOptionen);
+  // Mitarbeiter-Dropdown-Optionen generiert
   
   // Render Funktion für Zeiterfassungstabelle
   const renderZeiterfassungen = () => {

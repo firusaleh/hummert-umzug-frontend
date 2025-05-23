@@ -3,9 +3,9 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import ClientForm from '../forms/ClientForm.fixed';
-import api from '../../services/api.fixed';
+import api from '../../services/api';
 
-jest.mock('../../services/api.fixed');
+jest.mock('../../services/api');
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: () => jest.fn()

@@ -103,7 +103,7 @@ const FahrzeugForm = () => {
           }
           setLoading(false);
         } catch (err) {
-          console.error('Fehler beim Laden des Fahrzeugs:', err);
+          // Fehler beim Laden des Fahrzeugs
           setError('Das Fahrzeug konnte nicht geladen werden.');
           toast.error('Fahrzeug konnte nicht geladen werden');
           setLoading(false);
@@ -195,7 +195,7 @@ const FahrzeugForm = () => {
           delete transformed.anschaffungsdatum;
         }
       } catch (error) {
-        console.error('Fehler beim Formatieren des Anschaffungsdatums:', error);
+        // Fehler beim Formatieren des Anschaffungsdatums
         delete transformed.anschaffungsdatum;
       }
     }
@@ -209,7 +209,7 @@ const FahrzeugForm = () => {
           delete transformed.tuev;
         }
       } catch (error) {
-        console.error('Fehler beim Formatieren des TÜV-Datums:', error);
+        // Fehler beim Formatieren des TÜV-Datums
         delete transformed.tuev;
       }
     }
@@ -223,7 +223,7 @@ const FahrzeugForm = () => {
           delete transformed.naechsterService;
         }
       } catch (error) {
-        console.error('Fehler beim Formatieren des Service-Datums:', error);
+        // Fehler beim Formatieren des Service-Datums
         delete transformed.naechsterService;
       }
     }
@@ -294,7 +294,7 @@ const FahrzeugForm = () => {
             delete transformed.versicherung.ablaufdatum;
           }
         } catch (error) {
-          console.error('Fehler beim Formatieren des Ablaufdatums:', error);
+          // Fehler beim Formatieren des Ablaufdatums
           delete transformed.versicherung.ablaufdatum;
         }
       }
@@ -442,8 +442,7 @@ const FahrzeugForm = () => {
       // Daten transformieren für API mit der neuen Transformationsfunktion
       const transformedData = transformFahrzeugData(formData);
       
-      // Detailliertes Logging für Debugging
-      console.log('Transformierte Daten zum Speichern:', JSON.stringify(transformedData, null, 2));
+      // Transformierte Daten zum Speichern vorbereitet
       
       let response;
       let fahrzeugId = id;
@@ -455,18 +454,18 @@ const FahrzeugForm = () => {
           const toastId = toast.loading('Erstelle Fahrzeug...');
           
           response = await fahrzeugeService.create(transformedData);
-          console.log('API Antwort:', response);
+          // API Antwort erhalten
           
           // Update den loading toast
           toast.dismiss(toastId);
           
           // Check if response indicates an error
           if (response && !response.success) {
-            console.error('API returned error:', response.message, response.errors);
+            // API returned error
             
             // Extract and show detailed validation errors
             if (response.errors && Array.isArray(response.errors)) {
-              console.table(response.errors); // Better display of errors
+              // Errors table display for debugging
               
               // Group errors by field for easier debugging
               const errorsByField = {};
@@ -475,7 +474,7 @@ const FahrzeugForm = () => {
                   errorsByField[err.field] = err.message;
                 }
               });
-              console.log('Grouped errors by field:', errorsByField);
+              // Grouped errors by field for debugging
               
               // Generate a more user-friendly error message for display
               const errorFieldsList = Object.keys(errorsByField).map(field => 
@@ -505,7 +504,7 @@ const FahrzeugForm = () => {
           
           toast.success('Fahrzeug wurde erfolgreich erstellt!');
         } catch (error) {
-          console.error('Fehler beim Erstellen des Fahrzeugs:', error);
+          // Fehler beim Erstellen des Fahrzeugs
           handleApiError(error, 'Das Fahrzeug konnte nicht erstellt werden');
           return;
         }
@@ -522,7 +521,7 @@ const FahrzeugForm = () => {
           
           // Check if response indicates an error
           if (response && !response.success) {
-            console.error('API error on update:', response.message, response.errors);
+            // API error on update
             
             if (response.errors && Array.isArray(response.errors)) {
               // Generate a more user-friendly error message
@@ -550,7 +549,7 @@ const FahrzeugForm = () => {
           
           toast.success('Fahrzeug wurde erfolgreich aktualisiert!');
         } catch (error) {
-          console.error('Fehler beim Aktualisieren des Fahrzeugs:', error);
+          // Fehler beim Aktualisieren des Fahrzeugs
           handleApiError(error, 'Das Fahrzeug konnte nicht aktualisiert werden');
           return;
         }
@@ -569,7 +568,7 @@ const FahrzeugForm = () => {
           toast.dismiss(uploadToastId);
           toast.success('Bild erfolgreich hochgeladen');
         } catch (error) {
-          console.error('Fehler beim Hochladen des Bildes:', error);
+          // Fehler beim Hochladen des Bildes
           toast.error('Das Bild konnte nicht hochgeladen werden, Fahrzeug wurde aber gespeichert');
         }
       }
@@ -577,7 +576,7 @@ const FahrzeugForm = () => {
       // Zurück zur Übersicht navigieren
       navigate('/fahrzeuge');
     } catch (err) {
-      console.error('Fehler beim Speichern des Fahrzeugs:', err);
+      // Fehler beim Speichern des Fahrzeugs
       handleApiError(err, 'Es ist ein unerwarteter Fehler aufgetreten');
     } finally {
       setSaving(false);
@@ -586,15 +585,7 @@ const FahrzeugForm = () => {
   
   // Helper function to handle API errors
   const handleApiError = (error, defaultMessage) => {
-    // Detailed error logging
-    console.group('API Error Details:');
-    console.error('Error object:', error);
-    
-    if (error.response) {
-      console.log('Status:', error.response.status);
-      console.log('Data:', error.response.data);
-    }
-    console.groupEnd();
+    // API Error Details for debugging
     
     // Reset field errors
     setFieldErrors({});

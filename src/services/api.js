@@ -1,1179 +1,943 @@
-// src/services/api.js - Enhanced with standardized error handling
+// src/services/api.fixed.js
 import axios from 'axios';
-import { logError, formatApiError } from '../utils/errorHandler';
 
-// Configure API URL without hardcoded fallback
-const API_URL = process.env.REACT_APP_API_URL || '/api';
+// API Configuration
+const API_CONFIG = {
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
+  timeout: 30000, // 30 seconds
+  retryAttempts: 3,
+  retryDelay: 1000, // 1 second
+};
 
-// Get base URL safely
-const getBaseURL = () => API_URL;
+// Token storage keys
+const TOKEN_KEYS = {
+  access: 'auth_token',
+  refresh: 'refresh_token',
+  timestamp: 'token_timestamp',
+  user: 'auth_user',
+};
 
-// Axios-Instanz mit verbesserten Einstellungen
+// Create axios instance
 const api = axios.create({
-  baseURL: getBaseURL(),
-  timeout: 15000, // 15 Sekunden Timeout für alle Anfragen
+  baseURL: API_CONFIG.baseURL,
+  timeout: API_CONFIG.timeout,
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json'
+    'Accept': 'application/json',
   },
-  // Ermöglicht das Senden von Cookies
-  withCredentials: false
+  withCredentials: false,
 });
 
 // Token management utilities
 const tokenManager = {
-  getToken: () => localStorage.getItem('token'),
-  setToken: (token) => localStorage.setItem('token', token),
-  removeToken: () => localStorage.removeItem('token'),
+  getAccessToken: () => localStorage.getItem(TOKEN_KEYS.access),
+  getRefreshToken: () => localStorage.getItem(TOKEN_KEYS.refresh),
   
-  getUser: () => {
-    try {
-      const user = localStorage.getItem('user');
-      return user ? JSON.parse(user) : null;
-    } catch {
-      return null;
-    }
+  setTokens: (accessToken, refreshToken) => {
+    localStorage.setItem(TOKEN_KEYS.access, accessToken);
+    localStorage.setItem(TOKEN_KEYS.refresh, refreshToken);
+    localStorage.setItem(TOKEN_KEYS.timestamp, Date.now().toString());
   },
   
-  setUser: (user) => localStorage.setItem('user', JSON.stringify(user)),
-  removeUser: () => localStorage.removeItem('user'),
-  
-  getTokenTimestamp: () => {
-    const timestamp = localStorage.getItem('tokenTimestamp');
-    return timestamp ? parseInt(timestamp, 10) : null;
-  },
-  
-  setTokenTimestamp: () => localStorage.setItem('tokenTimestamp', Date.now().toString()),
-  
-  clearAuthData: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('tokenTimestamp');
+  clearTokens: () => {
+    Object.values(TOKEN_KEYS).forEach(key => localStorage.removeItem(key));
   },
   
   isTokenExpired: () => {
-    const timestamp = tokenManager.getTokenTimestamp();
+    const timestamp = localStorage.getItem(TOKEN_KEYS.timestamp);
     if (!timestamp) return true;
     
-    // Token lifetime in milliseconds (e.g., 2 hours)
-    const tokenLifetime = 2 * 60 * 60 * 1000; 
-    
-    // Check if token is expired
-    return Date.now() - timestamp > tokenLifetime;
+    const tokenAge = Date.now() - parseInt(timestamp);
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+    return tokenAge > maxAge;
   },
-  
-  isTokenExpiringSoon: () => {
-    const timestamp = tokenManager.getTokenTimestamp();
-    if (!timestamp) return true;
-    
-    // Token lifetime in milliseconds (e.g., 2 hours)
-    const tokenLifetime = 2 * 60 * 60 * 1000;
-    
-    // Check if token will expire in the next 10 minutes
-    const expirationBuffer = 10 * 60 * 1000; // 10 minutes
-    return Date.now() - timestamp > tokenLifetime - expirationBuffer;
-  },
-  
-  refreshTokenIfNeeded: async () => {
-    // Check if token is about to expire
-    if (tokenManager.isTokenExpiringSoon() && !tokenManager.isTokenExpired()) {
-      try {
-        // Try to refresh the token
-        const response = await api.get('/auth/refresh');
-        if (response && response.data && response.data.token) {
-          tokenManager.setToken(response.data.token);
-          tokenManager.setTokenTimestamp();
-          console.log('Token refreshed successfully');
-          return true;
-        }
-      } catch (error) {
-        console.warn('Failed to refresh token:', error);
-        // Don't clear auth data here, let the interceptor handle actual expiration
-      }
-    }
-    return false;
-  }
 };
 
-// Request interceptor with token refresh capability
+// Request interceptor
 api.interceptors.request.use(
-  async (config) => {
-    // Skip token handling for auth endpoints
-    const isAuthEndpoint = config.url && (
-      config.url.includes('/auth/login') || 
-      config.url.includes('/auth/register') ||
-      config.url.includes('/auth/refresh')
-    );
-    
-    if (isAuthEndpoint) {
-      return config;
+  (config) => {
+    // Add auth token
+    const token = tokenManager.getAccessToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // For non-auth endpoints, handle token
-    const token = tokenManager.getToken();
-    
-    if (token) {
-      // Check if token needs refreshing before making the request
-      if (tokenManager.isTokenExpiringSoon() && !tokenManager.isTokenExpired()) {
-        try {
-          await tokenManager.refreshTokenIfNeeded();
-          // Get the fresh token after refresh
-          const freshToken = tokenManager.getToken();
-          if (freshToken) {
-            config.headers.Authorization = `Bearer ${freshToken}`;
-          }
-        } catch (error) {
-          console.warn('Token refresh failed in request interceptor:', error);
-          // Use the existing token as fallback
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-      } else {
-        // Use existing token
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+    // Log request (without sensitive data)
+    if (process.env.NODE_ENV === 'development') {
+      const { data = {}, params = {} } = config;
+      const safeData = { ...data, ...params };
+      
+      // Hide sensitive fields
+      const sensitiveFields = ['password', 'newPassword', 'currentPassword', 'token'];
+      sensitiveFields.forEach(field => {
+        if (safeData[field]) safeData[field] = '***';
+      });
+      
+      console.log(`${config.method?.toUpperCase()} ${config.url}`, safeData);
     }
     
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('Request interceptor error:', error);
+    return Promise.reject(error);
+  }
 );
 
-// Response interceptor for token expiration and error handling
+// Response interceptor with retry logic
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // Handle authentication errors
-    if (error.response && error.response.status === 401) {
-      // More comprehensive check for token issues
-      const isTokenExpired = error?.response?.data?.message?.includes('Token') ||
-                          error?.response?.data?.message?.includes('abgelaufen') ||
-                          error?.response?.data?.message?.includes('expired') ||
-                          error?.response?.data?.message?.includes('Sitzung') ||
-                          error?.response?.data?.message?.includes('session') ||
-                          error?.response?.data?.message?.includes('nicht authentifiziert') ||
-                          error?.response?.data?.message?.includes('not authenticated') ||
-                          error?.response?.data?.message?.includes('invalid token') ||
-                          error?.response?.data?.message?.includes('jwt') ||
-                          error?.response?.data?.message?.includes('unauthorized') ||
-                          error?.response?.data?.message?.includes('unautorisiert');
+  (response) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Response ${response.status}:`, response.config.url);
+    }
+    return response;
+  },
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // Log error details
+    if (error.response) {
+      console.error(`API Error ${error.response.status}:`, error.response.data);
+    } else if (error.request) {
+      console.error('No response:', error.request);
+    } else {
+      console.error('Request error:', error.message);
+    }
+    
+    // Handle token expiration
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
       
-      // Also check for specific response codes used in some APIs
-      const isAuthError = isTokenExpired || 
-                          error?.response?.data?.code === 'invalid_token' ||
-                          error?.response?.data?.code === 'token_expired' ||
-                          error?.response?.data?.status === 'unauthorized';
-      
-      if (isAuthError) {
-        // Log the auth error for debugging
-        console.warn('Authentication error detected:', error?.response?.data?.message || 'Unknown auth error');
-        
-        // Clear auth data
-        tokenManager.clearAuthData();
-        
-        // Store the attempted URL to redirect back after login
-        const currentPath = window.location.pathname + window.location.search;
-        if (!currentPath.includes('/login')) {
-          try {
-            localStorage.setItem('auth_redirect', currentPath);
-          } catch (e) {
-            console.error('Error storing auth redirect path:', e);
+      try {
+        const refreshToken = tokenManager.getRefreshToken();
+        if (refreshToken) {
+          const response = await api.post('/auth/refresh', { refreshToken });
+          if (response.data?.token) {
+            tokenManager.setTokens(response.data.token, refreshToken);
+            originalRequest.headers.Authorization = `Bearer ${response.data.token}`;
+            return api(originalRequest);
           }
         }
-        
-        // Only redirect to login if we're not already on the login page or other public pages
-        const publicPaths = ['/login', '/register', '/forgot-password', '/reset-password'];
-        const isPublicPath = publicPaths.some(path => window.location.pathname.includes(path));
-        
-        if (!isPublicPath) {
-          // Add a query parameter to indicate session expiration
-          window.location.href = `/login?session=expired&redirect=${encodeURIComponent(currentPath)}`;
-          
-          // Return an empty promise that never resolves to prevent further error handling
-          return new Promise(() => {});
-        }
+      } catch (refreshError) {
+        console.error('Token refresh failed:', refreshError);
       }
+      
+      // Clear tokens and redirect to login
+      tokenManager.clearTokens();
+      if (!window.location.pathname.includes('/login')) {
+        window.location.replace('/login');
+      }
+    }
+    
+    // Retry logic for network errors
+    if (!originalRequest._retryCount) {
+      originalRequest._retryCount = 0;
+    }
+    
+    const shouldRetry = 
+      originalRequest._retryCount < API_CONFIG.retryAttempts &&
+      (error.code === 'ECONNABORTED' || 
+       error.code === 'ENOTFOUND' ||
+       error.response?.status >= 500);
+    
+    if (shouldRetry) {
+      originalRequest._retryCount++;
+      
+      // Wait before retry
+      await new Promise(resolve => 
+        setTimeout(resolve, API_CONFIG.retryDelay * originalRequest._retryCount)
+      );
+      
+      return api(originalRequest);
     }
     
     return Promise.reject(error);
   }
 );
 
-// Base service creator for standardized API interaction
-const createService = (basePath) => {
-  return {
-    getAll: async (params) => {
-      try {
-        const response = await api.get(basePath, { params });
-        return response.data;
-      } catch (error) {
-        logError(`getAll ${basePath}`, error);
-        return formatApiError(error, `Fehler beim Laden der Daten`);
-      }
-    },
-    
-    getById: async (id) => {
-      try {
-        const response = await api.get(`${basePath}/${id}`);
-        return response.data;
-      } catch (error) {
-        logError(`getById ${basePath}/${id}`, error);
-        return formatApiError(error, `Fehler beim Laden der Daten`);
-      }
-    },
-    
-    create: async (data) => {
-      try {
-        // Enhanced logging for debugging validation errors
-        console.log(`Sending POST to ${basePath} with data:`, JSON.stringify(data, null, 2));
-        
-        // Special validation logging for complex data structures that often cause issues
-        if (basePath.includes('umzuege')) {
-          console.group('Pre-validation check for Umzug data:');
-          // Check required fields
-          const requiredFields = [
-            'auftraggeber.name', 'auftraggeber.telefon', 
-            'auszugsadresse.strasse', 'auszugsadresse.hausnummer', 'auszugsadresse.plz', 'auszugsadresse.ort',
-            'einzugsadresse.strasse', 'einzugsadresse.hausnummer', 'einzugsadresse.plz', 'einzugsadresse.ort',
-            'startDatum', 'endDatum'
-          ];
-          
-          const missingFields = [];
-          for (const field of requiredFields) {
-            const [parent, child] = field.includes('.') ? field.split('.') : [field, null];
-            if (child) {
-              if (!data[parent] || !data[parent][child] || data[parent][child] === '') {
-                missingFields.push(field);
-              }
-            } else if (!data[parent] || data[parent] === '') {
-              missingFields.push(field);
-            }
-          }
-          
-          if (missingFields.length > 0) {
-            console.warn('Missing required fields:', missingFields);
-          }
-          
-          // Log specific properties that often cause issues
-          console.log('auftraggeber:', data.auftraggeber);
-          console.log('auszugsadresse:', data.auszugsadresse);
-          console.log('einzugsadresse:', data.einzugsadresse);
-          console.log('mitarbeiter:', data.mitarbeiter);
-          console.log('fahrzeuge:', data.fahrzeuge);
-          console.log('dates:', {
-            startDatum: data.startDatum,
-            endDatum: data.endDatum,
-            isStartValid: data.startDatum && !isNaN(new Date(data.startDatum).getTime()),
-            isEndValid: data.endDatum && !isNaN(new Date(data.endDatum).getTime())
-          });
-          console.groupEnd();
-        }
-        
-        const response = await api.post(basePath, data);
-        return response.data;
-      } catch (error) {
-        logError(`create ${basePath}`, error);
-        
-        // Log full error response for debugging
-        console.group('API Error Details:');
-        console.error('Complete error response:', error);
-        
-        if (error.response) {
-          console.log('Status:', error.response.status);
-          console.log('Status Text:', error.response.statusText);
-          
-          if (error.response.data) {
-            console.log('Server response data:', error.response.data);
-            
-            // Handle validation errors
-            if (error.response.data.errors) {
-              console.group('Validation Errors:');
-              console.table(error.response.data.errors);
-              
-              // Group errors by field for easier debugging
-              const errorsByField = {};
-              if (Array.isArray(error.response.data.errors)) {
-                error.response.data.errors.forEach(err => {
-                  if (err.field || err.param) {
-                    const fieldName = err.field || err.param;
-                    errorsByField[fieldName] = err.message || err.msg;
-                  }
-                });
-                console.log('Grouped by field:', errorsByField);
-              }
-              console.groupEnd();
-            }
-            
-            // Check for message property
-            if (error.response.data.message) {
-              console.error('Error message:', error.response.data.message);
-            }
-          }
-        } else if (error.request) {
-          console.error('No response received. Network issue?');
-        } else {
-          console.error('Error before request completion:', error.message);
-        }
-        
-        console.groupEnd();
-        
-        return formatApiError(error, `Fehler beim Erstellen`);
-      }
-    },
-    
-    update: async (id, data) => {
-      try {
-        const response = await api.put(`${basePath}/${id}`, data);
-        return response.data;
-      } catch (error) {
-        logError(`update ${basePath}/${id}`, error);
-        return formatApiError(error, `Fehler beim Aktualisieren`);
-      }
-    },
-    
-    delete: async (id) => {
-      try {
-        const response = await api.delete(`${basePath}/${id}`);
-        return response.data;
-      } catch (error) {
-        logError(`delete ${basePath}/${id}`, error);
-        return formatApiError(error, `Fehler beim Löschen`);
-      }
-    }
-  };
-};
-
-// Auth-Services with standardized error handling
-export const authService = {
-  register: async (userData) => {
-    try {
-      const response = await api.post('/auth/register', userData);
-      if (response.data.token) {
-        tokenManager.setToken(response.data.token);
-        tokenManager.setUser(response.data.user);
-      }
-      return response.data;
-    } catch (error) {
-      logError('auth:register', error, { email: userData.email });
-      throw formatApiError(error, 'Registrierung fehlgeschlagen');
-    }
-  },
+// Base service class
+class BaseService {
+  constructor(endpoint) {
+    this.endpoint = endpoint;
+  }
   
-  login: async (credentials) => {
+  async handleResponse(promise) {
     try {
-      console.log('Sending login request to API...');
-      const response = await api.post('/auth/login', credentials);
-      console.log('Login response received:', { success: !!response.data.success, hasToken: !!response.data.token });
-      
+      const response = await promise;
+      return { success: true, data: response.data };
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+  
+  handleError(error) {
+    let message = 'Ein Fehler ist aufgetreten';
+    let status = null;
+    let errors = null;
+    
+    if (error.response) {
+      status = error.response.status;
+      message = error.response.data?.message || this.getErrorMessage(status);
+      errors = error.response.data?.errors;
+    } else if (error.request) {
+      message = 'Keine Verbindung zum Server';
+    } else {
+      message = error.message;
+    }
+    
+    return { success: false, message, status, errors };
+  }
+  
+  getErrorMessage(status) {
+    const errorMessages = {
+      400: 'Ungültige Anfrage',
+      401: 'Nicht autorisiert',
+      403: 'Zugriff verweigert',
+      404: 'Nicht gefunden',
+      409: 'Konflikt - Ressource existiert bereits',
+      422: 'Validierungsfehler',
+      429: 'Zu viele Anfragen',
+      500: 'Serverfehler',
+      503: 'Service nicht verfügbar',
+    };
+    
+    return errorMessages[status] || 'Ein Fehler ist aufgetreten';
+  }
+  
+  // CRUD operations
+  async getAll(params = {}) {
+    return this.handleResponse(api.get(this.endpoint, { params }));
+  }
+  
+  async getById(id) {
+    return this.handleResponse(api.get(`${this.endpoint}/${id}`));
+  }
+  
+  async create(data) {
+    return this.handleResponse(api.post(this.endpoint, data));
+  }
+  
+  async update(id, data) {
+    return this.handleResponse(api.put(`${this.endpoint}/${id}`, data));
+  }
+  
+  async patch(id, data) {
+    return this.handleResponse(api.patch(`${this.endpoint}/${id}`, data));
+  }
+  
+  async delete(id) {
+    return this.handleResponse(api.delete(`${this.endpoint}/${id}`));
+  }
+}
+
+
+// User Service
+class UserService extends BaseService {
+  constructor() {
+    super('/users');
+  }
+  
+  async getProfile() {
+    return this.handleResponse(api.get('/users/me'));
+  }
+  
+  async updateProfile(profileData) {
+    return this.handleResponse(api.put('/users/me', profileData));
+  }
+  
+  async changePassword(passwordData) {
+    return this.handleResponse(api.post('/users/change-password', passwordData));
+  }
+  
+  async updateAvatar(file) {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    
+    return this.handleResponse(
+      api.post('/users/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+    );
+  }
+}
+
+// Umzug Service
+class UmzugService extends BaseService {
+  constructor() {
+    super('/umzuege');
+  }
+  
+  async updateStatus(id, status, reason) {
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/status`, { status, reason })
+    );
+  }
+  
+  async addTask(id, taskData) {
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/tasks`, taskData)
+    );
+  }
+  
+  async updateTask(id, taskId, updates) {
+    return this.handleResponse(
+      api.put(`${this.endpoint}/${id}/tasks/${taskId}`, updates)
+    );
+  }
+  
+  async deleteTask(id, taskId) {
+    return this.handleResponse(
+      api.delete(`${this.endpoint}/${id}/tasks/${taskId}`)
+    );
+  }
+  
+  async addNote(id, noteData) {
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/notes`, noteData)
+    );
+  }
+  
+  async uploadDocument(id, file) {
+    const formData = new FormData();
+    formData.append('document', file);
+    
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/documents`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+    );
+  }
+  
+  async generateInvoice(id) {
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/invoice`)
+    );
+  }
+  
+  async export(id, format = 'pdf') {
+    return this.handleResponse(
+      api.get(`${this.endpoint}/${id}/export`, {
+        params: { format },
+        responseType: 'blob'
+      })
+    );
+  }
+}
+
+// Mitarbeiter Service
+class MitarbeiterService extends BaseService {
+  constructor() {
+    super('/mitarbeiter');
+  }
+  
+  async addArbeitszeit(id, arbeitszeitData) {
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/arbeitszeiten`, arbeitszeitData)
+    );
+  }
+  
+  async getArbeitszeiten(id, params) {
+    return this.handleResponse(
+      api.get(`${this.endpoint}/${id}/arbeitszeiten`, { params })
+    );
+  }
+  
+  async updateArbeitszeit(id, arbeitszeitId, updates) {
+    return this.handleResponse(
+      api.put(`${this.endpoint}/${id}/arbeitszeiten/${arbeitszeitId}`, updates)
+    );
+  }
+  
+  async deleteArbeitszeit(id, arbeitszeitId) {
+    return this.handleResponse(
+      api.delete(`${this.endpoint}/${id}/arbeitszeiten/${arbeitszeitId}`)
+    );
+  }
+  
+  async addQualifikation(id, qualifikationData) {
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/qualifikationen`, qualifikationData)
+    );
+  }
+  
+  async deleteQualifikation(id, qualifikationId) {
+    return this.handleResponse(
+      api.delete(`${this.endpoint}/${id}/qualifikationen/${qualifikationId}`)
+    );
+  }
+  
+  async uploadDokument(id, file) {
+    const formData = new FormData();
+    formData.append('dokument', file);
+    
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/dokumente`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+    );
+  }
+  
+  async getMonatsbericht(id, year, month) {
+    return this.handleResponse(
+      api.get(`${this.endpoint}/${id}/monatsbericht`, {
+        params: { year, month }
+      })
+    );
+  }
+}
+
+// Aufnahme Service
+class AufnahmeService extends BaseService {
+  constructor() {
+    super('/aufnahmen');
+  }
+  
+  async addRaum(id, raumData) {
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/raeume`, raumData)
+    );
+  }
+  
+  async updateRaum(id, raumId, updates) {
+    return this.handleResponse(
+      api.put(`${this.endpoint}/${id}/raeume/${raumId}`, updates)
+    );
+  }
+  
+  async deleteRaum(id, raumId) {
+    return this.handleResponse(
+      api.delete(`${this.endpoint}/${id}/raeume/${raumId}`)
+    );
+  }
+  
+  async addMoebel(id, raumId, moebelData) {
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/raeume/${raumId}/moebel`, moebelData)
+    );
+  }
+  
+  async updateMoebel(id, raumId, moebelId, updates) {
+    return this.handleResponse(
+      api.put(`${this.endpoint}/${id}/raeume/${raumId}/moebel/${moebelId}`, updates)
+    );
+  }
+  
+  async deleteMoebel(id, raumId, moebelId) {
+    return this.handleResponse(
+      api.delete(`${this.endpoint}/${id}/raeume/${raumId}/moebel/${moebelId}`)
+    );
+  }
+  
+  async uploadFotos(id, files) {
+    const formData = new FormData();
+    files.forEach(file => formData.append('fotos', file));
+    
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/fotos`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+    );
+  }
+  
+  async generateAngebot(id, angebotData = {}) {
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/angebot`, angebotData)
+    );
+  }
+  
+  async exportToPDF(id) {
+    return this.handleResponse(
+      api.get(`${this.endpoint}/${id}/export`, { responseType: 'blob' })
+    );
+  }
+}
+
+// Finance Service
+class FinanceService extends BaseService {
+  constructor() {
+    super('/finanzen');
+  }
+  
+  // Angebote (Quotes)
+  async getAngebote(params) {
+    return this.handleResponse(api.get('/finanzen/angebote', { params }));
+  }
+  
+  async getAngebotById(id) {
+    return this.handleResponse(api.get(`/finanzen/angebote/${id}`));
+  }
+  
+  async createAngebot(angebotData) {
+    return this.handleResponse(api.post('/finanzen/angebote', angebotData));
+  }
+  
+  async updateAngebot(id, updates) {
+    return this.handleResponse(api.put(`/finanzen/angebote/${id}`, updates));
+  }
+  
+  async deleteAngebot(id) {
+    return this.handleResponse(api.delete(`/finanzen/angebote/${id}`));
+  }
+  
+  async versendenAngebot(id, empfaenger) {
+    return this.handleResponse(
+      api.post(`/finanzen/angebote/${id}/versenden`, empfaenger)
+    );
+  }
+  
+  // Rechnungen (Invoices)
+  async getRechnungen(params) {
+    return this.handleResponse(api.get('/finanzen/rechnungen', { params }));
+  }
+  
+  async getRechnungById(id) {
+    return this.handleResponse(api.get(`/finanzen/rechnungen/${id}`));
+  }
+  
+  async createRechnung(rechnungData) {
+    return this.handleResponse(api.post('/finanzen/rechnungen', rechnungData));
+  }
+  
+  async updateRechnung(id, updates) {
+    return this.handleResponse(api.put(`/finanzen/rechnungen/${id}`, updates));
+  }
+  
+  async deleteRechnung(id) {
+    return this.handleResponse(api.delete(`/finanzen/rechnungen/${id}`));
+  }
+  
+  async addZahlung(id, zahlungData) {
+    return this.handleResponse(
+      api.post(`/finanzen/rechnungen/${id}/zahlungen`, zahlungData)
+    );
+  }
+  
+  async createMahnung(id, mahnungData = {}) {
+    return this.handleResponse(
+      api.post(`/finanzen/rechnungen/${id}/mahnungen`, mahnungData)
+    );
+  }
+  
+  async stornieren(id, grund) {
+    return this.handleResponse(
+      api.post(`/finanzen/rechnungen/${id}/stornieren`, { grund })
+    );
+  }
+  
+  // Projektkosten (Project Costs)
+  async getProjektkosten(params) {
+    return this.handleResponse(api.get('/finanzen/projektkosten', { params }));
+  }
+  
+  async getProjektkostenById(id) {
+    return this.handleResponse(api.get(`/finanzen/projektkosten/${id}`));
+  }
+  
+  async createProjektkosten(kostenData) {
+    return this.handleResponse(api.post('/finanzen/projektkosten', kostenData));
+  }
+  
+  async updateProjektkosten(id, updates) {
+    return this.handleResponse(api.put(`/finanzen/projektkosten/${id}`, updates));
+  }
+  
+  async deleteProjektkosten(id) {
+    return this.handleResponse(api.delete(`/finanzen/projektkosten/${id}`));
+  }
+  
+  async genehmigenKosten(id, genehmigung) {
+    return this.handleResponse(
+      api.post(`/finanzen/projektkosten/${id}/genehmigung`, genehmigung)
+    );
+  }
+  
+  async markAsBezahlt(id, zahlungData) {
+    return this.handleResponse(
+      api.post(`/finanzen/projektkosten/${id}/bezahlung`, zahlungData)
+    );
+  }
+  
+  // Finanzübersicht (Financial Overview)
+  async getUebersicht(year, month) {
+    return this.handleResponse(
+      api.get('/finanzen/uebersicht', { params: { year, month } })
+    );
+  }
+  
+  async generateUebersicht(year, month) {
+    return this.handleResponse(
+      api.post('/finanzen/uebersicht/generieren', { year, month })
+    );
+  }
+  
+  async finalizeUebersicht(year, month) {
+    return this.handleResponse(
+      api.post(`/finanzen/uebersicht/${year}/${month}/finalisieren`)
+    );
+  }
+  
+  // Reports
+  async getUmsatzbericht(von, bis, gruppierung = 'monat') {
+    return this.handleResponse(
+      api.get('/finanzen/berichte/umsatz', {
+        params: { von, bis, gruppierung }
+      })
+    );
+  }
+  
+  async getKostenbericht(von, bis, kategorie = null) {
+    return this.handleResponse(
+      api.get('/finanzen/berichte/kosten', {
+        params: { von, bis, kategorie }
+      })
+    );
+  }
+  
+  async getOffeneForderungen() {
+    return this.handleResponse(api.get('/finanzen/berichte/forderungen'));
+  }
+  
+  // Export
+  async exportRechnungen(format, von, bis) {
+    return this.handleResponse(
+      api.get('/finanzen/export/rechnungen', {
+        params: { format, von, bis },
+        responseType: format === 'pdf' ? 'blob' : 'json'
+      })
+    );
+  }
+  
+  async exportKosten(format, von, bis) {
+    return this.handleResponse(
+      api.get('/finanzen/export/kosten', {
+        params: { format, von, bis },
+        responseType: format === 'pdf' ? 'blob' : 'json'
+      })
+    );
+  }
+}
+
+// Notification Service
+class NotificationService extends BaseService {
+  constructor() {
+    super('/benachrichtigungen');
+  }
+  
+  async markAsRead(id, gelesen = true) {
+    return this.handleResponse(
+      api.put(`${this.endpoint}/${id}/read`, { gelesen })
+    );
+  }
+  
+  async markAllAsRead() {
+    return this.handleResponse(api.put(`${this.endpoint}/mark-all-read`));
+  }
+  
+  async deleteAllRead() {
+    return this.handleResponse(api.delete(`${this.endpoint}/delete-all-read`));
+  }
+  
+  async getPreferences() {
+    return this.handleResponse(api.get(`${this.endpoint}/preferences`));
+  }
+  
+  async updatePreferences(preferences) {
+    return this.handleResponse(
+      api.put(`${this.endpoint}/preferences`, preferences)
+    );
+  }
+  
+  async subscribeToPush(subscription) {
+    return this.handleResponse(
+      api.post(`${this.endpoint}/subscribe`, { subscription })
+    );
+  }
+  
+  async unsubscribeFromPush() {
+    return this.handleResponse(api.post(`${this.endpoint}/unsubscribe`));
+  }
+}
+
+// Time Tracking Service
+class TimeTrackingService extends BaseService {
+  constructor() {
+    super('/zeiterfassung');
+  }
+  
+  async checkIn(zeiterfassungData) {
+    return this.handleResponse(api.post(this.endpoint, zeiterfassungData));
+  }
+  
+  async checkOut(id, endzeit) {
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/checkout`, { endzeit })
+    );
+  }
+  
+  async addPause(id, pauseData) {
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/pause`, pauseData)
+    );
+  }
+  
+  async approve(id, genehmigung) {
+    return this.handleResponse(
+      api.post(`${this.endpoint}/${id}/approve`, genehmigung)
+    );
+  }
+  
+  async bulkApprove(ids, genehmigt) {
+    return this.handleResponse(
+      api.post(`${this.endpoint}/bulk-approve`, { ids, genehmigt })
+    );
+  }
+  
+  async getMonthlyReport(year, month, mitarbeiterId = null) {
+    return this.handleResponse(
+      api.get(`${this.endpoint}/report/monthly`, {
+        params: { year, month, mitarbeiterId }
+      })
+    );
+  }
+  
+  async getProjectReport(projektId, vonDatum, bisDatum) {
+    return this.handleResponse(
+      api.get(`${this.endpoint}/report/project`, {
+        params: { projektId, vonDatum, bisDatum }
+      })
+    );
+  }
+  
+  async getOvertimeReport(year, month = null, mitarbeiterId = null) {
+    return this.handleResponse(
+      api.get(`${this.endpoint}/report/overtime`, {
+        params: { year, month, mitarbeiterId }
+      })
+    );
+  }
+  
+  async export(format, vonDatum, bisDatum, mitarbeiterId = null) {
+    return this.handleResponse(
+      api.get(`${this.endpoint}/export`, {
+        params: { format, vonDatum, bisDatum, mitarbeiterId },
+        responseType: format === 'pdf' ? 'blob' : 'json'
+      })
+    );
+  }
+}
+
+// Project Service
+class ProjectService extends BaseService {
+  async getAll(params = {}) {
+    return this.handleResponse(api.get('/projects', { params }));
+  }
+  
+  async getById(id) {
+    return this.handleResponse(api.get(`/projects/${id}`));
+  }
+  
+  async create(projectData) {
+    return this.handleResponse(api.post('/projects', projectData));
+  }
+  
+  async update(id, updates) {
+    return this.handleResponse(api.put(`/projects/${id}`, updates));
+  }
+  
+  async delete(id) {
+    return this.handleResponse(api.delete(`/projects/${id}`));
+  }
+}
+
+// Task Service
+class TaskService extends BaseService {
+  async getAll(params = {}) {
+    return this.handleResponse(api.get('/tasks', { params }));
+  }
+  
+  async getById(id) {
+    return this.handleResponse(api.get(`/tasks/${id}`));
+  }
+  
+  async create(taskData) {
+    return this.handleResponse(api.post('/tasks', taskData));
+  }
+  
+  async update(id, updates) {
+    return this.handleResponse(api.put(`/tasks/${id}`, updates));
+  }
+  
+  async delete(id) {
+    return this.handleResponse(api.delete(`/tasks/${id}`));
+  }
+}
+
+// Vehicle Service
+class VehicleService extends BaseService {
+  async getAll(params = {}) {
+    return this.handleResponse(api.get('/fahrzeuge', { params }));
+  }
+  
+  async getById(id) {
+    return this.handleResponse(api.get(`/fahrzeuge/${id}`));
+  }
+  
+  async create(vehicleData) {
+    return this.handleResponse(api.post('/fahrzeuge', vehicleData));
+  }
+  
+  async update(id, updates) {
+    return this.handleResponse(api.put(`/fahrzeuge/${id}`, updates));
+  }
+  
+  async delete(id) {
+    return this.handleResponse(api.delete(`/fahrzeuge/${id}`));
+  }
+  
+  async updateMileage(id, mileageData) {
+    return this.handleResponse(api.post(`/fahrzeuge/${id}/kilometerstand`, mileageData));
+  }
+}
+
+// Auth Service
+class AuthService extends BaseService {
+  async login(credentials) {
+    const response = await this.handleResponse(api.post('/auth/login', credentials));
+    
+    if (response.success && response.data) {
+      // Store tokens and user data
       if (response.data.token) {
-        // Store token with proper timestamp
         tokenManager.setToken(response.data.token);
-        tokenManager.setTokenTimestamp(); // Set current timestamp
+      }
+      if (response.data.refreshToken) {
+        tokenManager.setRefreshToken(response.data.refreshToken);
+      }
+      if (response.data.user) {
         tokenManager.setUser(response.data.user);
-        console.log('Auth data stored in localStorage');
+      }
+      tokenManager.setTokenTimestamp();
+    }
+    
+    return response;
+  }
+  
+  async register(userData) {
+    return this.handleResponse(api.post('/auth/register', userData));
+  }
+  
+  async logout() {
+    try {
+      await this.handleResponse(api.post('/auth/logout'));
+    } catch (error) {
+      // Continue with logout even if API call fails
+      console.warn('Logout API call failed:', error);
+    } finally {
+      // Always clear local tokens
+      tokenManager.clearTokens();
+    }
+  }
+  
+  async refreshToken() {
+    const refreshToken = tokenManager.getRefreshToken();
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
+    
+    const response = await this.handleResponse(api.post('/auth/refresh', { refreshToken }));
+    
+    if (response.success && response.data?.token) {
+      tokenManager.setToken(response.data.token);
+      tokenManager.setTokenTimestamp();
+    }
+    
+    return response;
+  }
+  
+  async getCurrentUser() {
+    return this.handleResponse(api.get('/auth/me'));
+  }
+  
+  async updateProfile(updates) {
+    return this.handleResponse(api.put('/auth/profile', updates));
+  }
+  
+  async changePassword(passwordData) {
+    return this.handleResponse(api.put('/auth/password', passwordData));
+  }
+}
+
+// Client Service
+class ClientService extends BaseService {
+  async getAll(params = {}) {
+    return this.handleResponse(api.get('/clients', { params }));
+  }
+  
+  async getById(id) {
+    return this.handleResponse(api.get(`/clients/${id}`));
+  }
+  
+  async create(clientData) {
+    return this.handleResponse(api.post('/clients', clientData));
+  }
+  
+  async update(id, updates) {
+    return this.handleResponse(api.put(`/clients/${id}`, updates));
+  }
+  
+  async delete(id) {
+    return this.handleResponse(api.delete(`/clients/${id}`));
+  }
+  
+  async getUmzuege(clientId, params = {}) {
+    return this.handleResponse(api.get(`/clients/${clientId}/umzuege`, { params }));
+  }
+  
+  async getStatistics(clientId) {
+    return this.handleResponse(api.get(`/clients/${clientId}/statistics`));
+  }
+}
+
+// File Service
+class FileService {
+  async upload(file, metadata = {}) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Add metadata
+    Object.entries(metadata).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        value.forEach(item => formData.append(`${key}[]`, item));
       } else {
-        console.warn('No token received in login response');
+        formData.append(key, value);
       }
-      
-      // Check for redirect info from previous session expiration
-      const redirectUrl = localStorage.getItem('auth_redirect');
-      if (redirectUrl) {
-        // Store redirect URL in the response for the component to handle
-        response.data.redirectUrl = redirectUrl;
-        // Clear after retrieval
-        localStorage.removeItem('auth_redirect');
-      }
-      
-      return response.data;
-    } catch (error) {
-      // Enhanced error logging
-      logError('auth:login', error, { email: credentials.email });
-      
-      // More specific error message based on the error
-      let errorMessage = 'Login fehlgeschlagen';
-      
-      if (error.response) {
-        const status = error.response.status;
-        
-        if (status === 401) {
-          errorMessage = 'Ungültige E-Mail oder Passwort';
-        } else if (status === 400) {
-          errorMessage = error.response.data?.message || 'Ungültige Eingabe';
-        } else if (status === 403) {
-          errorMessage = 'Ihr Konto wurde gesperrt. Bitte kontaktieren Sie den Administrator.';
-        } else if (status === 429) {
-          errorMessage = 'Zu viele Anmeldeversuche. Bitte versuchen Sie es später erneut.';
-        } else if (status >= 500) {
-          errorMessage = 'Serverfehler. Bitte versuchen Sie es später erneut.';
-        }
-      } else if (error.request) {
-        errorMessage = 'Keine Antwort vom Server erhalten. Bitte überprüfen Sie Ihre Internetverbindung.';
-      }
-      
-      throw formatApiError(error, errorMessage);
-    }
-  },
-  
-  logout: () => {
-    tokenManager.clearAuthData();
-    // Only redirect if not already on login page
-    if (!window.location.pathname.includes('/login')) {
-      window.location.href = '/login';
-    }
-  },
-  
-  checkAuth: async () => {
+    });
+    
     try {
-      const response = await api.get('/auth/check');
-      return response.data;
-    } catch (error) {
-      logError('auth:checkAuth', error);
-      throw formatApiError(error, 'Authentifizierungsprüfung fehlgeschlagen');
-    }
-  },
-  
-  checkApiHealth: async () => {
-    try {
-      // Try multiple endpoints in order
-      try {
-        const response = await api.get('/health');
-        return response;
-      } catch (healthError) {
-        try {
-          const response = await axios.get(`${getBaseURL()}/`, { 
-            timeout: 5000, 
-            validateStatus: (status) => status < 500
-          });
-          return response;
-        } catch (authError) {
-          const response = await axios.get(getBaseURL(), { 
-            timeout: 5000,
-            validateStatus: (status) => status < 500 
-          });
-          return response;
-        }
-      }
-    } catch (error) {
-      logError('auth:checkApiHealth', error);
-      throw formatApiError(error, 'API nicht erreichbar');
-    }
-  }
-};
-
-// Services using the standardized approach
-export const userService = createService('/users');
-export const clientService = createService('/clients');
-
-// Umzuege service with additional methods
-export const umzuegeService = {
-  ...createService('/umzuege'),
-  
-  // Method to update the status of a move
-  updateStatus: async (id, statusData) => {
-    try {
-      const response = await api.post(`/umzuege/${id}/status`, statusData);
-      return response.data;
-    } catch (error) {
-      console.error(`updateStatus /umzuege/${id}/status`, error);
-      return {
-        success: false,
-        message: error.response?.data?.message || 'Fehler beim Aktualisieren des Status'
-      };
-    }
-  }
-};
-
-export const mitarbeiterService = {
-  ...createService('/mitarbeiter'),
-  
-  // Method to upload a profile image
-  uploadImage: async (id, formData) => {
-    try {
-      const response = await api.post(`/mitarbeiter/${id}/profile-image`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
-        onUploadProgress: progressEvent => {
-          if (formData.onProgress && typeof formData.onProgress === 'function') {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            formData.onProgress(percentCompleted);
-          }
-        }
-      });
-      return response.data;
-    } catch (error) {
-      logError(`uploadImage /mitarbeiter/${id}/profile-image`, error);
-      return formatApiError(error, 'Fehler beim Hochladen des Profilbilds');
-    }
-  }
-};
-export const fahrzeugeService = {
-  ...createService('/fahrzeuge'),
-  
-  // Method to update vehicle status
-  updateStatus: async (id, statusData) => {
-    try {
-      const response = await api.patch(`/fahrzeuge/${id}/status`, statusData);
-      return response.data;
-    } catch (error) {
-      logError(`updateStatus /fahrzeuge/${id}/status`, error);
-      return formatApiError(error, 'Fehler beim Aktualisieren des Status');
-    }
-  },
-  
-  // Method to update odometer reading
-  updateKilometerstand: async (id, kilometerstand) => {
-    try {
-      const response = await api.patch(`/fahrzeuge/${id}/kilometerstand`, { kilometerstand });
-      return response.data;
-    } catch (error) {
-      logError(`updateKilometerstand /fahrzeuge/${id}/kilometerstand`, error);
-      return formatApiError(error, 'Fehler beim Aktualisieren des Kilometerstands');
-    }
-  },
-  
-  // Method to upload a vehicle image
-  uploadImage: async (id, formData) => {
-    try {
-      const response = await api.post(`/fahrzeuge/${id}/image`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
-        onUploadProgress: progressEvent => {
-          if (formData.onProgress && typeof formData.onProgress === 'function') {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            formData.onProgress(percentCompleted);
-          }
-        }
-      });
-      return response.data;
-    } catch (error) {
-      logError(`uploadImage /fahrzeuge/${id}/image`, error);
-      return formatApiError(error, 'Fehler beim Hochladen des Fahrzeugbilds');
-    }
-  }
-};
-export const aufnahmenService = createService('/aufnahmen');
-
-// Financial services with correct backend endpoints
-export const finanzenService = {
-  // Angebote-bezogene Methoden
-  getAngebote: async (params) => {
-    try {
-      const response = await api.get('/finanzen/angebote', { params });
-      return response.data;
-    } catch (error) {
-      logError('finanzen:getAngebote', error);
-      return formatApiError(error, 'Fehler beim Laden der Angebote');
-    }
-  },
-  
-  getAngebotById: async (id) => {
-    try {
-      const response = await api.get(`/finanzen/angebote/${id}`);
-      return response.data;
-    } catch (error) {
-      logError(`finanzen:getAngebotById/${id}`, error);
-      return formatApiError(error, 'Fehler beim Laden des Angebots');
-    }
-  },
-  
-  createAngebot: async (data) => {
-    try {
-      const response = await api.post('/finanzen/angebote', data);
-      return response.data;
-    } catch (error) {
-      logError('finanzen:createAngebot', error);
-      return formatApiError(error, 'Fehler beim Erstellen des Angebots');
-    }
-  },
-  
-  updateAngebot: async (id, data) => {
-    try {
-      const response = await api.put(`/finanzen/angebote/${id}`, data);
-      return response.data;
-    } catch (error) {
-      logError(`finanzen:updateAngebot/${id}`, error);
-      return formatApiError(error, 'Fehler beim Aktualisieren des Angebots');
-    }
-  },
-  
-  deleteAngebot: async (id) => {
-    try {
-      const response = await api.delete(`/finanzen/angebote/${id}`);
-      return response.data;
-    } catch (error) {
-      logError(`finanzen:deleteAngebot/${id}`, error);
-      return formatApiError(error, 'Fehler beim Löschen des Angebots');
-    }
-  },
-  
-  // Rechnungen-bezogene Methoden
-  getRechnungen: async (params) => {
-    try {
-      const response = await api.get('/finanzen/rechnungen', { params });
-      return response.data;
-    } catch (error) {
-      logError('finanzen:getRechnungen', error);
-      return formatApiError(error, 'Fehler beim Laden der Rechnungen');
-    }
-  },
-  
-  getRechnungById: async (id) => {
-    try {
-      const response = await api.get(`/finanzen/rechnungen/${id}`);
-      return response.data;
-    } catch (error) {
-      logError(`finanzen:getRechnungById/${id}`, error);
-      return formatApiError(error, 'Fehler beim Laden der Rechnung');
-    }
-  },
-  
-  createRechnung: async (data) => {
-    try {
-      const response = await api.post('/finanzen/rechnungen', data);
-      return response.data;
-    } catch (error) {
-      logError('finanzen:createRechnung', error);
-      return formatApiError(error, 'Fehler beim Erstellen der Rechnung');
-    }
-  },
-  
-  updateRechnung: async (id, data) => {
-    try {
-      const response = await api.put(`/finanzen/rechnungen/${id}`, data);
-      return response.data;
-    } catch (error) {
-      logError(`finanzen:updateRechnung/${id}`, error);
-      return formatApiError(error, 'Fehler beim Aktualisieren der Rechnung');
-    }
-  },
-  
-  deleteRechnung: async (id) => {
-    try {
-      const response = await api.delete(`/finanzen/rechnungen/${id}`);
-      return response.data;
-    } catch (error) {
-      logError(`finanzen:deleteRechnung/${id}`, error);
-      return formatApiError(error, 'Fehler beim Löschen der Rechnung');
-    }
-  },
-  
-  markRechnungAsBezahlt: async (id, data) => {
-    try {
-      const response = await api.put(`/finanzen/rechnungen/${id}/bezahlt`, data);
-      return response.data;
-    } catch (error) {
-      logError(`finanzen:markRechnungAsBezahlt/${id}`, error);
-      return formatApiError(error, 'Fehler beim Markieren der Rechnung als bezahlt');
-    }
-  },
-  
-  // Projektkosten-bezogene Methoden
-  getProjektkosten: async (params) => {
-    try {
-      const response = await api.get('/finanzen/projektkosten', { params });
-      return response.data;
-    } catch (error) {
-      logError('finanzen:getProjektkosten', error);
-      return formatApiError(error, 'Fehler beim Laden der Projektkosten');
-    }
-  },
-  
-  getProjektkostenById: async (id) => {
-    try {
-      const response = await api.get(`/finanzen/projektkosten/${id}`);
-      return response.data;
-    } catch (error) {
-      logError(`finanzen:getProjektkostenById/${id}`, error);
-      return formatApiError(error, 'Fehler beim Laden der Projektkosten');
-    }
-  },
-  
-  createProjektkosten: async (data) => {
-    try {
-      const response = await api.post('/finanzen/projektkosten', data);
-      return response.data;
-    } catch (error) {
-      logError('finanzen:createProjektkosten', error);
-      return formatApiError(error, 'Fehler beim Erstellen der Projektkosten');
-    }
-  },
-  
-  updateProjektkosten: async (id, data) => {
-    try {
-      const response = await api.put(`/finanzen/projektkosten/${id}`, data);
-      return response.data;
-    } catch (error) {
-      logError(`finanzen:updateProjektkosten/${id}`, error);
-      return formatApiError(error, 'Fehler beim Aktualisieren der Projektkosten');
-    }
-  },
-  
-  deleteProjektkosten: async (id) => {
-    try {
-      const response = await api.delete(`/finanzen/projektkosten/${id}`);
-      return response.data;
-    } catch (error) {
-      logError(`finanzen:deleteProjektkosten/${id}`, error);
-      return formatApiError(error, 'Fehler beim Löschen der Projektkosten');
-    }
-  },
-  
-  // Finanzübersicht-bezogene Methoden
-  getFinanzuebersicht: async () => {
-    try {
-      const response = await api.get('/finanzen/uebersicht');
-      return response.data;
-    } catch (error) {
-      logError('finanzen:getFinanzuebersicht', error);
-      return formatApiError(error, 'Fehler beim Laden der Finanzübersicht');
-    }
-  },
-  
-  getMonatsUebersicht: async (jahr) => {
-    try {
-      // Die Backend-Route erwartet '/finanzen/monatsuebersicht/:jahr'
-      const response = await api.get(`/finanzen/monatsuebersicht/${jahr}`);
-      return response.data;
-    } catch (error) {
-      logError(`finanzen:getMonatsUebersicht/${jahr}`, error);
-      return formatApiError(error, 'Fehler beim Laden der Monatsübersicht');
-    }
-  },
-  
-  getMonatsDetails: async (jahr, monat) => {
-    try {
-      // Die Backend-Route erwartet '/finanzen/monat/:monat/:jahr'
-      const response = await api.get(`/finanzen/monat/${monat}/${jahr}`);
-      return response.data;
-    } catch (error) {
-      logError(`finanzen:getMonatsDetails/${jahr}/${monat}`, error);
-      return formatApiError(error, 'Fehler beim Laden der Monatsdetails');
-    }
-  }
-};
-
-export const zeiterfassungService = {
-  ...createService('/zeiterfassung'),
-  
-  // Get all available employees for time tracking
-  getMitarbeiter: async () => {
-    try {
-      console.log('Fetching mitarbeiter data for zeiterfassung...');
-      
-      // Try both endpoints - first try zeiterfassung specific endpoint
-      let response;
-      try {
-        response = await api.get('/zeiterfassung/mitarbeiter');
-        console.log('Successfully fetched from /zeiterfassung/mitarbeiter');
-      } catch (error) {
-        console.log('Failed to fetch from /zeiterfassung/mitarbeiter, trying fallback to /mitarbeiter');
-        // If that fails, try the general mitarbeiter endpoint
-        response = await api.get('/mitarbeiter');
-        console.log('Successfully fetched from /mitarbeiter');
-      }
-      
-      // Debug log raw response
-      console.log('Raw mitarbeiter API response:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-        dataType: typeof response.data,
-        dataIsArray: Array.isArray(response.data),
-        dataLength: Array.isArray(response.data) ? response.data.length : 'not an array'
-      });
-      
-      // Return data directly, not wrapped in success/data object
-      return response.data;
-    } catch (error) {
-      console.error('Fehler beim Laden der Mitarbeiter:', error);
-      console.error('Error details:', error.response ? {
-        status: error.response.status,
-        statusText: error.response.statusText,
-        data: error.response.data
-      } : 'No response');
-      
-      logError('zeiterfassung:getMitarbeiter', error);
-      return formatApiError(error, 'Fehler beim Laden der Mitarbeiterdaten');
-    }
-  },
-  
-  // Get all available projects for time tracking
-  getUmzugsprojekte: async () => {
-    try {
-      console.log('Fetching projekt data for zeiterfassung...');
-      
-      // Try both endpoints - first try zeiterfassung specific endpoint
-      let response;
-      try {
-        response = await api.get('/zeiterfassung/projekte');
-        console.log('Successfully fetched from /zeiterfassung/projekte');
-      } catch (error) {
-        console.log('Failed to fetch from /zeiterfassung/projekte, trying fallback to /umzuege');
-        // If that fails, try the general umzuege endpoint
-        response = await api.get('/umzuege');
-        console.log('Successfully fetched from /umzuege');
-      }
-      
-      // Debug log raw response
-      console.log('Raw projekte API response:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-        dataType: typeof response.data,
-        dataIsArray: Array.isArray(response.data),
-        dataLength: Array.isArray(response.data) ? response.data.length : 'not an array'
-      });
-      
-      // Return data directly, not wrapped in success/data object
-      return response.data;
-    } catch (error) {
-      console.error('Fehler beim Laden der Projekte:', error);
-      console.error('Error details:', error.response ? {
-        status: error.response.status,
-        statusText: error.response.statusText,
-        data: error.response.data
-      } : 'No response');
-      
-      logError('zeiterfassung:getUmzugsprojekte', error);
-      return formatApiError(error, 'Fehler beim Laden der Projektdaten');
-    }
-  },
-  
-  // Get time entries for a specific project
-  getZeiterfassungen: async (projektId) => {
-    try {
-      const response = await api.get(`/zeiterfassung/projekt/${projektId}`);
-      console.log('Raw zeiterfassungen API response:', {
-        status: response.status,
-        statusText: response.statusText,
-        dataType: typeof response.data,
-        dataIsArray: Array.isArray(response.data),
-        dataLength: Array.isArray(response.data) ? response.data.length : 'not an array'
-      });
-      
-      // Return data directly, not wrapped in success/data object
-      return response.data;
-    } catch (error) {
-      logError(`zeiterfassung:getZeiterfassungen/${projektId}`, error);
-      return formatApiError(error, 'Fehler beim Laden der Zeiterfassungen für das Projekt');
-    }
-  },
-  
-  // Add a new time entry
-  addZeiterfassung: async (data) => {
-    try {
-      // Using the correct endpoint from zeiterfassung.routes.js
-      const response = await api.post('/zeiterfassung', data);
-      console.log('Add zeiterfassung API response:', {
-        status: response.status,
-        statusText: response.statusText
-      });
-      
-      // Return data directly, not wrapped in success/data object
-      return response.data;
-    } catch (error) {
-      logError('zeiterfassung:addZeiterfassung', error);
-      return formatApiError(error, 'Fehler beim Hinzufügen der Zeiterfassung');
-    }
-  },
-  
-  // Update an existing time entry
-  updateZeiterfassung: async (id, data) => {
-    try {
-      // Using the correct endpoint from zeiterfassung.routes.js
-      const response = await api.put(`/zeiterfassung/${id}`, data);
-      console.log('Update zeiterfassung API response:', {
-        status: response.status,
-        statusText: response.statusText
-      });
-      
-      // Return data directly, not wrapped in success/data object
-      return response.data;
-    } catch (error) {
-      logError(`zeiterfassung:updateZeiterfassung/${id}`, error);
-      return formatApiError(error, 'Fehler beim Aktualisieren der Zeiterfassung');
-    }
-  },
-  
-  // Delete a time entry
-  deleteZeiterfassung: async (id) => {
-    try {
-      // Using the correct endpoint from zeiterfassung.routes.js
-      const response = await api.delete(`/zeiterfassung/${id}`);
-      console.log('Delete zeiterfassung API response:', {
-        status: response.status,
-        statusText: response.statusText
-      });
-      
-      // Return data directly, not wrapped in success/data object
-      return response.data;
-    } catch (error) {
-      logError(`zeiterfassung:deleteZeiterfassung/${id}`, error);
-      return formatApiError(error, 'Fehler beim Löschen der Zeiterfassung');
-    }
-  },
-  
-  getEintraege: async (params) => {
-    try {
-      const response = await api.get('/zeiterfassung/eintraege', { params });
-      return response.data;
-    } catch (error) {
-      logError('zeiterfassung:getEintraege', error);
-      return formatApiError(error, 'Fehler beim Laden der Zeiterfassungseinträge');
-    }
-  },
-  
-  getEintragById: async (id) => {
-    try {
-      const response = await api.get(`/zeiterfassung/eintraege/${id}`);
-      return response.data;
-    } catch (error) {
-      logError(`zeiterfassung:getEintragById/${id}`, error);
-      return formatApiError(error, 'Fehler beim Laden des Zeiterfassungseintrags');
-    }
-  },
-  
-  startZeiterfassung: async (data) => {
-    try {
-      const response = await api.post('/zeiterfassung/start', data);
-      return response.data;
-    } catch (error) {
-      logError('zeiterfassung:startZeiterfassung', error);
-      return formatApiError(error, 'Fehler beim Starten der Zeiterfassung');
-    }
-  },
-  
-  stopZeiterfassung: async (id, data) => {
-    try {
-      const response = await api.post(`/zeiterfassung/stop/${id}`, data);
-      return response.data;
-    } catch (error) {
-      logError(`zeiterfassung:stopZeiterfassung/${id}`, error);
-      return formatApiError(error, 'Fehler beim Stoppen der Zeiterfassung');
-    }
-  },
-  
-  createEintrag: async (data) => {
-    try {
-      const response = await api.post('/zeiterfassung/eintraege', data);
-      return response.data;
-    } catch (error) {
-      logError('zeiterfassung:createEintrag', error);
-      return formatApiError(error, 'Fehler beim Erstellen des Zeiterfassungseintrags');
-    }
-  },
-  
-  updateEintrag: async (id, data) => {
-    try {
-      const response = await api.put(`/zeiterfassung/eintraege/${id}`, data);
-      return response.data;
-    } catch (error) {
-      logError(`zeiterfassung:updateEintrag/${id}`, error);
-      return formatApiError(error, 'Fehler beim Aktualisieren des Zeiterfassungseintrags');
-    }
-  },
-  
-  deleteEintrag: async (id) => {
-    try {
-      const response = await api.delete(`/zeiterfassung/eintraege/${id}`);
-      return response.data;
-    } catch (error) {
-      logError(`zeiterfassung:deleteEintrag/${id}`, error);
-      return formatApiError(error, 'Fehler beim Löschen des Zeiterfassungseintrags');
-    }
-  },
-  
-  getBericht: async (params) => {
-    try {
-      const response = await api.get('/zeiterfassung/bericht', { params });
-      return response.data;
-    } catch (error) {
-      logError('zeiterfassung:getBericht', error);
-      return formatApiError(error, 'Fehler beim Laden des Zeiterfassungsberichts');
-    }
-  },
-  
-  getMitarbeiterBericht: async (mitarbeiterId, params) => {
-    try {
-      const response = await api.get(`/zeiterfassung/bericht/mitarbeiter/${mitarbeiterId}`, { params });
-      return response.data;
-    } catch (error) {
-      logError(`zeiterfassung:getMitarbeiterBericht/${mitarbeiterId}`, error);
-      return formatApiError(error, 'Fehler beim Laden des Mitarbeiter-Zeiterfassungsberichts');
-    }
-  },
-  
-  getProjektBericht: async (projektId, params) => {
-    try {
-      const response = await api.get(`/zeiterfassung/bericht/projekt/${projektId}`, { params });
-      return response.data;
-    } catch (error) {
-      logError(`zeiterfassung:getProjektBericht/${projektId}`, error);
-      return formatApiError(error, 'Fehler beim Laden des Projekt-Zeiterfassungsberichts');
-    }
-  }
-};
-
-// Services with custom methods in addition to standard CRUD
-export const benachrichtigungenService = {
-  ...createService('/benachrichtigungen'),
-  
-  markAsRead: async (id) => {
-    try {
-      const response = await api.put(`/benachrichtigungen/${id}/read`);
-      return response.data;
-    } catch (error) {
-      logError(`markAsRead /benachrichtigungen/${id}/read`, error);
-      return formatApiError(error, 'Fehler beim Markieren als gelesen');
-    }
-  },
-  
-  markAllAsRead: async () => {
-    try {
-      const response = await api.put('/benachrichtigungen/read-all');
-      return response.data;
-    } catch (error) {
-      logError('markAllAsRead /benachrichtigungen/read-all', error);
-      return formatApiError(error, 'Fehler beim Markieren aller Benachrichtigungen als gelesen');
-    }
-  },
-  
-  deleteAllRead: async () => {
-    try {
-      const response = await api.delete('/benachrichtigungen/read');
-      return response.data;
-    } catch (error) {
-      logError('deleteAllRead /benachrichtigungen/read', error);
-      return formatApiError(error, 'Fehler beim Löschen gelesener Benachrichtigungen');
-    }
-  },
-  
-  getUnread: async () => {
-    try {
-      const response = await api.get('/benachrichtigungen/unread');
-      return response.data;
-    } catch (error) {
-      logError('getUnread /benachrichtigungen/unread', error);
-      return formatApiError(error, 'Fehler beim Laden ungelesener Benachrichtigungen');
-    }
-  },
-  
-  getCount: async () => {
-    try {
-      const response = await api.get('/benachrichtigungen/count');
-      return response.data;
-    } catch (error) {
-      logError('getCount /benachrichtigungen/count', error);
-      return formatApiError(error, 'Fehler beim Abrufen der Benachrichtigungsanzahl');
-    }
-  }
-};
-
-// Custom umzugsaufnahme service
-export const umzugsaufnahmeService = {
-  ...createService('/umzugsaufnahmen'),
-  
-  uploadBilder: async (id, itemId, bilder) => {
-    try {
-      const formData = new FormData();
-      bilder.forEach(bild => {
-        formData.append('bilder', bild);
-      });
-      
-      const response = await api.post(`/umzugsaufnahmen/${id}/items/${itemId}/bilder`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      
-      return response.data;
-    } catch (error) {
-      logError(`uploadBilder /umzugsaufnahmen/${id}/items/${itemId}/bilder`, error);
-      return formatApiError(error, 'Fehler beim Hochladen der Bilder');
-    }
-  }
-};
-
-// Specialized file service with upload progress
-export const fileService = {
-  ...createService('/files'),
-  
-  uploadFile: async (fileData) => {
-    try {
-      // Add null check for fileData itself
-      if (!fileData) {
-        console.error('uploadFile called with null or undefined fileData');
-        return {
-          success: false,
-          message: 'Keine Datei zum Hochladen angegeben',
-          errors: [{ field: 'file', message: 'Datei ist erforderlich' }]
-        };
-      }
-      
-      const formData = new FormData();
-      
-      if (fileData.file) {
-        formData.append('file', fileData.file);
-      }
-      
-      if (fileData.project) {
-        formData.append('project', fileData.project);
-      }
-      
-      if (fileData.category) {
-        formData.append('category', fileData.category);
-      }
-      
-      if (fileData.task) {
-        formData.append('task', fileData.task);
-      }
-      
-      // Add additional metadata
-      if (fileData.description) {
-        formData.append('description', fileData.description);
-      }
-      
-      if (fileData.tags) {
-        if (Array.isArray(fileData.tags)) {
-          fileData.tags.forEach(tag => tag && formData.append('tags[]', tag));
-        } else {
-          formData.append('tags', fileData.tags);
-        }
-      }
-      
       const response = await api.post('/files/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
-        onUploadProgress: progressEvent => {
-          if (fileData.onProgress && typeof fileData.onProgress === 'function' && progressEvent?.total) {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            fileData.onProgress(percentCompleted);
-          }
-        }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: metadata.onProgress || null,
       });
       
-      return response.data;
+      return { success: true, data: response.data };
     } catch (error) {
-      logError('files:upload', error, { fileName: fileData.file?.name });
-      return formatApiError(error, 'Fehler beim Hochladen der Datei');
+      return new BaseService().handleError(error);
     }
-  },
+  }
   
-  downloadFile: async (id) => {
+  async download(id) {
     try {
-      const response = await api.get(`/files/download/${id}`, { responseType: 'blob' });
+      const response = await api.get(`/files/download/${id}`, {
+        responseType: 'blob'
+      });
       
-      // Extract filename or use generic name with null safety
-      const contentDisposition = response?.headers?.['content-disposition'];
+      // Extract filename from headers
+      const contentDisposition = response.headers['content-disposition'];
       let filename = 'download';
       
       if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
-        if (filenameMatch && filenameMatch[1]) {
-          // Fix: Use global replace to remove all quotes
-          filename = filenameMatch[1].replace(/['"\/\\:*?<>|]/g, '');
+        const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (match && match[1]) {
+          filename = match[1].replace(/['"]/g, '');
         }
       }
       
@@ -1187,12 +951,53 @@ export const fileService = {
       link.remove();
       window.URL.revokeObjectURL(url);
       
-      return { success: true, message: 'Download gestartet' };
+      return { success: true };
     } catch (error) {
-      logError(`files:download/${id}`, error);
-      return formatApiError(error, 'Fehler beim Herunterladen der Datei');
+      return new BaseService().handleError(error);
     }
   }
-};
+  
+  async getAll(params = {}) {
+    return new BaseService().handleResponse(api.get('/files', { params }));
+  }
+  
+  async getById(id) {
+    return new BaseService().handleResponse(api.get(`/files/${id}`));
+  }
+  
+  async update(id, updates) {
+    return new BaseService().handleResponse(api.put(`/files/${id}`, updates));
+  }
+  
+  async delete(id) {
+    return new BaseService().handleResponse(api.delete(`/files/${id}`));
+  }
+}
 
+// Initialize services
+export const userService = new UserService();
+export const umzugService = new UmzugService();
+export const mitarbeiterService = new MitarbeiterService();
+export const aufnahmeService = new AufnahmeService();
+export const financeService = new FinanceService();
+export const notificationService = new NotificationService();
+export const timeTrackingService = new TimeTrackingService();
+export const clientService = new ClientService();
+export const fileService = new FileService();
+export const projectService = new ProjectService();
+export const taskService = new TaskService();
+export const vehicleService = new VehicleService();
+export const authService = new AuthService();
+
+// Aliases for backward compatibility
+export const umzuegeService = umzugService;
+export const finanzenService = financeService;
+export const aufnahmenService = aufnahmeService;
+export const fahrzeugeService = vehicleService;
+export const zeiterfassungService = timeTrackingService;
+
+// Export API instance for custom requests
 export default api;
+
+// Export configuration for testing
+export { API_CONFIG, tokenManager };

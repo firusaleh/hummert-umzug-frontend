@@ -131,7 +131,7 @@ export default function UmzugsaufnahmeFormular({ initialData = {}, onSave, onCan
 
   // Transformiert die Aufnahme-Daten für die API
   const transformAufnahmeData = useCallback((data) => {
-    console.log('Transformiere Aufnahme-Daten für API:', data);
+    // Transformiere Aufnahme-Daten für API
     
     // Kopie erstellen, um das Original nicht zu verändern
     const transformed = { ...data };
@@ -155,18 +155,18 @@ export default function UmzugsaufnahmeFormular({ initialData = {}, onSave, onCan
                 dateObj.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
                 transformed.datum = dateObj.toISOString();
               } catch (uhrzeitError) {
-                console.error('Fehler beim Kombinieren von Datum und Uhrzeit:', uhrzeitError);
+                // Fehler beim Kombinieren von Datum und Uhrzeit
               }
             }
             
-            console.log('Formatiertes Datum:', transformed.datum);
+            // Datum erfolgreich formatiert
           } else {
-            console.warn('Ungültiges Datumsformat, verwende aktuelles Datum');
+            // Ungültiges Datumsformat, verwende aktuelles Datum
             transformed.datum = new Date().toISOString();
           }
         }
       } catch (error) {
-        console.error('Fehler beim Formatieren des Datums:', error);
+        // Fehler beim Formatieren des Datums
         transformed.datum = new Date().toISOString();
       }
     } else {
@@ -193,7 +193,7 @@ export default function UmzugsaufnahmeFormular({ initialData = {}, onSave, onCan
         transformed.angebotspreis.brutto = Math.round(transformed.angebotspreis.brutto * 100) / 100;
       }
       
-      console.log('Formatierte Preise:', transformed.angebotspreis);
+      // Preise erfolgreich formatiert
     }
     
     // Umzugsvolumen als Zahl formatieren
@@ -204,7 +204,7 @@ export default function UmzugsaufnahmeFormular({ initialData = {}, onSave, onCan
       // Sicherstellen, dass das Volumen nicht negativ ist
       if (transformed.umzugsvolumen < 0) transformed.umzugsvolumen = 0;
       
-      console.log('Formatiertes Umzugsvolumen:', transformed.umzugsvolumen);
+      // Umzugsvolumen erfolgreich formatiert
     }
     
     // Validiere Bewertung (1-5)
@@ -235,7 +235,7 @@ export default function UmzugsaufnahmeFormular({ initialData = {}, onSave, onCan
       if (transformed.auszugsadresse.etage < 0) transformed.auszugsadresse.etage = 0;
       if (transformed.auszugsadresse.entfernung < 0) transformed.auszugsadresse.entfernung = 0;
       
-      console.log('Formatierte Auszugsadresse:', transformed.auszugsadresse);
+      // Auszugsadresse erfolgreich formatiert
     }
     
     if (transformed.einzugsadresse) {
@@ -257,7 +257,7 @@ export default function UmzugsaufnahmeFormular({ initialData = {}, onSave, onCan
       if (transformed.einzugsadresse.etage < 0) transformed.einzugsadresse.etage = 0;
       if (transformed.einzugsadresse.entfernung < 0) transformed.einzugsadresse.entfernung = 0;
       
-      console.log('Formatierte Einzugsadresse:', transformed.einzugsadresse);
+      // Einzugsadresse erfolgreich formatiert
     }
     
     // Kontaktdaten formatieren
@@ -274,7 +274,7 @@ export default function UmzugsaufnahmeFormular({ initialData = {}, onSave, onCan
       // Deutsche Telefonnummer validieren
       const phoneRegex = /^(\+49|0)[0-9\s\/-]{6,20}$/;
       if (!phoneRegex.test(transformed.telefon)) {
-        console.warn('Ungültiges Telefonformat');
+        // Warnung: Ungültiges Telefonformat
       }
     }
     
@@ -283,7 +283,7 @@ export default function UmzugsaufnahmeFormular({ initialData = {}, onSave, onCan
       // E-Mail-Format validieren
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(transformed.email)) {
-        console.warn('Ungültiges E-Mail-Format');
+        // Warnung: Ungültiges E-Mail-Format
       }
     }
     
@@ -304,7 +304,7 @@ export default function UmzugsaufnahmeFormular({ initialData = {}, onSave, onCan
     // uhrzeit-Feld entfernen, da wir es bereits ins Datum integriert haben
     delete transformed.uhrzeit;
     
-    console.log('Transformierte Daten für API:', transformed);
+    // Daten für API transformiert
     return transformed;
   }, []);
 

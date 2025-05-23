@@ -63,7 +63,7 @@ export default function AufnahmeForm() {
       try {
         transformed.datum = new Date(transformed.datum).toISOString();
       } catch (error) {
-        console.error('Fehler beim Formatieren des Datums:', error);
+        // Fehler beim Formatieren des Datums
         transformed.datum = new Date().toISOString();
       }
     } else {
@@ -144,14 +144,14 @@ export default function AufnahmeForm() {
             const filesData = extractApiData(filesResponse);
             setUploadedFiles(ensureArray(filesData) || []);
           } catch (fileError) {
-            console.error('Fehler beim Laden der Dateien:', fileError);
+            // Fehler beim Laden der Dateien
             // Keine Aktion notwendig, Uploads sind optional
             setUploadedFiles([]);
           }
           
           setLoading(false);
         } catch (error) {
-          console.error('Fehler beim Laden der Aufnahme:', error);
+          // Fehler beim Laden der Aufnahme
           toast.error('Die Aufnahme konnte nicht geladen werden: ' + (error.message || 'Unbekannter Fehler'));
           setLoading(false);
           navigate('/aufnahmen'); // Zurück zur Übersicht bei Fehler
@@ -191,7 +191,7 @@ export default function AufnahmeForm() {
           throw new Error('Keine Mitarbeiterdaten erhalten');
         }
       } catch (error) {
-        console.error('Fehler beim Laden der Mitarbeiter:', error);
+        // Fehler beim Laden der Mitarbeiter
         toast.error('Mitarbeiterdaten konnten nicht geladen werden');
         setVerfuegbareMitarbeiter([]);
       }
@@ -275,7 +275,7 @@ export default function AufnahmeForm() {
         }
       }
     } catch (error) {
-      console.error('Fehler beim Datei-Upload:', error);
+      // Fehler beim Datei-Upload
       toast.error('Fehler beim Hochladen der Dateien: ' + (error.message || 'Unbekannter Fehler'));
     }
   };
@@ -300,7 +300,7 @@ export default function AufnahmeForm() {
         throw new Error(deleteResult?.message || 'Unbekannter Fehler');
       }
     } catch (error) {
-      console.error('Fehler beim Löschen der Datei:', error);
+      // Fehler beim Löschen der Datei
       toast.error('Fehler beim Löschen der Datei: ' + (error.message || 'Unbekannter Fehler'));
     }
   };
@@ -319,9 +319,7 @@ export default function AufnahmeForm() {
         return;
       }
       
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('Speichere Aufnahme:', transformedData);
-      }
+      // Debug: Speichere Aufnahme in development
       
       let response;
       
@@ -369,7 +367,7 @@ export default function AufnahmeForm() {
       // Zurück zur Aufnahmen-Übersicht navigieren
       navigate('/aufnahmen');
     } catch (error) {
-      console.error('Fehler beim Speichern der Aufnahme:', error);
+      // Fehler beim Speichern der Aufnahme
       toast.error('Fehler beim Speichern: ' + (error.message || 'Unbekannter Fehler'));
     }
   };

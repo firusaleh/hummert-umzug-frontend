@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { isNetworkError, isAuthError, formatApiError } from '../utils/errorHandler';
 import { isErrorResponse, getErrorMessage } from '../utils/dataUtils';
 

@@ -41,7 +41,7 @@ const FahrzeugeList = () => {
         setFahrzeuge(Array.isArray(data) ? data : []);
         setFilteredFahrzeuge(Array.isArray(data) ? data : []);
       } catch (err) {
-        console.error('Fehler beim Laden der Fahrzeuge:', err);
+        // Fehler beim Laden der Fahrzeuge
         setError('Die Fahrzeuge konnten nicht geladen werden.');
         toast.error('Fahrzeuge konnten nicht geladen werden');
       } finally {
@@ -108,7 +108,7 @@ const FahrzeugeList = () => {
         setFahrzeuge(Array.isArray(data) ? data : []);
         setFilteredFahrzeuge(Array.isArray(data) ? data : []);
       } catch (error) {
-        console.error('Fehler beim Löschen des Fahrzeugs:', error);
+        // Fehler beim Löschen des Fahrzeugs
         toast.error('Das Fahrzeug konnte nicht gelöscht werden');
       }
     }

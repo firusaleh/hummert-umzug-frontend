@@ -15,7 +15,7 @@ const AufnahmenList = () => {
     setLoading(true);
     try {
       const response = await aufnahmenService.getAll();
-      console.log('API Response für Aufnahmen:', response);
+      // API Response für Aufnahmen erhalten
       
       // Extrahiere die Aufnahmen aus der Antwort
       // Die Antwort kann entweder direkt ein Array sein, oder in response.aufnahmen oder response.data enthalten sein
@@ -45,10 +45,10 @@ const AufnahmenList = () => {
         }
       }
       
-      console.log('Extrahierte Aufnahmen:', aufnahmenData);
+      // Aufnahmen erfolgreich extrahiert
       setAufnahmen(aufnahmenData);
     } catch (error) {
-      console.error('Fehler beim Laden der Aufnahmen:', error);
+      // Fehler beim Laden der Aufnahmen
       // Verbesserte Fehlermeldung mit Details
       const errorMessage = error.response?.data?.message || error.message || 'Die Aufnahmen konnten nicht geladen werden.';
       alert(`Fehler: ${errorMessage}`);
@@ -87,7 +87,7 @@ const AufnahmenList = () => {
         // Nach erfolgreicher Löschung aktualisierte Liste laden
         loadAufnahmen();
       } catch (error) {
-        console.error('Fehler beim Löschen der Aufnahme:', error);
+        // Fehler beim Löschen der Aufnahme
         const errorMessage = error.response?.data?.message || error.message || 'Die Aufnahme konnte nicht gelöscht werden.';
         alert(`Fehler: ${errorMessage}`);
         setLoading(false);
@@ -115,11 +115,11 @@ const AufnahmenList = () => {
       if (currentAufnahme) {
         // Bestehende Aufnahme aktualisieren
         result = await aufnahmenService.update(currentAufnahme._id, data);
-        console.log('Aufnahme aktualisiert:', result);
+        // Aufnahme erfolgreich aktualisiert
       } else {
         // Neue Aufnahme erstellen
         result = await aufnahmenService.create(data);
-        console.log('Neue Aufnahme erstellt:', result);
+        // Neue Aufnahme erfolgreich erstellt
       }
       
       // Formular schließen und Aufnahmen neu laden
@@ -131,7 +131,7 @@ const AufnahmenList = () => {
       const action = currentAufnahme ? 'aktualisiert' : 'erstellt';
       alert(`Aufnahme erfolgreich ${action}!`);
     } catch (error) {
-      console.error('Fehler beim Speichern:', error);
+      // Fehler beim Speichern der Aufnahme
       const errorMessage = error.response?.data?.message || error.message || 'Es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.';
       alert(`Fehler: ${errorMessage}`);
     } finally {

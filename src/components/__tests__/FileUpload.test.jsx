@@ -2,9 +2,9 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import FileUpload from '../files/FileUpload.fixed';
-import api from '../../services/api.fixed';
+import api from '../../services/api';
 
-jest.mock('../../services/api.fixed');
+jest.mock('../../services/api');
 
 describe('FileUpload', () => {
   const defaultProps = {

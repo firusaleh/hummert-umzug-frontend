@@ -1,6 +1,6 @@
 // src/services/websocket.js
 import { io } from 'socket.io-client';
-import { tokenManager } from './api.fixed';
+import { tokenManager } from './api';
 
 class WebSocketService {
   constructor() {
@@ -13,9 +13,9 @@ class WebSocketService {
   }
   
   // Connect to WebSocket server
-  connect(url = process.env.REACT_APP_WS_URL || 'http://localhost:5000') {
+  connect(url = process.env.REACT_APP_WS_URL || process.env.REACT_APP_API_URL?.replace('/api', '') || '') {
     if (this.socket && this.isConnected) {
-      console.log('WebSocket already connected');
+      // WebSocket already connected
       return;
     }
     
@@ -40,20 +40,20 @@ class WebSocketService {
   // Setup default event handlers
   setupEventHandlers() {
     this.socket.on('connect', () => {
-      console.log('WebSocket connected');
+      // WebSocket connected
       this.isConnected = true;
       this.reconnectAttempts = 0;
       this.emit('ws:connected');
     });
     
     this.socket.on('disconnect', (reason) => {
-      console.log('WebSocket disconnected:', reason);
+      // WebSocket disconnected
       this.isConnected = false;
       this.emit('ws:disconnected', reason);
     });
     
     this.socket.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error);
+      // WebSocket connection error
       this.reconnectAttempts++;
       
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
@@ -62,18 +62,18 @@ class WebSocketService {
     });
     
     this.socket.on('error', (error) => {
-      console.error('WebSocket error:', error);
+      // WebSocket error occurred
       this.emit('ws:error', error);
     });
     
     // Authentication events
     this.socket.on('authenticated', () => {
-      console.log('WebSocket authenticated');
+      // WebSocket authenticated
       this.emit('ws:authenticated');
     });
     
     this.socket.on('unauthorized', (error) => {
-      console.error('WebSocket unauthorized:', error);
+      // WebSocket unauthorized
       this.emit('ws:unauthorized', error);
       this.disconnect();
     });
@@ -167,7 +167,7 @@ class WebSocketService {
   // Emit event to server
   send(event, data, callback) {
     if (!this.isConnected) {
-      console.warn('WebSocket not connected');
+      // WebSocket not connected
       return;
     }
     
@@ -213,7 +213,7 @@ class WebSocketService {
       try {
         callback(data);
       } catch (error) {
-        console.error(`Error in WebSocket listener for ${event}:`, error);
+        // Error in WebSocket listener
       }
     });
   }

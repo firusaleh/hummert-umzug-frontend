@@ -29,8 +29,7 @@ class ErrorBoundary extends Component {
     // Speichere errorInfo für Debugging
     this.setState({ errorInfo });
     
-    // Fehler in der Konsole protokollieren
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    // Error caught by boundary
     
     // Wenn eine onError Funktion bereitgestellt wurde, rufe sie auf
     if (this.props.onError) {

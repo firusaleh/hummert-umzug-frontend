@@ -36,11 +36,11 @@ const MitarbeiterList = () => {
       setLoading(true);
       try {
         const response = await mitarbeiterService.getAll();
-        console.log('Geladene Mitarbeiter:', response.data);
+        // Mitarbeiter erfolgreich geladen
         setMitarbeiter(response.data);
         setFilteredMitarbeiter(response.data);
       } catch (err) {
-        console.error('Fehler beim Laden der Mitarbeiter:', err);
+        // Fehler beim Laden der Mitarbeiter
         setError('Die Mitarbeiter konnten nicht geladen werden.');
         // Fallback: Wenn Backend nicht erreichbar ist, verwenden wir die lokalen Beispieldaten
         // Diese Zeile würde in Produktion entfernt werden
@@ -109,7 +109,7 @@ const MitarbeiterList = () => {
         setMitarbeiter(response.data);
         setFilteredMitarbeiter(response.data);
       } catch (error) {
-        console.error('Fehler beim Löschen des Mitarbeiters:', error);
+        // Fehler beim Löschen des Mitarbeiters
         alert('Der Mitarbeiter konnte nicht gelöscht werden.');
       }
     }

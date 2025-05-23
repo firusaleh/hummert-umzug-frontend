@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api, { umzuegeService, mitarbeiterService, fahrzeugeService } from '../../services/api';
+import { umzuegeService, mitarbeiterService, fahrzeugeService } from '../../services/api';
 import { toast } from 'react-toastify';
 import { extractApiData, ensureArray } from '../../utils/apiUtils';
 import useErrorHandler from '../../hooks/useErrorHandler';
-import ErrorAlert from '../../components/common/ErrorAlert';
-import { createValidationSchema, patterns, commonRules } from '../../utils/validationUtils';
+import { createValidationSchema, commonRules } from '../../utils/validationUtils';
 import Form from '../../components/common/Form';
 import FormField from '../../components/common/FormField';
 
@@ -268,14 +267,14 @@ export default function UmzugForm() {
         // Make sure the date is valid before converting
         const date = new Date(transformed.startDatum);
         if (isNaN(date.getTime())) {
-          console.error('Ungültiges Startdatum:', transformed.startDatum);
+          // Invalid start date
           // Provide a valid default date if the startDatum is invalid
           transformed.startDatum = new Date().toISOString();
         } else {
           transformed.startDatum = date.toISOString();
         }
       } catch (error) {
-        console.error('Fehler beim Formatieren des Startdatums:', error);
+        // Error formatting start date
         transformed.startDatum = new Date().toISOString();
       }
     } else {
@@ -288,7 +287,7 @@ export default function UmzugForm() {
         // Make sure the date is valid before converting
         const date = new Date(transformed.endDatum);
         if (isNaN(date.getTime())) {
-          console.error('Ungültiges Enddatum:', transformed.endDatum);
+          // Invalid end date
           // Provide a valid default end date (1 day after start)
           const defaultEnd = new Date(transformed.startDatum);
           defaultEnd.setDate(defaultEnd.getDate() + 1);
@@ -297,7 +296,7 @@ export default function UmzugForm() {
           transformed.endDatum = date.toISOString();
         }
       } catch (error) {
-        console.error('Fehler beim Formatieren des Enddatums:', error);
+        // Error formatting end date
         // Provide a valid default end date (1 day after start)
         const defaultEnd = new Date(transformed.startDatum);
         defaultEnd.setDate(defaultEnd.getDate() + 1);
@@ -347,7 +346,7 @@ export default function UmzugForm() {
     // Überprüfe, ob die Telefonnummer dem Backend-Pattern entspricht
     const phoneRegex = /^[+]?[0-9\s\-\(\)]{8,20}$/;
     if (!phoneRegex.test(transformed.auftraggeber.telefon)) {
-      console.warn('Telefonnummer entspricht nicht dem erwarteten Format, korrigiere...');
+      // Phone number doesn't match expected format, correcting...
       // Bereinigen und formatieren der Telefonnummer
       let phone = transformed.auftraggeber.telefon.replace(/[^\d+\s\-()]/g, '');
       if (phone.length < 8) phone = '00000000'; // Mindestlänge sicherstellen
@@ -557,7 +556,7 @@ export default function UmzugForm() {
             
             setVerfuegbareMitarbeiter(formattedMitarbeiter);
           } else {
-            console.warn('Keine Mitarbeiter gefunden');
+            // No employees found
             setVerfuegbareMitarbeiter([]);
           }
         } else {
@@ -580,7 +579,7 @@ export default function UmzugForm() {
             
             setVerfuegbareFahrzeuge(formattedFahrzeuge);
           } else {
-            console.warn('Keine Fahrzeuge gefunden');
+            // No vehicles found
             setVerfuegbareFahrzeuge([]);
           }
         } else {
@@ -593,7 +592,7 @@ export default function UmzugForm() {
     };
     
     fetchResources();
-  }, [id, navigate, resetForm, handleApiError, updateFields]);
+  }, [id, navigate, resetForm, handleApiError, updateFields, clearErrors]);
 
   // Behandelt Änderungen in FormField-Komponenten
   const handleInputChange = (name, value) => {
@@ -689,9 +688,9 @@ export default function UmzugForm() {
       try {
         transformedData = transformUmzugData(formData);
         // Detailliertes Logging für Debugging
-        console.log('Transformierte Daten zum Speichern:', JSON.stringify(transformedData, null, 2));
+        // Transformed data ready for saving
       } catch (transformError) {
-        console.error('Fehler bei der Datentransformation:', transformError);
+        // Error during data transformation
         toast.error('Fehler bei der Vorbereitung der Daten: ' + transformError.message);
         return;
       }
@@ -703,18 +702,18 @@ export default function UmzugForm() {
           const toastId = toast.loading('Erstelle Umzug...');
           
           const response = await umzuegeService.create(transformedData);
-          console.log('API response:', response);
+          // API response received
           
           // Update the loading toast
           toast.dismiss(toastId);
           
           // Check if response indicates an error
           if (response && !response.success) {
-            console.error('API returned error:', response.message, response.errors);
+            // API returned error
             
             // Extract and show detailed validation errors
             if (response.errors && Array.isArray(response.errors)) {
-              console.table(response.errors); // Better display of errors
+              // Multiple validation errors
               
               // Group errors by field for easier debugging
               const errorsByField = {};
@@ -725,7 +724,7 @@ export default function UmzugForm() {
                   setFieldError(err.field, err.message);
                 }
               });
-              console.log('Grouped errors by field:', errorsByField);
+              // Validation errors grouped by field
               
               // Generate a more user-friendly error message for display
               const errorFieldsList = Object.keys(errorsByField).map(field => 
@@ -787,7 +786,7 @@ export default function UmzugForm() {
           
           // Check if response indicates an error
           if (response && !response.success) {
-            console.error('API error on update:', response.message, response.errors);
+            // API error on update
             
             if (response.errors && Array.isArray(response.errors)) {
               // Generate a more user-friendly error message

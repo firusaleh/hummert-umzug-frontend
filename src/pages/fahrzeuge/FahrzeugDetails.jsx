@@ -41,7 +41,7 @@ const FahrzeugDetails = () => {
           throw new Error('Keine Fahrzeugdaten erhalten');
         }
       } catch (err) {
-        console.error('Fehler beim Laden des Fahrzeugs:', err);
+        // Fehler beim Laden des Fahrzeugs
         setError('Das Fahrzeug konnte nicht geladen werden.');
         toast.error('Fahrzeug konnte nicht geladen werden');
       } finally {
@@ -62,7 +62,7 @@ const FahrzeugDetails = () => {
         toast.success('Fahrzeug erfolgreich gelöscht');
         navigate('/fahrzeuge');
       } catch (error) {
-        console.error('Fehler beim Löschen des Fahrzeugs:', error);
+        // Fehler beim Löschen des Fahrzeugs
         toast.error('Das Fahrzeug konnte nicht gelöscht werden');
       }
     }

@@ -1,278 +1,439 @@
-// src/context/AuthContext.jsx - Korrigierte Version
-import React, { createContext, useState, useEffect, useCallback } from 'react';
+// src/context/AuthContext.fixed.jsx
+import React, { createContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { authService } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
-// AuthContext erstellen
-const AuthContext = createContext();
+// Constants
+const TOKEN_KEY = 'auth_token';
+const USER_KEY = 'auth_user';
+const REFRESH_TOKEN_KEY = 'refresh_token';
+const TOKEN_TIMESTAMP_KEY = 'token_timestamp';
+const TOKEN_EXPIRY_TIME = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
-// Zusätzlich als benannten Export anbieten
-export { AuthContext };
+// Create Context
+export const AuthContext = createContext({
+  user: null,
+  loading: true,
+  error: null,
+  isAuthenticated: false,
+  isApiAvailable: false,
+  login: async () => {},
+  logout: () => {},
+  register: async () => {},
+  updateProfile: async () => {},
+  changePassword: async () => {},
+  forgotPassword: async () => {},
+  resetPassword: async () => {},
+  checkApiAvailability: async () => {},
+  clearError: () => {},
+  refreshToken: async () => {}
+});
 
-// Custom Hook zum einfachen Zugriff auf den AuthContext
+// Custom Hook
 export const useAuth = () => {
   const context = React.useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
 
+// Axios interceptor setup
+const setupAxiosInterceptors = (logout, refreshToken) => {
+  // Request interceptor to add token
+  axios.interceptors.request.use(
+    (config) => {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    },
+    (error) => Promise.reject(error)
+  );
+
+  // Response interceptor to handle token expiry
+  axios.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      const originalRequest = error.config;
+
+      if (error.response?.status === 401 && !originalRequest._retry) {
+        originalRequest._retry = true;
+
+        try {
+          const newToken = await refreshToken();
+          if (newToken) {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return axios(originalRequest);
+          }
+        } catch (refreshError) {
+          logout();
+          return Promise.reject(refreshError);
+        }
+      }
+
+      return Promise.reject(error);
+    }
+  );
+};
+
 export const AuthProvider = ({ children }) => {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isApiAvailable, setIsApiAvailable] = useState(false); 
+  const [isApiAvailable, setIsApiAvailable] = useState(false);
 
-  // Funktion zum Prüfen der API-Verfügbarkeit als useCallback für Stabilität
+  // Clear error
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  // Check API availability
   const checkApiAvailability = useCallback(async () => {
     try {
-      console.log("Prüfe API-Verfügbarkeit...");
-      const response = await authService.checkApiHealth();
-      console.log("API ist verfügbar!", response);
+      await authService.checkApiHealth();
       setIsApiAvailable(true);
       return true;
     } catch (error) {
-      console.warn('API nicht erreichbar:', error);
+      console.warn('API not available:', error);
       setIsApiAvailable(false);
       return false;
     }
   }, []);
 
-  // Logout-Funktion
-  const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('tokenTimestamp');
-    setUser(null);
-    setError(null);
-    // Die Weiterleitung zur Login-Seite erfolgt jetzt direkt hier
-    window.location.href = '/login';
+  // Token management
+  const isTokenExpired = useCallback(() => {
+    const timestamp = localStorage.getItem(TOKEN_TIMESTAMP_KEY);
+    if (!timestamp) return true;
+    
+    const tokenAge = Date.now() - parseInt(timestamp);
+    return tokenAge > TOKEN_EXPIRY_TIME;
   }, []);
 
-  // Beim Laden der Anwendung prüfen, ob der Benutzer bereits angemeldet ist
+  const saveAuthData = useCallback((token, refreshToken, user) => {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    localStorage.setItem(TOKEN_TIMESTAMP_KEY, Date.now().toString());
+  }, []);
+
+  const clearAuthData = useCallback(() => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(TOKEN_TIMESTAMP_KEY);
+    setUser(null);
+    setError(null);
+  }, []);
+
+  // Refresh token
+  const refreshToken = useCallback(async () => {
+    try {
+      const refresh = localStorage.getItem(REFRESH_TOKEN_KEY);
+      if (!refresh) throw new Error('No refresh token');
+
+      const response = await authService.refreshToken(refresh);
+      const { token, user } = response.data;
+      
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(TOKEN_TIMESTAMP_KEY, Date.now().toString());
+      setUser(user);
+      
+      return token;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      throw error;
+    }
+  }, []);
+
+  // Logout
+  const logout = useCallback(async () => {
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (token) {
+        await authService.logout();
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      clearAuthData();
+      navigate('/login');
+    }
+  }, [clearAuthData, navigate]);
+
+  // Login
+  const login = useCallback(async (credentials) => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const apiAvailable = await checkApiAvailability();
+      if (!apiAvailable) {
+        throw new Error('Server ist derzeit nicht erreichbar');
+      }
+
+      const response = await authService.login(credentials);
+      const { token, refreshToken, user } = response.data;
+
+      if (!token) {
+        throw new Error('Kein Token in der Antwort erhalten');
+      }
+
+      saveAuthData(token, refreshToken, user);
+      setUser(user);
+      setError(null);
+
+      return { success: true, user };
+    } catch (error) {
+      console.error('Login failed:', error);
+      
+      let errorMessage = 'Login fehlgeschlagen';
+      
+      if (error.response) {
+        switch (error.response.status) {
+          case 401:
+            errorMessage = 'Ungültige Anmeldedaten';
+            break;
+          case 404:
+            errorMessage = 'Benutzer nicht gefunden';
+            break;
+          case 429:
+            errorMessage = 'Zu viele Anmeldeversuche. Bitte später versuchen';
+            break;
+          default:
+            errorMessage = error.response.data?.message || errorMessage;
+        }
+      } else if (error.request) {
+        errorMessage = 'Keine Verbindung zum Server';
+      } else {
+        errorMessage = error.message;
+      }
+
+      setError(errorMessage);
+      return { success: false, message: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  }, [checkApiAvailability, saveAuthData]);
+
+  // Register
+  const register = useCallback(async (userData) => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const apiAvailable = await checkApiAvailability();
+      if (!apiAvailable) {
+        throw new Error('Server ist derzeit nicht erreichbar');
+      }
+
+      const response = await authService.register(userData);
+      const { token, refreshToken, user } = response.data;
+
+      if (!token) {
+        throw new Error('Kein Token in der Antwort erhalten');
+      }
+
+      saveAuthData(token, refreshToken, user);
+      setUser(user);
+      setError(null);
+
+      return { success: true, user };
+    } catch (error) {
+      console.error('Registration failed:', error);
+      
+      let errorMessage = 'Registrierung fehlgeschlagen';
+      
+      if (error.response) {
+        switch (error.response.status) {
+          case 409:
+            errorMessage = 'E-Mail-Adresse bereits registriert';
+            break;
+          case 400:
+            if (error.response.data?.errors) {
+              errorMessage = error.response.data.errors
+                .map(err => err.message || err.msg)
+                .join(', ');
+            } else {
+              errorMessage = 'Ungültige Eingabedaten';
+            }
+            break;
+          default:
+            errorMessage = error.response.data?.message || errorMessage;
+        }
+      } else if (error.request) {
+        errorMessage = 'Keine Verbindung zum Server';
+      } else {
+        errorMessage = error.message;
+      }
+
+      setError(errorMessage);
+      return { success: false, message: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  }, [checkApiAvailability, saveAuthData]);
+
+  // Update profile
+  const updateProfile = useCallback(async (profileData) => {
+    try {
+      const response = await authService.updateProfile(profileData);
+      const updatedUser = response.data.user;
+      
+      setUser(updatedUser);
+      localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+      
+      return { success: true, user: updatedUser };
+    } catch (error) {
+      console.error('Profile update failed:', error);
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Profil-Update fehlgeschlagen' 
+      };
+    }
+  }, []);
+
+  // Change password
+  const changePassword = useCallback(async (passwordData) => {
+    try {
+      await authService.changePassword(passwordData);
+      return { success: true };
+    } catch (error) {
+      console.error('Password change failed:', error);
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Passwortänderung fehlgeschlagen' 
+      };
+    }
+  }, []);
+
+  // Forgot password
+  const forgotPassword = useCallback(async (email) => {
+    try {
+      await authService.forgotPassword(email);
+      return { success: true };
+    } catch (error) {
+      console.error('Forgot password failed:', error);
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Anfrage fehlgeschlagen' 
+      };
+    }
+  }, []);
+
+  // Reset password
+  const resetPassword = useCallback(async (token, newPassword) => {
+    try {
+      await authService.resetPassword(token, newPassword);
+      return { success: true };
+    } catch (error) {
+      console.error('Password reset failed:', error);
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Passwort-Reset fehlgeschlagen' 
+      };
+    }
+  }, []);
+
+  // Initialize auth state
   useEffect(() => {
     const initAuth = async () => {
       try {
-        // Zuerst API-Verfügbarkeit prüfen
         const apiAvailable = await checkApiAvailability();
-        
-        // Token und Benutzerdaten aus localStorage holen
-        const token = localStorage.getItem('token');
-        const storedUser = localStorage.getItem('user');
-        
+        const token = localStorage.getItem(TOKEN_KEY);
+        const storedUser = localStorage.getItem(USER_KEY);
+
         if (!apiAvailable) {
-          console.warn('API nicht erreichbar, Authentifizierung wird übersprungen');
-          // Wenn die API nicht verfügbar ist, aber ein Token und Benutzerdaten existieren,
-          // setzen wir den Benutzer trotzdem, aber markieren den Loading-Status als abgeschlossen
           if (token && storedUser) {
             try {
-              const userData = JSON.parse(storedUser);
-              setUser(userData);
+              setUser(JSON.parse(storedUser));
             } catch (parseError) {
-              console.error('Fehler beim Parsen der Benutzerdaten:', parseError);
-              localStorage.removeItem('user'); // Ungültige Daten entfernen
+              console.error('Failed to parse user data:', parseError);
+              clearAuthData();
             }
           }
-          setLoading(false);
           return;
         }
 
-        // Wenn API verfügbar ist und Token existiert, Authentifizierung prüfen
         if (token && storedUser) {
-          try {
-            const userData = JSON.parse(storedUser);
-            
-            // Token-Gültigkeit überprüfen
+          if (isTokenExpired()) {
             try {
-              await authService.checkAuth();
-              console.log('Token gültig, Benutzer bereits angemeldet');
-              setUser(userData);
-            } catch (tokenError) {
-              console.warn('Token ist nicht mehr gültig:', tokenError);
-              // Token ist ungültig, ausloggen aber keine Weiterleitung
-              localStorage.removeItem('token');
-              localStorage.removeItem('user');
-              localStorage.removeItem('tokenTimestamp');
-              setUser(null);
+              await refreshToken();
+            } catch (refreshError) {
+              console.error('Token refresh failed:', refreshError);
+              clearAuthData();
             }
-          } catch (parseError) {
-            console.error('Fehler beim Parsen der Benutzerdaten:', parseError);
-            localStorage.removeItem('user'); // Ungültige Daten entfernen
+          } else {
+            try {
+              const userData = JSON.parse(storedUser);
+              await authService.checkAuth();
+              setUser(userData);
+            } catch (error) {
+              console.error('Auth check failed:', error);
+              clearAuthData();
+            }
           }
         }
       } catch (error) {
-        console.error('Fehler beim Initialisieren der Authentifizierung:', error);
+        console.error('Auth initialization failed:', error);
       } finally {
         setLoading(false);
       }
     };
-    
+
     initAuth();
-  }, [checkApiAvailability]);
+  }, [checkApiAvailability, isTokenExpired, refreshToken, clearAuthData]);
 
-  // Login-Funktion
-  const login = async (credentials) => {
-    setError(null);
-    setLoading(true);
-    
-    try {
-      // Prüfe API-Verfügbarkeit direkt vor dem Login-Versuch
-      const apiAvailable = await checkApiAvailability();
-      
-      if (!apiAvailable) {
-        console.error('Login nicht möglich: API nicht erreichbar');
-        setLoading(false);
-        return { 
-          success: false, 
-          message: 'Der Server ist derzeit nicht erreichbar. Bitte versuchen Sie es später erneut.'
-        };
-      }
-      
-      console.log('Login-Versuch mit:', { email: credentials.email });
-      
-      const response = await authService.login(credentials);
-      console.log('Login-Antwort erhalten:', response);
-      
-      if (response && response.data && response.data.token) {
-        // Token und Benutzer im localStorage speichern
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('tokenTimestamp', Date.now().toString());
-        
-        // Ensure user data exists before storing
-        if (response.data.user) {
-          localStorage.setItem('user', JSON.stringify(response.data.user));
-          setUser(response.data.user);
-        } else {
-          console.warn('No user data in login response, creating minimal user object');
-          // Create minimal user object from the response
-          const minimalUser = { 
-            id: response.data.userId || 'unknown',
-            email: credentials?.email || 'unknown'
-          };
-          localStorage.setItem('user', JSON.stringify(minimalUser));
-          setUser(minimalUser);
-        }
-        
-        setLoading(false);
-        return { success: true };
-      } else {
-        console.error('Ungültiges Antwortformat:', response);
-        throw new Error('Token nicht in der Antwort enthalten');
-      }
-    } catch (error) {
-      console.error('Login fehlgeschlagen:', error);
-      
-      // Detaillierte Fehlerinformationen erfassen
-      let errorMessage = 'Login fehlgeschlagen';
-      
-      if (error.response) {
-        console.error('Server-Fehler:', error.response.status, error.response.data);
-        errorMessage = error.response.data?.message || `Server-Fehler: ${error.response.status}`;
-        
-        // Spezifische Fehlerbehandlung
-        if (error.response.status === 401) {
-          errorMessage = 'Ungültige Anmeldedaten. Bitte überprüfen Sie Ihre E-Mail und Ihr Passwort.';
-        } else if (error.response.status === 404) {
-          errorMessage = 'Der Login-Dienst ist nicht erreichbar. Bitte versuchen Sie es später erneut.';
-        }
-      } else if (error.request) {
-        console.error('Keine Antwort vom Server');
-        errorMessage = 'Keine Antwort vom Server. Bitte überprüfen Sie Ihre Internetverbindung.';
-      } else {
-        console.error('Anfragefehler:', error.message);
-        errorMessage = error.message;
-      }
-      
-      setError(errorMessage);
-      setLoading(false);
-      return { success: false, message: errorMessage };
-    }
-  };
+  // Setup axios interceptors
+  useEffect(() => {
+    setupAxiosInterceptors(logout, refreshToken);
+  }, [logout, refreshToken]);
 
-  // Registrierungs-Funktion
-  const register = async (userData) => {
-    setError(null);
-    setLoading(true);
-    
-    try {
-      // Prüfe API-Verfügbarkeit direkt vor dem Registrierungsversuch
-      const apiAvailable = await checkApiAvailability();
-      
-      if (!apiAvailable) {
-        console.error('Registrierung nicht möglich: API nicht erreichbar');
-        setLoading(false);
-        return { 
-          success: false, 
-          message: 'Der Server ist derzeit nicht erreichbar. Bitte versuchen Sie es später erneut.'
-        };
-      }
-      
-      console.log('Registrierungsversuch mit:', { email: userData.email, name: userData.name });
-      
-      const response = await authService.register(userData);
-      
-      if (response && response.data && response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('tokenTimestamp', Date.now().toString());
-        
-        // Ensure user data exists before storing
-        if (response.data.user) {
-          localStorage.setItem('user', JSON.stringify(response.data.user));
-          setUser(response.data.user);
-        } else {
-          console.warn('No user data in register response, creating minimal user object');
-          // Create minimal user object from the userData
-          const minimalUser = { 
-            id: response.data.userId || 'unknown',
-            email: userData?.email || 'unknown',
-            name: userData?.name || 'User'
-          };
-          localStorage.setItem('user', JSON.stringify(minimalUser));
-          setUser(minimalUser);
-        }
-        
-        setLoading(false);
-        return { success: true };
-      } else {
-        throw new Error('Token nicht in der Antwort enthalten');
-      }
-    } catch (error) {
-      console.error('Registrierung fehlgeschlagen:', error);
-      
-      // Detaillierte Fehlerinformationen erfassen
-      let errorMessage = 'Registrierung fehlgeschlagen';
-      
-      if (error.response) {
-        errorMessage = error.response.data?.message || `Server-Fehler: ${error.response.status}`;
-        
-        // Spezifische Fehlerbehandlung für häufige Registrierungsfehler
-        if (error.response.status === 409 || 
-            (error.response.status === 400 && error.response.data?.message?.includes('existiert bereits'))) {
-          errorMessage = 'Diese E-Mail-Adresse wird bereits verwendet.';
-        } else if (error.response.status === 400) {
-          if (error.response.data?.errors) {
-            // Sammle alle Validierungsfehler
-            errorMessage = error.response.data.errors.map(err => err.msg || err.message).join(', ');
-          } else {
-            errorMessage = 'Ungültige Eingabedaten. Bitte überprüfen Sie alle Felder.';
+  // Auto refresh token before expiry
+  useEffect(() => {
+    if (!user) return;
+
+    const refreshInterval = setInterval(async () => {
+      try {
+        const timestamp = localStorage.getItem(TOKEN_TIMESTAMP_KEY);
+        if (timestamp) {
+          const tokenAge = Date.now() - parseInt(timestamp);
+          const timeUntilExpiry = TOKEN_EXPIRY_TIME - tokenAge;
+          
+          // Refresh 5 minutes before expiry
+          if (timeUntilExpiry < 5 * 60 * 1000) {
+            await refreshToken();
           }
-        } else if (error.response.status === 500) {
-          errorMessage = 'Serverfehler bei der Registrierung. Bitte versuchen Sie es später erneut.';
         }
-      } else if (error.request) {
-        errorMessage = 'Keine Antwort vom Server. Bitte überprüfen Sie Ihre Internetverbindung.';
-      } else {
-        errorMessage = error.message;
+      } catch (error) {
+        console.error('Auto refresh failed:', error);
       }
-      
-      setError(errorMessage);
-      setLoading(false);
-      return { success: false, message: errorMessage };
-    }
-  };
+    }, 60 * 1000); // Check every minute
 
-  // Bereitgestellter Wert für den Context
-  const value = {
+    return () => clearInterval(refreshInterval);
+  }, [user, refreshToken]);
+
+  // Context value
+  const value = useMemo(() => ({
+    user,
+    loading,
+    error,
+    isAuthenticated: !!user,
+    isApiAvailable,
+    login,
+    logout,
+    register,
+    updateProfile,
+    changePassword,
+    forgotPassword,
+    resetPassword,
+    checkApiAvailability,
+    clearError,
+    refreshToken
+  }), [
     user,
     loading,
     error,
@@ -280,8 +441,14 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     register,
-    checkApiAvailability
-  };
+    updateProfile,
+    changePassword,
+    forgotPassword,
+    resetPassword,
+    checkApiAvailability,
+    clearError,
+    refreshToken
+  ]);
 
   return (
     <AuthContext.Provider value={value}>

@@ -36,7 +36,7 @@ const KilometerstandForm = () => {
           throw new Error('Keine Fahrzeugdaten erhalten');
         }
       } catch (err) {
-        console.error('Fehler beim Laden des Fahrzeugs:', err);
+        // Fehler beim Laden des Fahrzeugs
         setError('Das Fahrzeug konnte nicht geladen werden.');
         toast.error('Fahrzeug konnte nicht geladen werden');
       } finally {
@@ -73,7 +73,7 @@ const KilometerstandForm = () => {
       toast.success('Kilometerstand wurde erfolgreich aktualisiert');
       navigate('/fahrzeuge');
     } catch (err) {
-      console.error('Fehler beim Aktualisieren des Kilometerstands:', err);
+      // Fehler beim Aktualisieren des Kilometerstands
       setError(err.message || 'Der Kilometerstand konnte nicht aktualisiert werden.');
       toast.error(err.message || 'Fehler beim Aktualisieren des Kilometerstands');
     } finally {

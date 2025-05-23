@@ -105,7 +105,7 @@ const MitarbeiterForm = () => {
           }
           setLoading(false);
         } catch (err) {
-          console.error('Fehler beim Laden des Mitarbeiters:', err);
+          // Fehler beim Laden des Mitarbeiters
           setError('Der Mitarbeiter konnte nicht geladen werden.');
           setLoading(false);
         }
@@ -171,7 +171,7 @@ const MitarbeiterForm = () => {
       }
       navigate('/mitarbeiter');
     } catch (error) {
-      console.error('Fehler beim Speichern des Mitarbeiters:', error);
+      // Fehler beim Speichern des Mitarbeiters
       toast.error(
         error.response?.data?.message || 
         error.response?.data?.errors?.[0]?.msg || 
@@ -248,7 +248,7 @@ const MitarbeiterForm = () => {
       // Zurück zur Übersicht navigieren
       navigate('/mitarbeiter');
     } catch (err) {
-      console.error('Fehler beim Speichern des Mitarbeiters:', err);
+      // Fehler beim Speichern des Mitarbeiters
       setError(err.response?.data?.message || 'Der Mitarbeiter konnte nicht gespeichert werden.');
       toast.error('Fehler beim Speichern des Mitarbeiters');
     } finally {

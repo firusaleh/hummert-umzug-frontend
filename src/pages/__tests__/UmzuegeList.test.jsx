@@ -3,11 +3,11 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import UmzuegeList from '../umzuege/UmzuegeList.fixed';
-import api from '../../services/api.fixed';
+import api from '../../services/api';
 import { AppContext } from '../../context/AppContext';
 import { NotificationContext } from '../../context/NotificationContext';
 
-jest.mock('../../services/api.fixed');
+jest.mock('../../services/api');
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
