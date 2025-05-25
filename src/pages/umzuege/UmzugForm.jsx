@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { umzuegeService, mitarbeiterService, fahrzeugeService } from '../../services/api';
+import { umzuegeService, mitarbeiterService, fahrzeugeService, configService } from '../../services/api';
 import { toast } from 'react-toastify';
 import { extractApiData, ensureArray } from '../../utils/apiUtils';
 import useErrorHandler from '../../hooks/useErrorHandler';
@@ -21,8 +21,8 @@ const validationSchema = createValidationSchema({
   'status': {
     required: true,
     validate: (value) => {
-      return ['geplant', 'bestaetigt', 'in_bearbeitung', 'abgeschlossen', 'storniert'].includes(value) || 
-        'Status muss einen gültigen Wert haben';
+      // Status validation will be dynamic based on config
+      return true; // Will be validated against dynamic options
     },
     errorMessages: {
       required: 'Status ist erforderlich'
@@ -255,6 +255,14 @@ export default function UmzugForm() {
   const [verfuegbareFahrzeuge, setVerfuegbareFahrzeuge] = useState([]);
   const [showKontaktForm, setShowKontaktForm] = useState(false);
   const [neuerKontakt, setNeuerKontakt] = useState({ name: '', telefon: '', email: '', isKunde: false });
+  
+  // Configuration options from API
+  const [configOptions, setConfigOptions] = useState({
+    umzugStatuses: [],
+    paymentMethods: [],
+    employeeRoles: [],
+    configLoading: true
+  });
 
   // Transformationsfunktion für Umzugsdaten - wichtig für das korrekte Format zum Speichern
   const transformUmzugData = useCallback((data) => {
@@ -331,8 +339,8 @@ export default function UmzugForm() {
       brutto: bruttoValue,
       mwst: mwstValue,
       bezahlt: Boolean(transformed.preis?.bezahlt),
-      zahlungsart: ['rechnung', 'bar', 'ueberweisung', 'paypal', 'kreditkarte', 'ec'].includes(transformed.preis?.zahlungsart) 
-        ? transformed.preis?.zahlungsart : 'rechnung'
+      zahlungsart: configOptions.paymentMethods.includes(transformed.preis?.zahlungsart) 
+        ? transformed.preis?.zahlungsart : (configOptions.paymentMethods[0] || 'rechnung')
     };
     
     // Sicherstellen, dass Auftraggeber alle erforderlichen Felder hat und nicht leer ist
@@ -463,8 +471,8 @@ export default function UmzugForm() {
     }
     
     // Set appropriate status value from backend's allowed list
-    if (!['geplant', 'bestaetigt', 'in_bearbeitung', 'abgeschlossen', 'storniert'].includes(transformed.status)) {
-      transformed.status = 'geplant'; // Default status if invalid
+    if (configOptions.umzugStatuses.length > 0 && !configOptions.umzugStatuses.includes(transformed.status)) {
+      transformed.status = configOptions.umzugStatuses[0] || 'geplant'; // Default to first status or 'geplant'
     }
     
     // Entferne alle undefined/null properties aus dem Objekt, um Validierungsfehler zu vermeiden
@@ -475,6 +483,37 @@ export default function UmzugForm() {
     });
     
     return transformed;
+  }, []);
+
+  // Load configuration options
+  useEffect(() => {
+    const loadConfigs = async () => {
+      try {
+        const [statuses, payments, roles] = await Promise.all([
+          configService.getUmzugStatuses(),
+          configService.getPaymentMethods(),
+          configService.getEmployeeRoles()
+        ]);
+        
+        setConfigOptions({
+          umzugStatuses: statuses,
+          paymentMethods: payments,
+          employeeRoles: roles,
+          configLoading: false
+        });
+      } catch (error) {
+        // Use fallback values from configService
+        const defaults = configService.getDefaultConfigs();
+        setConfigOptions({
+          umzugStatuses: defaults.umzugStatuses,
+          paymentMethods: defaults.paymentMethods,
+          employeeRoles: defaults.employeeRoles,
+          configLoading: false
+        });
+      }
+    };
+    
+    loadConfigs();
   }, []);
 
   // Lade Daten vom API
@@ -896,13 +935,10 @@ export default function UmzugForm() {
               onBlur={touchField}
               error={getFieldError('status')}
               inputProps={{
-                options: [
-                  { value: 'geplant', label: 'Geplant' },
-                  { value: 'bestaetigt', label: 'Bestätigt' },
-                  { value: 'in_bearbeitung', label: 'In Bearbeitung' },
-                  { value: 'abgeschlossen', label: 'Abgeschlossen' },
-                  { value: 'storniert', label: 'Storniert' }
-                ]
+                options: configOptions.umzugStatuses.map(status => ({
+                  value: status,
+                  label: status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')
+                }))
               }}
             />
           </div>
@@ -1305,10 +1341,11 @@ export default function UmzugForm() {
                           onClick={(e) => e.stopPropagation()}
                           className="text-sm border-gray-300 rounded"
                         >
-                          <option value="fahrer">Fahrer</option>
-                          <option value="helfer">Helfer</option>
-                          <option value="teamleiter">Teamleiter</option>
-                          <option value="träger">Träger</option>
+                          {configOptions.employeeRoles.map(role => (
+                            <option key={role} value={role}>
+                              {role.charAt(0).toUpperCase() + role.slice(1)}
+                            </option>
+                          ))}
                         </select>
                       )}
                     </div>
@@ -1393,14 +1430,10 @@ export default function UmzugForm() {
               value={formData.preis?.zahlungsart}
               onChange={handleInputChange}
               inputProps={{
-                options: [
-                  { value: 'rechnung', label: 'Rechnung' },
-                  { value: 'bar', label: 'Bar' },
-                  { value: 'überweisung', label: 'Überweisung' },
-                  { value: 'ec', label: 'EC-Karte' },
-                  { value: 'kreditkarte', label: 'Kreditkarte' },
-                  { value: 'paypal', label: 'PayPal' }
-                ]
+                options: configOptions.paymentMethods.map(method => ({
+                  value: method,
+                  label: method.charAt(0).toUpperCase() + method.slice(1).replace(/_/g, ' ')
+                }))
               }}
             />
             

@@ -12,35 +12,10 @@ import {
   MapPin, 
   ImagePlus
 } from 'lucide-react';
-import { mitarbeiterService } from '../../services/api';
+import { mitarbeiterService, configService } from '../../services/api';
 import { toast } from 'react-toastify';
 
-// Verfügbare Positionen
-const verfuegbarePositionen = [
-  'Teamleiter',
-  'Packer',
-  'Fahrer',
-  'Aufnahmespezialist',
-  'Aufnahme & Vertrieb',
-  'Lagerverwalter',
-  'Bürokraft'
-];
-
-// Verfügbare Fähigkeiten
-const verfuegbareFaehigkeiten = [
-  'Umzugsplanung',
-  'Teamführung',
-  'Führerschein Klasse B',
-  'Führerschein Klasse C',
-  'Englisch',
-  'Französisch',
-  'Spanisch',
-  'Kundengespräch',
-  'Verpackungsspezialist',
-  'Möbelmontage',
-  'Klaviertransport',
-  'Schwerlasttransport'
-];
+// Configuration options will be loaded dynamically
 
 const MitarbeiterForm = () => {
   const { id } = useParams();
@@ -70,6 +45,41 @@ const MitarbeiterForm = () => {
   const [profileImage, setProfileImage] = useState(null);
   const [profileImagePreview, setProfileImagePreview] = useState('');
   const [error, setError] = useState(null);
+  
+  // Configuration options from API
+  const [configOptions, setConfigOptions] = useState({
+    positions: [],
+    skills: [],
+    configLoading: true
+  });
+
+  // Load configuration options
+  useEffect(() => {
+    const loadConfigs = async () => {
+      try {
+        const [positions, skills] = await Promise.all([
+          configService.getEmployeePositions(),
+          configService.getEmployeeSkills()
+        ]);
+        
+        setConfigOptions({
+          positions,
+          skills,
+          configLoading: false
+        });
+      } catch (error) {
+        // Use fallback values
+        const defaults = configService.getDefaultConfigs();
+        setConfigOptions({
+          positions: defaults.employeePositions,
+          skills: defaults.employeeSkills,
+          configLoading: false
+        });
+      }
+    };
+    
+    loadConfigs();
+  }, []);
 
   // Daten beim Bearbeiten laden
   useEffect(() => {
@@ -396,7 +406,7 @@ const MitarbeiterForm = () => {
                   required
                 >
                   <option value="">Bitte auswählen</option>
-                  {verfuegbarePositionen.map((position) => (
+                  {configOptions.positions.map((position) => (
                     <option key={position} value={position}>{position}</option>
                   ))}
                 </select>
@@ -528,7 +538,7 @@ const MitarbeiterForm = () => {
               </p>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {verfuegbareFaehigkeiten.map((faehigkeit) => (
+                {configOptions.skills.map((faehigkeit) => (
                   <div key={faehigkeit} className="flex items-center">
                     <input
                       type="checkbox"

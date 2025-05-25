@@ -61,17 +61,10 @@ const setupAxiosInterceptors = (logout, refreshToken) => {
 
       if (error.response?.status === 401 && !originalRequest._retry) {
         originalRequest._retry = true;
-
-        try {
-          const newToken = await refreshToken();
-          if (newToken) {
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
-            return axios(originalRequest);
-          }
-        } catch (refreshError) {
-          logout();
-          return Promise.reject(refreshError);
-        }
+        
+        // No refresh token support, just logout
+        logout();
+        return Promise.reject(error);
       }
 
       return Promise.reject(error);
@@ -129,25 +122,13 @@ export const AuthProvider = ({ children }) => {
     setError(null);
   }, []);
 
-  // Refresh token
+  // Refresh token - disabled as backend doesn't support it
   const refreshToken = useCallback(async () => {
-    try {
-      const refresh = localStorage.getItem(REFRESH_TOKEN_KEY);
-      if (!refresh) throw new Error('No refresh token');
-
-      const response = await authService.refreshToken(refresh);
-      const { token, user } = response.data;
-      
-      localStorage.setItem(TOKEN_KEY, token);
-      localStorage.setItem(TOKEN_TIMESTAMP_KEY, Date.now().toString());
-      setUser(user);
-      
-      return token;
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      throw error;
-    }
-  }, []);
+    console.warn('Refresh token not implemented in backend');
+    // Clear auth data and redirect to login
+    clearAuthData();
+    throw new Error('Session expired, please login again');
+  }, [clearAuthData]);
 
   // Logout
   const logout = useCallback(async () => {
@@ -176,13 +157,17 @@ export const AuthProvider = ({ children }) => {
       }
 
       const response = await authService.login(credentials);
-      const { token, refreshToken, user } = response.data;
+      const { token, user } = response.data;
 
       if (!token) {
         throw new Error('Kein Token in der Antwort erhalten');
       }
 
-      saveAuthData(token, refreshToken, user);
+      // Save auth data without refresh token (backend doesn't support it yet)
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      localStorage.setItem(TOKEN_TIMESTAMP_KEY, Date.now().toString());
+      
       setUser(user);
       setError(null);
 
@@ -231,13 +216,17 @@ export const AuthProvider = ({ children }) => {
       }
 
       const response = await authService.register(userData);
-      const { token, refreshToken, user } = response.data;
+      const { token, user } = response.data;
 
       if (!token) {
         throw new Error('Kein Token in der Antwort erhalten');
       }
 
-      saveAuthData(token, refreshToken, user);
+      // Save auth data without refresh token (backend doesn't support it yet)
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      localStorage.setItem(TOKEN_TIMESTAMP_KEY, Date.now().toString());
+      
       setUser(user);
       setError(null);
 
@@ -360,12 +349,9 @@ export const AuthProvider = ({ children }) => {
 
         if (token && storedUser) {
           if (isTokenExpired()) {
-            try {
-              await refreshToken();
-            } catch (refreshError) {
-              console.error('Token refresh failed:', refreshError);
-              clearAuthData();
-            }
+            // Token expired, clear auth data
+            console.log('Token expired, clearing auth data');
+            clearAuthData();
           } else {
             try {
               const userData = JSON.parse(storedUser);
@@ -392,29 +378,8 @@ export const AuthProvider = ({ children }) => {
     setupAxiosInterceptors(logout, refreshToken);
   }, [logout, refreshToken]);
 
-  // Auto refresh token before expiry
-  useEffect(() => {
-    if (!user) return;
-
-    const refreshInterval = setInterval(async () => {
-      try {
-        const timestamp = localStorage.getItem(TOKEN_TIMESTAMP_KEY);
-        if (timestamp) {
-          const tokenAge = Date.now() - parseInt(timestamp);
-          const timeUntilExpiry = TOKEN_EXPIRY_TIME - tokenAge;
-          
-          // Refresh 5 minutes before expiry
-          if (timeUntilExpiry < 5 * 60 * 1000) {
-            await refreshToken();
-          }
-        }
-      } catch (error) {
-        console.error('Auto refresh failed:', error);
-      }
-    }, 60 * 1000); // Check every minute
-
-    return () => clearInterval(refreshInterval);
-  }, [user, refreshToken]);
+  // Auto refresh token before expiry - disabled as backend doesn't support refresh tokens
+  // TODO: Re-enable when backend implements refresh token support
 
   // Context value
   const value = useMemo(() => ({

@@ -15,7 +15,7 @@ import {
   ImagePlus,
   BadgeEuro
 } from 'lucide-react';
-import { fahrzeugeService } from '../../services/api';
+import { fahrzeugeService, configService } from '../../services/api';
 import { toast } from 'react-toastify';
 import { extractApiData } from '../../utils/apiUtils';
 
@@ -58,6 +58,45 @@ const FahrzeugForm = () => {
   const [vehicleImagePreview, setVehicleImagePreview] = useState('');
   const [error, setError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  
+  // Configuration options from API
+  const [configOptions, setConfigOptions] = useState({
+    vehicleTypes: [],
+    vehicleStatuses: [],
+    licenseClasses: [],
+    configLoading: true
+  });
+
+  // Load configuration options
+  useEffect(() => {
+    const loadConfigs = async () => {
+      try {
+        const [types, statuses, licenses] = await Promise.all([
+          configService.getVehicleTypes(),
+          configService.getVehicleStatuses(),
+          configService.getLicenseClasses()
+        ]);
+        
+        setConfigOptions({
+          vehicleTypes: types,
+          vehicleStatuses: statuses,
+          licenseClasses: licenses,
+          configLoading: false
+        });
+      } catch (error) {
+        // Use fallback values
+        const defaults = configService.getDefaultConfigs();
+        setConfigOptions({
+          vehicleTypes: defaults.vehicleTypes,
+          vehicleStatuses: defaults.vehicleStatuses,
+          licenseClasses: defaults.licenseClasses,
+          configLoading: false
+        });
+      }
+    };
+    
+    loadConfigs();
+  }, []);
 
   // Daten beim Bearbeiten laden
   useEffect(() => {
@@ -183,7 +222,7 @@ const FahrzeugForm = () => {
     // Format required fields
     transformed.kennzeichen = transformed.kennzeichen?.trim() || '';
     transformed.bezeichnung = transformed.bezeichnung?.trim() || '';
-    transformed.typ = transformed.typ || 'Transporter';
+    transformed.typ = transformed.typ || configOptions.vehicleTypes[0] || 'Transporter';
     
     // Convert date fields to ISO format
     if (transformed.anschaffungsdatum) {
@@ -314,15 +353,13 @@ const FahrzeugForm = () => {
     }
     
     // Validate status against allowed values
-    const validStatusValues = ['Verfügbar', 'Im Einsatz', 'In Wartung', 'Defekt', 'Außer Dienst'];
-    if (!validStatusValues.includes(transformed.status)) {
-      transformed.status = 'Verfügbar';
+    if (configOptions.vehicleStatuses.length > 0 && !configOptions.vehicleStatuses.includes(transformed.status)) {
+      transformed.status = configOptions.vehicleStatuses[0] || 'Verfügbar';
     }
     
     // Validate typ against allowed values
-    const validTypValues = ['LKW', 'Transporter', 'PKW', 'Anhänger', 'Sonstige'];
-    if (!validTypValues.includes(transformed.typ)) {
-      transformed.typ = 'Transporter';
+    if (configOptions.vehicleTypes.length > 0 && !configOptions.vehicleTypes.includes(transformed.typ)) {
+      transformed.typ = configOptions.vehicleTypes[0] || 'Transporter';
     }
     
     // Remove undefined and null properties
@@ -721,11 +758,9 @@ const FahrzeugForm = () => {
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="Verfügbar">Verfügbar</option>
-                  <option value="Im Einsatz">Im Einsatz</option>
-                  <option value="In Wartung">In Wartung</option>
-                  <option value="Defekt">Defekt</option>
-                  <option value="Außer Dienst">Außer Dienst</option>
+                  {configOptions.vehicleStatuses.map((status) => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
                 </select>
               </div>
               
@@ -737,11 +772,9 @@ const FahrzeugForm = () => {
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="LKW">LKW</option>
-                  <option value="Transporter">Transporter</option>
-                  <option value="PKW">PKW</option>
-                  <option value="Anhänger">Anhänger</option>
-                  <option value="Sonstige">Sonstige</option>
+                  {configOptions.vehicleTypes.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
                 </select>
               </div>
               
@@ -753,16 +786,9 @@ const FahrzeugForm = () => {
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="B">B</option>
-                  <option value="BE">BE</option>
-                  <option value="C1">C1</option>
-                  <option value="C1E">C1E</option>
-                  <option value="C">C</option>
-                  <option value="CE">CE</option>
-                  <option value="D1">D1</option>
-                  <option value="D1E">D1E</option>
-                  <option value="D">D</option>
-                  <option value="DE">DE</option>
+                  {configOptions.licenseClasses.map((license) => (
+                    <option key={license} value={license}>{license}</option>
+                  ))}
                 </select>
               </div>
             </div>

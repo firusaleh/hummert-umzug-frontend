@@ -201,7 +201,7 @@ const Dashboard = () => {
             
             setMonthlyData(realMonthlyData);
           } catch (error) {
-            console.error('Fehler beim Laden der Monatsdaten:', error);
+            // Error loading monthly data
             
             // Use empty data as fallback
             const emptyData = [];
@@ -260,7 +260,7 @@ const Dashboard = () => {
           
           setCategoryData(categoryStats);
         } catch (categoryError) {
-          console.error('Fehler beim Laden der Kategoriedaten:', categoryError);
+          // Error loading category data
           
           // Fallback auf leeres Array
           setCategoryData([]);
@@ -283,7 +283,7 @@ const Dashboard = () => {
               
             setUpcomingMoves(filteredMoves);
           } catch (error) {
-            console.error('Fehler bei der Verarbeitung bevorstehender Umzüge:', error);
+            // Error processing upcoming moves
             setUpcomingMoves([]);
           }
         } else {
@@ -293,7 +293,7 @@ const Dashboard = () => {
         setLoading(false);
       } catch (err) {
         // Verbesserte Fehlerbehandlung beim Laden der Dashboard-Daten
-        console.error('Dashboard Fehler:', err);
+        // Dashboard error
         setError('Die Dashboard-Daten konnten nicht vollständig geladen werden: ' + (err.message || 'Unbekannter Fehler'));
         setLoading(false);
       }

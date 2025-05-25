@@ -1,5 +1,6 @@
 // src/services/api.fixed.js
 import axios from 'axios';
+import configService from './configService';
 
 // API Configuration
 const API_CONFIG = {
@@ -802,32 +803,49 @@ class VehicleService extends BaseService {
 // Auth Service
 class AuthService extends BaseService {
   async login(credentials) {
-    const response = await this.handleResponse(api.post('/auth/login', credentials));
-    
-    if (response.success && response.data) {
-      // Store tokens and user data
-      if (response.data.token) {
-        tokenManager.setToken(response.data.token);
+    // Direct API call to match backend response format
+    try {
+      const response = await api.post('/auth/login', credentials);
+      
+      if (response.data && response.data.token) {
+        // Store token and user data - backend only sends token, not refreshToken
+        localStorage.setItem(TOKEN_KEYS.access, response.data.token);
+        localStorage.setItem(TOKEN_KEYS.timestamp, Date.now().toString());
+        
+        if (response.data.user) {
+          localStorage.setItem(TOKEN_KEYS.user, JSON.stringify(response.data.user));
+        }
       }
-      if (response.data.refreshToken) {
-        tokenManager.setRefreshToken(response.data.refreshToken);
-      }
-      if (response.data.user) {
-        tokenManager.setUser(response.data.user);
-      }
-      tokenManager.setTokenTimestamp();
+      
+      return response;
+    } catch (error) {
+      throw error;
     }
-    
-    return response;
   }
   
   async register(userData) {
-    return this.handleResponse(api.post('/auth/register', userData));
+    try {
+      const response = await api.post('/auth/register', userData);
+      
+      if (response.data && response.data.token) {
+        // Store token and user data
+        localStorage.setItem(TOKEN_KEYS.access, response.data.token);
+        localStorage.setItem(TOKEN_KEYS.timestamp, Date.now().toString());
+        
+        if (response.data.user) {
+          localStorage.setItem(TOKEN_KEYS.user, JSON.stringify(response.data.user));
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      throw error;
+    }
   }
   
   async logout() {
     try {
-      await this.handleResponse(api.post('/auth/logout'));
+      await api.post('/auth/logout');
     } catch (error) {
       // Continue with logout even if API call fails
       console.warn('Logout API call failed:', error);
@@ -838,31 +856,41 @@ class AuthService extends BaseService {
   }
   
   async refreshToken() {
-    const refreshToken = tokenManager.getRefreshToken();
-    if (!refreshToken) {
-      throw new Error('No refresh token available');
-    }
-    
-    const response = await this.handleResponse(api.post('/auth/refresh', { refreshToken }));
-    
-    if (response.success && response.data?.token) {
-      tokenManager.setToken(response.data.token);
-      tokenManager.setTokenTimestamp();
-    }
-    
-    return response;
+    // Since backend doesn't support refresh tokens yet, throw error
+    throw new Error('Refresh token not implemented');
   }
   
-  async getCurrentUser() {
-    return this.handleResponse(api.get('/auth/me'));
+  async checkAuth() {
+    return api.get('/auth/check');
   }
   
-  async updateProfile(updates) {
-    return this.handleResponse(api.put('/auth/profile', updates));
+  async getMe() {
+    return api.get('/auth/me');
+  }
+  
+  async updateProfile(profileData) {
+    return api.put('/users/me', profileData);
   }
   
   async changePassword(passwordData) {
-    return this.handleResponse(api.put('/auth/password', passwordData));
+    return api.post('/users/change-password', passwordData);
+  }
+  
+  async forgotPassword(email) {
+    return api.post('/auth/forgot-password', { email });
+  }
+  
+  async resetPassword(token, newPassword) {
+    return api.post('/auth/reset-password', { token, newPassword });
+  }
+  
+  async checkApiHealth() {
+    try {
+      const response = await api.get('/health', { timeout: 5000 });
+      return response.data;
+    } catch (error) {
+      throw new Error('API not available');
+    }
   }
 }
 
@@ -1000,4 +1028,4 @@ export const zeiterfassungService = timeTrackingService;
 export default api;
 
 // Export configuration for testing
-export { API_CONFIG, tokenManager };
+export { API_CONFIG, tokenManager, configService };
