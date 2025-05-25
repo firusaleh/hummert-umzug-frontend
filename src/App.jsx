@@ -47,6 +47,7 @@ import ZeiterfassungDashboard from './pages/zeiterfassung/ZeiterfassungDashboard
 
 // Finanzen-Pages
 import FinanzenDashboard from './pages/finanzen/FinanzenDashboard';
+import ModernFinanceDashboard from './pages/finanzen/ModernFinanceDashboard';
 import FinanzenMonatsansicht from './pages/finanzen/FinanzenMonatsansicht';
 import InvoiceForm from './pages/finanzen/components/InvoiceForm';
 import AngebotForm from './components/finanzen/AngebotForm';
@@ -243,6 +244,14 @@ const App = () => {
         <ProtectedRoute>
           <MainLayout>
             <FinanzenDashboard />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/finanzen/modern" element={
+        <ProtectedRoute>
+          <MainLayout>
+            <ModernFinanceDashboard />
           </MainLayout>
         </ProtectedRoute>
       } />
