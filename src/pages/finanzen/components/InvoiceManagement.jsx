@@ -31,6 +31,7 @@ export default function InvoiceManagement() {
   const [selectedInvoices, setSelectedInvoices] = useState([]);
   const [showActions, setShowActions] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Filters and pagination
@@ -168,11 +169,7 @@ export default function InvoiceManagement() {
     try {
       switch (action) {
         case 'delete':
-          if (confirm(`Möchten Sie ${selectedInvoices.length} Rechnungen wirklich löschen?`)) {
-            await financeService.bulkDeleteInvoices(selectedInvoices);
-            setSelectedInvoices([]);
-            fetchInvoices();
-          }
+          setShowBulkDeleteConfirm(true);
           break;
         case 'markPaid':
           await financeService.bulkUpdateInvoiceStatus(selectedInvoices, 'bezahlt');
@@ -217,6 +214,18 @@ export default function InvoiceManagement() {
     } catch (err) {
       console.error('Error marking as paid:', err);
       alert('Fehler beim Markieren als bezahlt: ' + err.message);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await financeService.bulkDeleteInvoices(selectedInvoices);
+      setSelectedInvoices([]);
+      setShowBulkDeleteConfirm(false);
+      fetchInvoices();
+    } catch (err) {
+      console.error('Bulk delete error:', err);
+      alert('Fehler beim Löschen der Rechnungen: ' + err.message);
     }
   };
 
@@ -613,6 +622,34 @@ export default function InvoiceManagement() {
                 className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
               >
                 Löschen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk delete confirmation modal */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Mehrere Rechnungen löschen
+            </h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Möchten Sie {selectedInvoices.length} Rechnungen wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+              >
+                {selectedInvoices.length} Rechnungen löschen
               </button>
             </div>
           </div>
