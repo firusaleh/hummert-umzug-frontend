@@ -46,8 +46,9 @@ import Einstellungen from './pages/einstellungen/Einstellungen';
 import ZeiterfassungDashboard from './pages/zeiterfassung/ZeiterfassungDashboard';
 
 // Finanzen-Pages
-import Finanzverwaltung from './pages/finanzen/Finanzverwaltung';
+import FinanzenDashboard from './pages/finanzen/FinanzenDashboard';
 import FinanzenMonatsansicht from './pages/finanzen/FinanzenMonatsansicht';
+import InvoiceForm from './pages/finanzen/components/InvoiceForm';
 import AngebotForm from './components/finanzen/AngebotForm';
 import RechnungForm from './components/finanzen/RechnungForm';
 import ProjektkostenForm from './components/finanzen/ProjektkostenForm';
@@ -241,7 +242,7 @@ const App = () => {
       <Route path="/finanzen" element={
         <ProtectedRoute>
           <MainLayout>
-            <Finanzverwaltung />
+            <FinanzenDashboard />
           </MainLayout>
         </ProtectedRoute>
       } />
@@ -283,7 +284,7 @@ const App = () => {
       <Route path="/finanzen/rechnungen/neu" element={
         <ProtectedRoute>
           <MainLayout>
-            <RechnungForm />
+            <InvoiceForm />
           </MainLayout>
         </ProtectedRoute>
       } />
@@ -291,7 +292,7 @@ const App = () => {
       <Route path="/finanzen/rechnungen/:id" element={
         <ProtectedRoute>
           <MainLayout>
-            <RechnungForm />
+            <InvoiceForm />
           </MainLayout>
         </ProtectedRoute>
       } />
@@ -299,7 +300,7 @@ const App = () => {
       <Route path="/finanzen/rechnungen/:id/bearbeiten" element={
         <ProtectedRoute>
           <MainLayout>
-            <RechnungForm />
+            <InvoiceForm />
           </MainLayout>
         </ProtectedRoute>
       } />
