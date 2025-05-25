@@ -4,7 +4,7 @@ import configService from './configService';
 
 // API Configuration
 const API_CONFIG = {
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
+  baseURL: process.env.REACT_APP_API_URL || '/api',
   timeout: 30000, // 30 seconds
   retryAttempts: 3,
   retryDelay: 1000, // 1 second
@@ -120,7 +120,7 @@ api.interceptors.response.use(
           }
         }
       } catch (refreshError) {
-        console.error('Token refresh failed:', refreshError);
+        // Token error handled silently;
       }
       
       // Clear tokens and redirect to login

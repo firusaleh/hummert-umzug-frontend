@@ -77,9 +77,10 @@ const configService = {
 
     try {
       const response = await api.get('/config/umzug-statuses');
-      configCache.umzugStatuses = response.data;
+      const data = response.data.data || response.data;
+      configCache.umzugStatuses = data;
       configCache.cacheTimestamp = Date.now();
-      return response.data;
+      return data;
     } catch (error) {
       // Fallback to hardcoded values
       return ['geplant', 'bestaetigt', 'in_bearbeitung', 'abgeschlossen', 'storniert'];
@@ -94,9 +95,10 @@ const configService = {
 
     try {
       const response = await api.get('/config/payment-methods');
-      configCache.paymentMethods = response.data;
+      const data = response.data.data || response.data;
+      configCache.paymentMethods = data;
       configCache.cacheTimestamp = Date.now();
-      return response.data;
+      return data;
     } catch (error) {
       // Fallback to hardcoded values
       return ['rechnung', 'bar', 'ueberweisung', 'ec', 'kreditkarte', 'paypal'];
@@ -111,9 +113,10 @@ const configService = {
 
     try {
       const response = await api.get('/config/employee-positions');
-      configCache.employeePositions = response.data;
+      const data = response.data.data || response.data;
+      configCache.employeePositions = data;
       configCache.cacheTimestamp = Date.now();
-      return response.data;
+      return data;
     } catch (error) {
       // Fallback to hardcoded values
       return [
@@ -139,9 +142,10 @@ const configService = {
 
     try {
       const response = await api.get('/config/employee-skills');
-      configCache.employeeSkills = response.data;
+      const data = response.data.data || response.data;
+      configCache.employeeSkills = data;
       configCache.cacheTimestamp = Date.now();
-      return response.data;
+      return data;
     } catch (error) {
       // Fallback to hardcoded values
       return [
@@ -171,9 +175,10 @@ const configService = {
 
     try {
       const response = await api.get('/config/employee-roles');
-      configCache.employeeRoles = response.data;
+      const data = response.data.data || response.data;
+      configCache.employeeRoles = data;
       configCache.cacheTimestamp = Date.now();
-      return response.data;
+      return data;
     } catch (error) {
       // Fallback to hardcoded values
       return ['fahrer', 'helfer', 'teamleiter', 'träger'];
@@ -188,9 +193,10 @@ const configService = {
 
     try {
       const response = await api.get('/config/vehicle-types');
-      configCache.vehicleTypes = response.data;
+      const data = response.data.data || response.data;
+      configCache.vehicleTypes = data;
       configCache.cacheTimestamp = Date.now();
-      return response.data;
+      return data;
     } catch (error) {
       // Fallback to hardcoded values
       return ['LKW', 'Transporter', 'PKW', 'Anhänger', 'Sonstige'];
@@ -205,9 +211,10 @@ const configService = {
 
     try {
       const response = await api.get('/config/vehicle-statuses');
-      configCache.vehicleStatuses = response.data;
+      const data = response.data.data || response.data;
+      configCache.vehicleStatuses = data;
       configCache.cacheTimestamp = Date.now();
-      return response.data;
+      return data;
     } catch (error) {
       // Fallback to hardcoded values
       return ['Verfügbar', 'Im Einsatz', 'In Wartung', 'Defekt', 'Außer Dienst'];
@@ -222,9 +229,10 @@ const configService = {
 
     try {
       const response = await api.get('/config/license-classes');
-      configCache.licenseClasses = response.data;
+      const data = response.data.data || response.data;
+      configCache.licenseClasses = data;
       configCache.cacheTimestamp = Date.now();
-      return response.data;
+      return data;
     } catch (error) {
       // Fallback to hardcoded values
       return ['B', 'BE', 'C1', 'C1E', 'C', 'CE', 'D1', 'D1E', 'D', 'DE'];

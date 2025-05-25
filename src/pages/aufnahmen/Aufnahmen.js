@@ -242,7 +242,12 @@ const AufnahmeForm = () => {
             queryClient.invalidateQueries(['aufnahme', id]);
             toast.success('Bild erfolgreich hochgeladen');
             setUploadDialog(false);
-          });
+          }
+    )
+    .catch(error => {
+      console.error('Error:', error.message);
+      // Handle error appropriately
+    });
         }
       },
       onError: (error) => {
@@ -1489,7 +1494,12 @@ const AufnahmeDetails = () => {
           status: 'bestellt'
         }).then(() => {
           queryClient.invalidateQueries(['aufnahme', id]);
-        });
+        }
+    )
+    .catch(error => {
+      console.error('Error:', error.message);
+      // Handle error appropriately
+    });
         
         setUmzugErstellenDialog(false);
         toast.success('Umzug erfolgreich erstellt');

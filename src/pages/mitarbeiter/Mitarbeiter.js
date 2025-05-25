@@ -358,7 +358,12 @@ const MitarbeiterDetails = () => {
             queryClient.invalidateQueries(['mitarbeiter', id]);
             toast.success('Dokument erfolgreich hochgeladen');
             setUploadDialog(false);
-          });
+          }
+    )
+    .catch(error => {
+      console.error('Error:', error.message);
+      // Handle error appropriately
+    });
         }
       },
       onError: (error) => {

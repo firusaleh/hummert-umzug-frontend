@@ -124,7 +124,7 @@ export const AuthProvider = ({ children }) => {
 
   // Refresh token - disabled as backend doesn't support it
   const refreshToken = useCallback(async () => {
-    console.warn('Refresh token not implemented in backend');
+    // Removed sensitive token logging;
     // Clear auth data and redirect to login
     clearAuthData();
     throw new Error('Session expired, please login again');
@@ -291,7 +291,7 @@ export const AuthProvider = ({ children }) => {
       await authService.changePassword(passwordData);
       return { success: true };
     } catch (error) {
-      console.error('Password change failed:', error);
+      // Removed sensitive password logging;
       return { 
         success: false, 
         message: error.response?.data?.message || 'Passwortänderung fehlgeschlagen' 
@@ -305,7 +305,7 @@ export const AuthProvider = ({ children }) => {
       await authService.forgotPassword(email);
       return { success: true };
     } catch (error) {
-      console.error('Forgot password failed:', error);
+      // Removed sensitive password logging;
       return { 
         success: false, 
         message: error.response?.data?.message || 'Anfrage fehlgeschlagen' 
@@ -319,7 +319,7 @@ export const AuthProvider = ({ children }) => {
       await authService.resetPassword(token, newPassword);
       return { success: true };
     } catch (error) {
-      console.error('Password reset failed:', error);
+      // Removed sensitive password logging;
       return { 
         success: false, 
         message: error.response?.data?.message || 'Passwort-Reset fehlgeschlagen' 
@@ -350,7 +350,7 @@ export const AuthProvider = ({ children }) => {
         if (token && storedUser) {
           if (isTokenExpired()) {
             // Token expired, clear auth data
-            console.log('Token expired, clearing auth data');
+            // Removed sensitive token logging;
             clearAuthData();
           } else {
             try {

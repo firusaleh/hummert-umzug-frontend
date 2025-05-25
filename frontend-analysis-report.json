@@ -1,0 +1,53 @@
+{
+  "timestamp": "2025-05-25T14:43:13.638Z",
+  "summary": {
+    "sensitiveLogging": 2,
+    "hardcodedUrls": 1,
+    "unhandledPromises": 3
+  },
+  "details": {
+    "unusedVars": [],
+    "missingDependencies": [],
+    "sensitiveLogging": [
+      {
+        "file": "src/context/AuthContext.jsx",
+        "matches": [
+          "console.warn('Refresh token",
+          "console.error('Password",
+          "console.error('Forgot password",
+          "console.error('Password",
+          "console.log('Token"
+        ]
+      },
+      {
+        "file": "src/services/api.js",
+        "matches": [
+          "console.error('Token"
+        ]
+      }
+    ],
+    "hardcodedValues": [
+      {
+        "file": "src/services/api.js",
+        "matches": [
+          "http://localhost:5000/api"
+        ]
+      }
+    ],
+    "noErrorHandling": [
+      {
+        "file": "src/pages/aufnahmen/Aufnahmen.js",
+        "count": 2
+      },
+      {
+        "file": "src/pages/mitarbeiter/Mitarbeiter.js",
+        "count": 1
+      },
+      {
+        "file": "src/reportWebVitals.js",
+        "count": 1
+      }
+    ],
+    "unusedImports": []
+  }
+}

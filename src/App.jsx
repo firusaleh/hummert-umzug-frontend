@@ -54,6 +54,7 @@ import ProjektkostenForm from './components/finanzen/ProjektkostenForm';
 
 // 404 Seite
 import NotFound from './pages/NotFound';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Protected Route Komponente - verwendet den AuthContext
 const ProtectedRoute = ({ children }) => {
