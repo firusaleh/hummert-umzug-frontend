@@ -43,7 +43,7 @@ import Benachrichtigungen from './pages/benachrichtigungen/Benachrichtigungen';
 import Einstellungen from './pages/einstellungen/Einstellungen';
 
 // Zeiterfassung
-import ZeiterfassungSystem from './pages/zeiterfassung/ZeiterfassungSystem';
+import ZeiterfassungDashboard from './pages/zeiterfassung/ZeiterfassungDashboard';
 
 // Finanzen-Pages
 import Finanzverwaltung from './pages/finanzen/Finanzverwaltung';
@@ -333,7 +333,7 @@ const App = () => {
       <Route path="/zeiterfassung" element={
         <ProtectedRoute>
           <MainLayout>
-            <ZeiterfassungSystem />
+            <ZeiterfassungDashboard />
           </MainLayout>
         </ProtectedRoute>
       } />
