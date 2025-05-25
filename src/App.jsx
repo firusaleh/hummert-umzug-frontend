@@ -47,12 +47,8 @@ import ZeiterfassungDashboard from './pages/zeiterfassung/ZeiterfassungDashboard
 
 // Finanzen-Pages
 import FinanzenDashboard from './pages/finanzen/FinanzenDashboard';
-import ModernFinanceDashboard from './pages/finanzen/ModernFinanceDashboard';
-import FinanzenMonatsansicht from './pages/finanzen/FinanzenMonatsansicht';
 import InvoiceForm from './pages/finanzen/components/InvoiceForm';
-import AngebotForm from './components/finanzen/AngebotForm';
-import RechnungForm from './components/finanzen/RechnungForm';
-import ProjektkostenForm from './components/finanzen/ProjektkostenForm';
+import InvoiceManagement from './pages/finanzen/components/InvoiceManagement';
 
 // 404 Seite
 import NotFound from './pages/NotFound';
@@ -248,48 +244,14 @@ const App = () => {
         </ProtectedRoute>
       } />
       
-      <Route path="/finanzen/modern" element={
+      <Route path="/finanzen/rechnungen" element={
         <ProtectedRoute>
           <MainLayout>
-            <ModernFinanceDashboard />
+            <InvoiceManagement />
           </MainLayout>
         </ProtectedRoute>
       } />
       
-      <Route path="/finanzen/monatsansicht" element={
-        <ProtectedRoute>
-          <MainLayout>
-            <FinanzenMonatsansicht />
-          </MainLayout>
-        </ProtectedRoute>
-      } />
-
-      {/* Angebote Routes */}
-      <Route path="/finanzen/angebote/neu" element={
-        <ProtectedRoute>
-          <MainLayout>
-            <AngebotForm />
-          </MainLayout>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/finanzen/angebote/:id" element={
-        <ProtectedRoute>
-          <MainLayout>
-            <AngebotForm />
-          </MainLayout>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/finanzen/angebote/:id/bearbeiten" element={
-        <ProtectedRoute>
-          <MainLayout>
-            <AngebotForm />
-          </MainLayout>
-        </ProtectedRoute>
-      } />
-      
-      {/* Rechnungen Routes */}
       <Route path="/finanzen/rechnungen/neu" element={
         <ProtectedRoute>
           <MainLayout>
@@ -313,31 +275,7 @@ const App = () => {
           </MainLayout>
         </ProtectedRoute>
       } />
-      
-      {/* Projektkosten Routes */}
-      <Route path="/finanzen/projektkosten/neu" element={
-        <ProtectedRoute>
-          <MainLayout>
-            <ProjektkostenForm />
-          </MainLayout>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/finanzen/projektkosten/:id" element={
-        <ProtectedRoute>
-          <MainLayout>
-            <ProjektkostenForm />
-          </MainLayout>
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/finanzen/projektkosten/:id/bearbeiten" element={
-        <ProtectedRoute>
-          <MainLayout>
-            <ProjektkostenForm />
-          </MainLayout>
-        </ProtectedRoute>
-      } />
+
       
       {/* Zeiterfassung Routes */}
       <Route path="/zeiterfassung" element={
