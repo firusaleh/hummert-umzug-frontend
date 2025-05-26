@@ -565,6 +565,18 @@ class FinanceService extends BaseService {
     );
   }
   
+  // Alias for getUebersicht to match Dashboard usage
+  async getFinanzuebersicht(year, month) {
+    return this.getUebersicht(year, month);
+  }
+  
+  // Get monthly overview for a specific year
+  async getMonatsUebersicht(year) {
+    return this.handleResponse(
+      api.get(`/finanzen/monatsuebersicht/${year}`)
+    );
+  }
+  
   async generateUebersicht(year, month) {
     return this.handleResponse(
       api.post('/finanzen/uebersicht/generieren', { year, month })
