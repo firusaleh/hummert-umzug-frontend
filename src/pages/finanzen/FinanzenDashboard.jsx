@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, TrendingDown, Euro, Receipt, FileText, 
   AlertCircle, Calendar, PieChart, BarChart3, Download,
-  Plus, RefreshCw, CreditCard, Wallet, Target, Package, Users
+  Plus, RefreshCw, CreditCard, Wallet, Target, Package, Users, CalendarDays
 } from 'lucide-react';
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart as RePieChart, 
@@ -21,6 +21,7 @@ import AngebotForm from './components/AngebotForm';
 import ProjektkostenManagement from './components/ProjektkostenManagement';
 import ProjektkostenForm from './components/ProjektkostenForm';
 import FinancialReports from './components/FinancialReports';
+import FinanzenMonatsansicht from './FinanzenMonatsansicht';
 
 // Constants
 const CHART_COLORS = ['#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6'];
@@ -361,6 +362,7 @@ export default function FinanzenDashboard() {
   // Tabs configuration
   const tabs = [
     { id: 'overview', name: 'Übersicht', icon: BarChart3 },
+    { id: 'monthly', name: 'Monatsansicht', icon: CalendarDays },
     { id: 'invoices', name: 'Rechnungen', icon: Receipt, count: counts.invoices },
     { id: 'quotes', name: 'Angebote', icon: FileText, count: counts.quotes },
     { id: 'costs', name: 'Projektkosten', icon: Package, count: counts.costs },
@@ -557,6 +559,8 @@ export default function FinanzenDashboard() {
             refreshing={refreshing}
           />
         )}
+        
+        {activeTab === 'monthly' && <FinanzenMonatsansicht />}
         
         {activeTab === 'invoices' && <InvoiceManagement />}
         
