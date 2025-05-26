@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { 
   Receipt, Plus, Search, Edit2, Trash2, Eye, Send, 
   CheckCircle, XCircle, AlertTriangle, FileText,
-  ChevronLeft, ChevronRight, RefreshCw, Filter, Download
+  ChevronLeft, ChevronRight, RefreshCw, Filter, Download,
+  CreditCard
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import api from '../../../services/api';
+import PaymentTracking from './PaymentTracking';
 
 const STATUS_CONFIG = {
   entwurf: { label: 'Entwurf', color: 'bg-gray-100 text-gray-800', icon: FileText },
@@ -29,6 +31,7 @@ export default function InvoiceManagement() {
   const [totalPages, setTotalPages] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [showPaymentTracking, setShowPaymentTracking] = useState(null);
   
   const itemsPerPage = 10;
   
@@ -269,12 +272,22 @@ export default function InvoiceManagement() {
                       </p>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <p className="text-sm font-medium text-gray-900">
-                        {(invoice.gesamtbetrag || 0).toLocaleString('de-DE', { 
-                          style: 'currency', 
-                          currency: 'EUR' 
-                        })}
-                      </p>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {(invoice.gesamtbetrag || 0).toLocaleString('de-DE', { 
+                            style: 'currency', 
+                            currency: 'EUR' 
+                          })}
+                        </p>
+                        {invoice.bezahltBetrag > 0 && invoice.bezahltBetrag < invoice.gesamtbetrag && (
+                          <p className="text-xs text-green-600 mt-1">
+                            {invoice.bezahltBetrag.toLocaleString('de-DE', { 
+                              style: 'currency', 
+                              currency: 'EUR' 
+                            })} bezahlt
+                          </p>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusDisplay.color}`}>
@@ -298,10 +311,11 @@ export default function InvoiceManagement() {
                         </button>
                         {invoice.status !== 'bezahlt' && invoice.status !== 'storniert' && (
                           <button
-                            onClick={() => handleMarkAsPaid(invoice._id)}
+                            onClick={() => setShowPaymentTracking(invoice)}
                             className="text-green-600 hover:text-green-900"
+                            title="Zahlung erfassen"
                           >
-                            <CheckCircle className="h-4 w-4" />
+                            <CreditCard className="h-4 w-4" />
                           </button>
                         )}
                         <button
@@ -380,6 +394,18 @@ export default function InvoiceManagement() {
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Payment Tracking Modal */}
+      {showPaymentTracking && (
+        <PaymentTracking
+          invoice={showPaymentTracking}
+          onUpdate={() => {
+            setShowPaymentTracking(null);
+            fetchInvoices();
+          }}
+          onClose={() => setShowPaymentTracking(null)}
+        />
       )}
     </div>
   );

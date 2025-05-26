@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, TrendingDown, Euro, Receipt, FileText, 
   AlertCircle, Calendar, PieChart, BarChart3, Download,
-  Plus, RefreshCw, CreditCard, Wallet, Target
+  Plus, RefreshCw, CreditCard, Wallet, Target, Package, Users
 } from 'lucide-react';
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart as RePieChart, 
@@ -13,8 +13,55 @@ import { de } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 
+// Import new components
+import InvoiceManagement from './components/InvoiceManagement';
+import InvoiceForm from './components/InvoiceForm';
+import AngebotManagement from './components/AngebotManagement';
+import AngebotForm from './components/AngebotForm';
+import ProjektkostenManagement from './components/ProjektkostenManagement';
+import ProjektkostenForm from './components/ProjektkostenForm';
+import FinancialReports from './components/FinancialReports';
+
 // Constants
 const CHART_COLORS = ['#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6'];
+
+// Navigation Tab Component
+const NavigationTab = ({ tabs, activeTab, onTabChange }) => {
+  return (
+    <div className="border-b border-gray-200">
+      <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onTabChange(tab.id)}
+              className={`
+                ${activeTab === tab.id
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }
+                whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2
+              `}
+            >
+              <Icon className="h-5 w-5" />
+              {tab.name}
+              {tab.count !== undefined && (
+                <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
+                  activeTab === tab.id
+                    ? 'bg-indigo-100 text-indigo-600'
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+    </div>
+  );
+};
 
 // KPI Card Component
 const KPICard = ({ title, value, icon: Icon, trend, color = 'indigo', subtitle }) => {
@@ -92,226 +139,35 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-export default function FinanzenDashboard() {
+// Dashboard Overview Component
+const DashboardOverview = ({ loading, error, summary, monthlyData, categoryData, recentInvoices, invoiceStatusData, onRefresh, refreshing }) => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  
-  // Data states
-  const [summary, setSummary] = useState({
-    totalRevenue: 0,
-    totalExpenses: 0,
-    profit: 0,
-    openInvoices: 0,
-    overdueInvoices: 0,
-    profitMargin: 0
-  });
-  const [monthlyData, setMonthlyData] = useState([]);
-  const [categoryData, setCategoryData] = useState([]);
-  const [recentInvoices, setRecentInvoices] = useState([]);
-  const [invoiceStatusData, setInvoiceStatusData] = useState([]);
-  
-  // Fetch all data
-  const fetchData = async () => {
-    try {
-      setError(null);
-      
-      // Fetch invoices
-      const invoicesRes = await api.get('/finanzen/rechnungen');
-      const invoices = Array.isArray(invoicesRes.data?.data) 
-        ? invoicesRes.data.data 
-        : Array.isArray(invoicesRes.data) 
-        ? invoicesRes.data 
-        : [];
-      
-      // Fetch expenses
-      const expensesRes = await api.get('/finanzen/projektkosten');
-      const expenses = Array.isArray(expensesRes.data?.data)
-        ? expensesRes.data.data
-        : Array.isArray(expensesRes.data)
-        ? expensesRes.data
-        : [];
-      
-      // Calculate summary
-      const totalRevenue = invoices
-        .filter(inv => inv.status === 'bezahlt')
-        .reduce((sum, inv) => sum + (inv.gesamtbetrag || 0), 0);
-      
-      const totalExpenses = expenses
-        .reduce((sum, exp) => sum + (exp.betrag || 0), 0);
-      
-      const openInvoices = invoices
-        .filter(inv => inv.status !== 'bezahlt' && inv.status !== 'storniert')
-        .reduce((sum, inv) => sum + (inv.gesamtbetrag || 0), 0);
-      
-      const overdueInvoices = invoices
-        .filter(inv => {
-          if (inv.status === 'bezahlt' || inv.status === 'storniert') return false;
-          if (!inv.faelligkeitsdatum) return false;
-          try {
-            const dueDate = new Date(inv.faelligkeitsdatum);
-            return dueDate < new Date();
-          } catch {
-            return false;
-          }
-        }).length;
-      
-      const profit = totalRevenue - totalExpenses;
-      const profitMargin = totalRevenue > 0 ? (profit / totalRevenue * 100) : 0;
-      
-      setSummary({
-        totalRevenue,
-        totalExpenses,
-        profit,
-        openInvoices,
-        overdueInvoices,
-        profitMargin
-      });
-      
-      // Calculate monthly data
-      const months = [];
-      for (let i = 11; i >= 0; i--) {
-        const date = subMonths(new Date(), i);
-        const monthKey = format(date, 'yyyy-MM');
-        const monthName = format(date, 'MMM', { locale: de });
-        
-        const monthRevenue = invoices
-          .filter(inv => {
-            if (!inv.rechnungsdatum) return false;
-            try {
-              return format(new Date(inv.rechnungsdatum), 'yyyy-MM') === monthKey && inv.status === 'bezahlt';
-            } catch {
-              return false;
-            }
-          })
-          .reduce((sum, inv) => sum + (inv.gesamtbetrag || 0), 0);
-        
-        const monthExpenses = expenses
-          .filter(exp => {
-            if (!exp.datum) return false;
-            try {
-              return format(new Date(exp.datum), 'yyyy-MM') === monthKey;
-            } catch {
-              return false;
-            }
-          })
-          .reduce((sum, exp) => sum + (exp.betrag || 0), 0);
-        
-        months.push({
-          month: monthName,
-          revenue: monthRevenue,
-          expenses: monthExpenses,
-          profit: monthRevenue - monthExpenses
-        });
-      }
-      setMonthlyData(months);
-      
-      // Calculate category data
-      const categories = {};
-      expenses.forEach(expense => {
-        const category = expense.kategorie || 'Sonstige';
-        categories[category] = (categories[category] || 0) + (expense.betrag || 0);
-      });
-      
-      const categoryArray = Object.entries(categories)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 6);
-      setCategoryData(categoryArray);
-      
-      // Invoice status data
-      const statusCount = {
-        'Entwurf': invoices.filter(inv => inv.status === 'entwurf').length,
-        'Versendet': invoices.filter(inv => inv.status === 'versendet').length,
-        'Bezahlt': invoices.filter(inv => inv.status === 'bezahlt').length,
-        'Überfällig': invoices.filter(inv => {
-          if (inv.status === 'bezahlt' || inv.status === 'storniert') return false;
-          if (!inv.faelligkeitsdatum) return false;
-          try {
-            return new Date(inv.faelligkeitsdatum) < new Date();
-          } catch {
-            return false;
-          }
-        }).length,
-        'Storniert': invoices.filter(inv => inv.status === 'storniert').length
-      };
-      
-      const statusData = Object.entries(statusCount)
-        .filter(([, count]) => count > 0)
-        .map(([name, value]) => ({ name, value }));
-      setInvoiceStatusData(statusData);
-      
-      // Recent invoices
-      const recent = invoices
-        .sort((a, b) => {
-          try {
-            return new Date(b.rechnungsdatum) - new Date(a.rechnungsdatum);
-          } catch {
-            return 0;
-          }
-        })
-        .slice(0, 5);
-      setRecentInvoices(recent);
-      
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      setError('Fehler beim Laden der Daten. Bitte versuchen Sie es später erneut.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-  
-  useEffect(() => {
-    fetchData();
-  }, []);
-  
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchData();
-  };
-  
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="h-8 w-8 text-indigo-600 animate-spin" />
-      </div>
-    );
-  }
   
   return (
-    <div className="space-y-6">
+    <>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Finanzverwaltung</h1>
+          <h2 className="text-xl font-bold text-gray-900">Übersicht</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Überblick über Ihre Finanzen und Geschäftszahlen
+            Ihre Finanzen auf einen Blick
           </p>
         </div>
         <div className="flex items-center space-x-3">
           <button
-            onClick={handleRefresh}
+            onClick={onRefresh}
             disabled={refreshing}
             className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Aktualisieren
           </button>
-          <button
-            onClick={() => navigate('/finanzen/rechnungen/neu')}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Neue Rechnung
-          </button>
         </div>
       </div>
       
       {/* Error Alert */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
           <div className="flex">
             <AlertCircle className="h-5 w-5 text-red-400" />
             <div className="ml-3">
@@ -322,7 +178,7 @@ export default function FinanzenDashboard() {
       )}
       
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPICard
           title="Umsatz"
           value={summary.totalRevenue}
@@ -353,7 +209,7 @@ export default function FinanzenDashboard() {
       </div>
       
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Revenue Trend */}
         <ChartCard title="Umsatzentwicklung">
           {monthlyData.length > 0 ? (
@@ -422,65 +278,6 @@ export default function FinanzenDashboard() {
         </ChartCard>
       </div>
       
-      {/* Monthly Profit and Invoice Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Monthly Profit */}
-        <ChartCard title="Monatlicher Gewinn" className="lg:col-span-2">
-          {monthlyData.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="profit" name="Gewinn" radius={[4, 4, 0, 0]}>
-                    {monthlyData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#10B981' : '#EF4444'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-64 flex items-center justify-center text-gray-500">
-              Keine Daten verfügbar
-            </div>
-          )}
-        </ChartCard>
-        
-        {/* Invoice Status */}
-        <ChartCard title="Rechnungsstatus">
-          {invoiceStatusData.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <RePieChart>
-                  <Pie
-                    data={invoiceStatusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {invoiceStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </RePieChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-64 flex items-center justify-center text-gray-500">
-              Keine Daten verfügbar
-            </div>
-          )}
-        </ChartCard>
-      </div>
-      
       {/* Recent Invoices */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b">
@@ -530,6 +327,244 @@ export default function FinanzenDashboard() {
             </div>
           )}
         </div>
+      </div>
+    </>
+  );
+};
+
+export default function FinanzenDashboard() {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+  
+  // Data states
+  const [summary, setSummary] = useState({
+    totalRevenue: 0,
+    totalExpenses: 0,
+    profit: 0,
+    openInvoices: 0,
+    overdueInvoices: 0,
+    profitMargin: 0
+  });
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [categoryData, setCategoryData] = useState([]);
+  const [recentInvoices, setRecentInvoices] = useState([]);
+  const [invoiceStatusData, setInvoiceStatusData] = useState([]);
+  const [counts, setCounts] = useState({
+    invoices: 0,
+    quotes: 0,
+    costs: 0
+  });
+  
+  // Tabs configuration
+  const tabs = [
+    { id: 'overview', name: 'Übersicht', icon: BarChart3 },
+    { id: 'invoices', name: 'Rechnungen', icon: Receipt, count: counts.invoices },
+    { id: 'quotes', name: 'Angebote', icon: FileText, count: counts.quotes },
+    { id: 'costs', name: 'Projektkosten', icon: Package, count: counts.costs },
+    { id: 'reports', name: 'Berichte', icon: PieChart }
+  ];
+  
+  // Fetch all data
+  const fetchData = async () => {
+    try {
+      setError(null);
+      
+      // Fetch all data in parallel
+      const [invoicesRes, quotesRes, expensesRes] = await Promise.all([
+        api.get('/finanzen/rechnungen'),
+        api.get('/finanzen/angebote'),
+        api.get('/finanzen/projektkosten')
+      ]);
+      
+      const invoices = Array.isArray(invoicesRes.data?.data) 
+        ? invoicesRes.data.data 
+        : Array.isArray(invoicesRes.data) 
+        ? invoicesRes.data 
+        : [];
+      
+      const quotes = Array.isArray(quotesRes.data?.data)
+        ? quotesRes.data.data
+        : Array.isArray(quotesRes.data)
+        ? quotesRes.data
+        : [];
+        
+      const expenses = Array.isArray(expensesRes.data?.data)
+        ? expensesRes.data.data
+        : Array.isArray(expensesRes.data)
+        ? expensesRes.data
+        : [];
+      
+      // Update counts
+      setCounts({
+        invoices: invoices.length,
+        quotes: quotes.length,
+        costs: expenses.length
+      });
+      
+      // Calculate summary
+      const totalRevenue = invoices
+        .filter(inv => inv.status === 'bezahlt')
+        .reduce((sum, inv) => sum + (inv.gesamtbetrag || 0), 0);
+      
+      const totalExpenses = expenses
+        .reduce((sum, exp) => sum + Math.abs(exp.betrag || 0), 0);
+      
+      const openInvoices = invoices
+        .filter(inv => inv.status !== 'bezahlt' && inv.status !== 'storniert')
+        .reduce((sum, inv) => sum + (inv.gesamtbetrag || 0), 0);
+      
+      const overdueInvoices = invoices
+        .filter(inv => {
+          if (inv.status === 'bezahlt' || inv.status === 'storniert') return false;
+          if (!inv.faelligkeitsdatum) return false;
+          try {
+            const dueDate = new Date(inv.faelligkeitsdatum);
+            return dueDate < new Date();
+          } catch {
+            return false;
+          }
+        }).length;
+      
+      const profit = totalRevenue - totalExpenses;
+      const profitMargin = totalRevenue > 0 ? (profit / totalRevenue * 100) : 0;
+      
+      setSummary({
+        totalRevenue,
+        totalExpenses,
+        profit,
+        openInvoices,
+        overdueInvoices,
+        profitMargin
+      });
+      
+      // Calculate monthly data
+      const months = [];
+      for (let i = 11; i >= 0; i--) {
+        const date = subMonths(new Date(), i);
+        const monthKey = format(date, 'yyyy-MM');
+        const monthName = format(date, 'MMM', { locale: de });
+        
+        const monthRevenue = invoices
+          .filter(inv => {
+            if (!inv.datum) return false;
+            try {
+              return format(new Date(inv.datum), 'yyyy-MM') === monthKey && inv.status === 'bezahlt';
+            } catch {
+              return false;
+            }
+          })
+          .reduce((sum, inv) => sum + (inv.gesamtbetrag || 0), 0);
+        
+        const monthExpenses = expenses
+          .filter(exp => {
+            if (!exp.datum) return false;
+            try {
+              return format(new Date(exp.datum), 'yyyy-MM') === monthKey;
+            } catch {
+              return false;
+            }
+          })
+          .reduce((sum, exp) => sum + Math.abs(exp.betrag || 0), 0);
+        
+        months.push({
+          month: monthName,
+          revenue: monthRevenue,
+          expenses: monthExpenses,
+          profit: monthRevenue - monthExpenses
+        });
+      }
+      setMonthlyData(months);
+      
+      // Calculate category data
+      const categories = {};
+      expenses.forEach(expense => {
+        const category = expense.kategorie || 'Sonstige';
+        categories[category] = (categories[category] || 0) + Math.abs(expense.betrag || 0);
+      });
+      
+      const categoryArray = Object.entries(categories)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 6);
+      setCategoryData(categoryArray);
+      
+      // Recent invoices
+      const recent = invoices
+        .sort((a, b) => {
+          try {
+            return new Date(b.datum || b.rechnungsdatum) - new Date(a.datum || a.rechnungsdatum);
+          } catch {
+            return 0;
+          }
+        })
+        .slice(0, 5);
+      setRecentInvoices(recent);
+      
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Fehler beim Laden der Daten. Bitte versuchen Sie es später erneut.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+  
+  useEffect(() => {
+    fetchData();
+  }, []);
+  
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchData();
+  };
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="h-8 w-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
+  
+  return (
+    <div className="space-y-6">
+      {/* Main Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Finanzverwaltung</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Verwalten Sie Ihre Rechnungen, Angebote und Projektkosten
+        </p>
+      </div>
+      
+      {/* Navigation Tabs */}
+      <NavigationTab tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+      
+      {/* Tab Content */}
+      <div className="mt-6">
+        {activeTab === 'overview' && (
+          <DashboardOverview
+            loading={loading}
+            error={error}
+            summary={summary}
+            monthlyData={monthlyData}
+            categoryData={categoryData}
+            recentInvoices={recentInvoices}
+            invoiceStatusData={invoiceStatusData}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+          />
+        )}
+        
+        {activeTab === 'invoices' && <InvoiceManagement />}
+        
+        {activeTab === 'quotes' && <AngebotManagement />}
+        
+        {activeTab === 'costs' && <ProjektkostenManagement />}
+        
+        {activeTab === 'reports' && <FinancialReports />}
       </div>
     </div>
   );
