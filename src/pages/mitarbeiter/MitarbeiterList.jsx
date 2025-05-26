@@ -17,6 +17,7 @@ import {
   UserPlus
 } from 'lucide-react';
 import { mitarbeiterService } from '../../services/api';
+import { extractArrayData, safeSlice } from '../../utils/responseUtils';
 
 const MitarbeiterList = () => {
   const [mitarbeiter, setMitarbeiter] = useState([]);
@@ -37,15 +38,17 @@ const MitarbeiterList = () => {
       try {
         const response = await mitarbeiterService.getAll();
         // Mitarbeiter erfolgreich geladen
-        setMitarbeiter(response.data);
-        setFilteredMitarbeiter(response.data);
+        // Use utility to safely extract array data
+        const mitarbeiterData = extractArrayData(response);
+        
+        setMitarbeiter(mitarbeiterData);
+        setFilteredMitarbeiter(mitarbeiterData);
       } catch (err) {
         // Fehler beim Laden der Mitarbeiter
         setError('Die Mitarbeiter konnten nicht geladen werden.');
-        // Fallback: Wenn Backend nicht erreichbar ist, verwenden wir die lokalen Beispieldaten
-        // Diese Zeile würde in Produktion entfernt werden
-        // setMitarbeiter(mockMitarbeiter);
-        // setFilteredMitarbeiter(mockMitarbeiter);
+        // Ensure states remain as arrays even on error
+        setMitarbeiter([]);
+        setFilteredMitarbeiter([]);
       } finally {
         setLoading(false);
       }
@@ -56,6 +59,12 @@ const MitarbeiterList = () => {
 
   // Filter und Suchfunktion
   useEffect(() => {
+    // Ensure mitarbeiter is an array
+    if (!Array.isArray(mitarbeiter)) {
+      setFilteredMitarbeiter([]);
+      return;
+    }
+    
     let results = mitarbeiter;
     
     // Suche
@@ -85,8 +94,8 @@ const MitarbeiterList = () => {
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredMitarbeiter.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredMitarbeiter.length / itemsPerPage);
+  const currentItems = safeSlice(filteredMitarbeiter, indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil((filteredMitarbeiter?.length || 0) / itemsPerPage);
 
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
@@ -106,8 +115,10 @@ const MitarbeiterList = () => {
         await mitarbeiterService.delete(id);
         // Nach erfolgreicher Löschung aktualisierte Liste laden
         const response = await mitarbeiterService.getAll();
-        setMitarbeiter(response.data);
-        setFilteredMitarbeiter(response.data);
+        const mitarbeiterData = extractArrayData(response);
+        
+        setMitarbeiter(mitarbeiterData);
+        setFilteredMitarbeiter(mitarbeiterData);
       } catch (error) {
         // Fehler beim Löschen des Mitarbeiters
         alert('Der Mitarbeiter konnte nicht gelöscht werden.');
@@ -149,7 +160,9 @@ const MitarbeiterList = () => {
   };
 
   // Liste der verfügbaren Positionen aus den Daten extrahieren
-  const availablePositions = [...new Set(mitarbeiter.filter(ma => ma.position).map(ma => ma.position))];
+  const availablePositions = Array.isArray(mitarbeiter) 
+    ? [...new Set(mitarbeiter.filter(ma => ma.position).map(ma => ma.position))]
+    : [];
 
   return (
     <div className="space-y-6">
@@ -367,9 +380,9 @@ const MitarbeiterList = () => {
                 <p className="text-sm text-gray-700">
                   Zeige <span className="font-medium">{indexOfFirstItem + 1}</span> bis{' '}
                   <span className="font-medium">
-                    {indexOfLastItem > filteredMitarbeiter.length ? filteredMitarbeiter.length : indexOfLastItem}
+                    {indexOfLastItem > (filteredMitarbeiter?.length || 0) ? (filteredMitarbeiter?.length || 0) : indexOfLastItem}
                   </span>{' '}
-                  von <span className="font-medium">{filteredMitarbeiter.length}</span> Einträgen
+                  von <span className="font-medium">{filteredMitarbeiter?.length || 0}</span> Einträgen
                 </p>
               </div>
               <div>
