@@ -153,6 +153,35 @@ const AddressForm = ({
           </div>
         </div>
 
+        {/* Country */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Land
+          </label>
+          <input
+            type="text"
+            value={address?.land || 'Deutschland'}
+            onChange={(e) => handleChange('land', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Deutschland"
+          />
+        </div>
+
+        {/* Distance to truck parking */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Entfernung zum LKW (m)
+          </label>
+          <input
+            type="number"
+            value={address?.entfernung || 0}
+            onChange={(e) => handleChange('entfernung', parseInt(e.target.value) || 0)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            min="0"
+            placeholder="0"
+          />
+        </div>
+
         {/* Additional Info */}
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">

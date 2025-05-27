@@ -15,7 +15,8 @@ import {
   Divider,
   Card,
   CardContent,
-  Chip
+  Chip,
+  TextField
 } from '@mui/material';
 import {
   Save,
@@ -27,10 +28,12 @@ import {
   DateRange,
   People,
   Build,
-  AttachMoney
+  AttachMoney,
+  Notes
 } from '@mui/icons-material';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { toast } from 'react-toastify';
 
 // Import modular components
 import AddressForm from './components/AddressForm';
@@ -40,7 +43,7 @@ import TeamAssignment from './components/TeamAssignment';
 import ServiceSelection from './components/ServiceSelection';
 
 // Import services
-import { umzuegeService } from '../../services/api';
+import { umzuegeService, clientService } from '../../services/api';
 
 const STEPS = [
   { label: 'Kunde', icon: <Person /> },
@@ -63,33 +66,58 @@ const UmzugForm = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
-  // Form data
+  // Form data with complete structure matching backend
   const [formData, setFormData] = useState({
-    kunde: null,
-    vonAdresse: {
+    // Customer data
+    kundennummer: '',
+    auftraggeber: null,
+    kontakte: [],
+    
+    // Addresses
+    auszugsadresse: {
       strasse: '',
       hausnummer: '',
       plz: '',
       ort: '',
-      etage: '',
-      zusatz: ''
+      land: 'Deutschland',
+      etage: 0,
+      aufzug: false,
+      entfernung: 0
     },
-    nachAdresse: {
+    einzugsadresse: {
       strasse: '',
       hausnummer: '',
       plz: '',
       ort: '',
-      etage: '',
-      zusatz: ''
+      land: 'Deutschland',
+      etage: 0,
+      aufzug: false,
+      entfernung: 0
     },
-    datum: null,
-    zeit: null,
+    zwischenstopps: [],
+    
+    // Date and time
+    startDatum: null,
+    endDatum: null,
+    
+    // Status and team
     status: 'geplant',
     mitarbeiter: [],
     fahrzeuge: [],
+    
+    // Additional services and notes
     zusatzleistungen: [],
-    notizen: '',
-    internalNotes: ''
+    bemerkungen: '',
+    interneBemerkungen: '',
+    
+    // Pricing
+    preis: {
+      netto: 0,
+      brutto: 0,
+      mwst: 19,
+      bezahlt: false,
+      zahlungsart: 'Rechnung'
+    }
   });
 
   // Validation errors
@@ -110,35 +138,50 @@ const UmzugForm = () => {
 
       // Transform data for form
       setFormData({
-        kunde: umzug.kunde || null,
-        vonAdresse: umzug.vonAdresse || {
+        kundennummer: umzug.kundennummer || '',
+        auftraggeber: umzug.auftraggeber || null,
+        kontakte: umzug.kontakte || [],
+        auszugsadresse: umzug.auszugsadresse || {
           strasse: '',
           hausnummer: '',
           plz: '',
           ort: '',
-          etage: '',
-          zusatz: ''
+          land: 'Deutschland',
+          etage: 0,
+          aufzug: false,
+          entfernung: 0
         },
-        nachAdresse: umzug.nachAdresse || {
+        einzugsadresse: umzug.einzugsadresse || {
           strasse: '',
           hausnummer: '',
           plz: '',
           ort: '',
-          etage: '',
-          zusatz: ''
+          land: 'Deutschland',
+          etage: 0,
+          aufzug: false,
+          entfernung: 0
         },
-        datum: umzug.datum ? new Date(umzug.datum) : null,
-        zeit: umzug.zeit || null,
+        zwischenstopps: umzug.zwischenstopps || [],
+        startDatum: umzug.startDatum ? new Date(umzug.startDatum) : null,
+        endDatum: umzug.endDatum ? new Date(umzug.endDatum) : null,
         status: umzug.status || 'geplant',
         mitarbeiter: umzug.mitarbeiter || [],
         fahrzeuge: umzug.fahrzeuge || [],
         zusatzleistungen: umzug.zusatzleistungen || [],
-        notizen: umzug.notizen || '',
-        internalNotes: umzug.internalNotes || ''
+        bemerkungen: umzug.bemerkungen || '',
+        interneBemerkungen: umzug.interneBemerkungen || '',
+        preis: umzug.preis || {
+          netto: 0,
+          brutto: 0,
+          mwst: 19,
+          bezahlt: false,
+          zahlungsart: 'Rechnung'
+        }
       });
     } catch (err) {
       console.error('Error loading Umzug:', err);
       setError('Fehler beim Laden der Umzugsdaten');
+      toast.error('Fehler beim Laden der Umzugsdaten');
     } finally {
       setLoading(false);
     }
@@ -150,47 +193,50 @@ const UmzugForm = () => {
 
     switch (step) {
       case 0: // Customer
-        if (!formData.kunde) {
-          newErrors.kunde = 'Bitte wählen Sie einen Kunden aus';
+        if (!formData.auftraggeber) {
+          newErrors.auftraggeber = 'Bitte wählen Sie einen Kunden aus';
         }
         break;
 
       case 1: // Addresses
-        // Von Address validation
-        if (!formData.vonAdresse.strasse) {
-          newErrors.vonStrasse = 'Straße ist erforderlich';
+        // Auszugsadresse validation
+        if (!formData.auszugsadresse.strasse) {
+          newErrors.auszugsStrasse = 'Straße ist erforderlich';
         }
-        if (!formData.vonAdresse.hausnummer) {
-          newErrors.vonHausnummer = 'Hausnummer ist erforderlich';
+        if (!formData.auszugsadresse.hausnummer) {
+          newErrors.auszugsHausnummer = 'Hausnummer ist erforderlich';
         }
-        if (!formData.vonAdresse.plz || !/^\d{5}$/.test(formData.vonAdresse.plz)) {
-          newErrors.vonPlz = 'Gültige PLZ erforderlich (5 Ziffern)';
+        if (!formData.auszugsadresse.plz || !/^\d{5}$/.test(formData.auszugsadresse.plz)) {
+          newErrors.auszugsPlz = 'Gültige PLZ erforderlich (5 Ziffern)';
         }
-        if (!formData.vonAdresse.ort) {
-          newErrors.vonOrt = 'Ort ist erforderlich';
+        if (!formData.auszugsadresse.ort) {
+          newErrors.auszugsOrt = 'Ort ist erforderlich';
         }
 
-        // Nach Address validation
-        if (!formData.nachAdresse.strasse) {
-          newErrors.nachStrasse = 'Straße ist erforderlich';
+        // Einzugsadresse validation
+        if (!formData.einzugsadresse.strasse) {
+          newErrors.einzugsStrasse = 'Straße ist erforderlich';
         }
-        if (!formData.nachAdresse.hausnummer) {
-          newErrors.nachHausnummer = 'Hausnummer ist erforderlich';
+        if (!formData.einzugsadresse.hausnummer) {
+          newErrors.einzugsHausnummer = 'Hausnummer ist erforderlich';
         }
-        if (!formData.nachAdresse.plz || !/^\d{5}$/.test(formData.nachAdresse.plz)) {
-          newErrors.nachPlz = 'Gültige PLZ erforderlich (5 Ziffern)';
+        if (!formData.einzugsadresse.plz || !/^\d{5}$/.test(formData.einzugsadresse.plz)) {
+          newErrors.einzugsPlz = 'Gültige PLZ erforderlich (5 Ziffern)';
         }
-        if (!formData.nachAdresse.ort) {
-          newErrors.nachOrt = 'Ort ist erforderlich';
+        if (!formData.einzugsadresse.ort) {
+          newErrors.einzugsOrt = 'Ort ist erforderlich';
         }
         break;
 
       case 2: // Date & Time
-        if (!formData.datum) {
-          newErrors.datum = 'Datum ist erforderlich';
+        if (!formData.startDatum) {
+          newErrors.startDatum = 'Startdatum ist erforderlich';
         }
-        if (!formData.zeit) {
-          newErrors.zeit = 'Uhrzeit ist erforderlich';
+        if (!formData.endDatum) {
+          newErrors.endDatum = 'Enddatum ist erforderlich';
+        }
+        if (formData.startDatum && formData.endDatum && formData.startDatum > formData.endDatum) {
+          newErrors.endDatum = 'Enddatum muss nach dem Startdatum liegen';
         }
         break;
 
@@ -238,6 +284,7 @@ const UmzugForm = () => {
 
     if (!allValid) {
       setError('Bitte füllen Sie alle erforderlichen Felder aus');
+      toast.error('Bitte füllen Sie alle erforderlichen Felder aus');
       return;
     }
 
@@ -245,37 +292,55 @@ const UmzugForm = () => {
       setSaving(true);
       setError(null);
 
-      // Prepare data for API
+      // Prepare data for API - matching backend model exactly
       const apiData = {
-        kundeId: formData.kunde._id,
-        vonAdresse: formData.vonAdresse,
-        nachAdresse: formData.nachAdresse,
-        datum: formData.datum,
-        zeit: formData.zeit,
+        kundennummer: formData.kundennummer || formData.auftraggeber?.kundennummer || '',
+        auftraggeber: {
+          name: formData.auftraggeber.name,
+          telefon: formData.auftraggeber.telefon,
+          email: formData.auftraggeber.email,
+          isKunde: true
+        },
+        kontakte: formData.kontakte.length > 0 ? formData.kontakte : [{
+          name: formData.auftraggeber.name,
+          telefon: formData.auftraggeber.telefon,
+          email: formData.auftraggeber.email,
+          isKunde: true
+        }],
+        auszugsadresse: formData.auszugsadresse,
+        einzugsadresse: formData.einzugsadresse,
+        zwischenstopps: formData.zwischenstopps,
+        startDatum: formData.startDatum,
+        endDatum: formData.endDatum || formData.startDatum, // Use startDatum as fallback
         status: formData.status,
-        mitarbeiterIds: formData.mitarbeiter.map(m => m._id),
-        fahrzeugIds: formData.fahrzeuge.map(f => f._id),
+        mitarbeiter: formData.mitarbeiter.map(m => m._id || m),
+        fahrzeuge: formData.fahrzeuge.map(f => f._id || f),
         zusatzleistungen: formData.zusatzleistungen,
-        notizen: formData.notizen,
-        internalNotes: formData.internalNotes
+        bemerkungen: formData.bemerkungen,
+        interneBemerkungen: formData.interneBemerkungen,
+        preis: formData.preis
       };
 
       if (isEditMode) {
         await umzuegeService.update(id, apiData);
         setSuccess(true);
+        toast.success('Umzug erfolgreich aktualisiert');
         setTimeout(() => {
           navigate('/umzuege');
         }, 1500);
       } else {
         const response = await umzuegeService.create(apiData);
         setSuccess(true);
+        toast.success('Umzug erfolgreich erstellt');
         setTimeout(() => {
           navigate(`/umzuege/${response.data._id}`);
         }, 1500);
       }
     } catch (err) {
       console.error('Error saving Umzug:', err);
-      setError(err.response?.data?.message || 'Fehler beim Speichern');
+      const errorMessage = err.response?.data?.message || 'Fehler beim Speichern';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -296,8 +361,8 @@ const UmzugForm = () => {
       case 0:
         return (
           <CustomerForm
-            customer={formData.kunde}
-            onChange={(kunde) => setFormData({ ...formData, kunde })}
+            customer={formData.auftraggeber}
+            onChange={(auftraggeber) => setFormData({ ...formData, auftraggeber })}
             errors={errors}
           />
         );
@@ -307,34 +372,34 @@ const UmzugForm = () => {
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
               <Typography variant="h6" gutterBottom>
-                Von Adresse
+                Auszugsadresse
               </Typography>
               <AddressForm
-                address={formData.vonAdresse}
-                onChange={(vonAdresse) => setFormData({ ...formData, vonAdresse })}
+                address={formData.auszugsadresse}
+                onChange={(auszugsadresse) => setFormData({ ...formData, auszugsadresse })}
                 errors={{
-                  strasse: errors.vonStrasse,
-                  hausnummer: errors.vonHausnummer,
-                  plz: errors.vonPlz,
-                  ort: errors.vonOrt
+                  strasse: errors.auszugsStrasse,
+                  hausnummer: errors.auszugsHausnummer,
+                  plz: errors.auszugsPlz,
+                  ort: errors.auszugsOrt
                 }}
-                prefix="von"
+                prefix="auszugs"
               />
             </Grid>
             <Grid item xs={12} md={6}>
               <Typography variant="h6" gutterBottom>
-                Nach Adresse
+                Einzugsadresse
               </Typography>
               <AddressForm
-                address={formData.nachAdresse}
-                onChange={(nachAdresse) => setFormData({ ...formData, nachAdresse })}
+                address={formData.einzugsadresse}
+                onChange={(einzugsadresse) => setFormData({ ...formData, einzugsadresse })}
                 errors={{
-                  strasse: errors.nachStrasse,
-                  hausnummer: errors.nachHausnummer,
-                  plz: errors.nachPlz,
-                  ort: errors.nachOrt
+                  strasse: errors.einzugsStrasse,
+                  hausnummer: errors.einzugsHausnummer,
+                  plz: errors.einzugsPlz,
+                  ort: errors.einzugsOrt
                 }}
-                prefix="nach"
+                prefix="einzugs"
               />
             </Grid>
           </Grid>
@@ -343,8 +408,8 @@ const UmzugForm = () => {
       case 2:
         return (
           <DateTimeForm
-            date={formData.datum}
-            time={formData.zeit}
+            startDate={formData.startDatum}
+            endDate={formData.endDatum}
             onChange={(updates) => setFormData({ ...formData, ...updates })}
             errors={errors}
           />
@@ -355,7 +420,7 @@ const UmzugForm = () => {
           <TeamAssignment
             employees={formData.mitarbeiter}
             vehicles={formData.fahrzeuge}
-            date={formData.datum}
+            date={formData.startDatum}
             onChange={(updates) => setFormData({ ...formData, ...updates })}
             errors={errors}
           />
@@ -383,12 +448,17 @@ const UmzugForm = () => {
                 <Typography variant="subtitle1" color="primary" gutterBottom>
                   Kunde
                 </Typography>
-                {formData.kunde && (
+                {formData.auftraggeber && (
                   <Box>
-                    <Typography>{formData.kunde.name}</Typography>
+                    <Typography>{formData.auftraggeber.name}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {formData.kunde.email} | {formData.kunde.telefon}
+                      {formData.auftraggeber.email} | {formData.auftraggeber.telefon}
                     </Typography>
+                    {formData.kundennummer && (
+                      <Typography variant="body2" color="text.secondary">
+                        Kundennummer: {formData.kundennummer}
+                      </Typography>
+                    )}
                   </Box>
                 )}
               </CardContent>
@@ -402,30 +472,32 @@ const UmzugForm = () => {
                 </Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12} md={6}>
-                    <Typography variant="body2" fontWeight="bold">Von:</Typography>
+                    <Typography variant="body2" fontWeight="bold">Auszug:</Typography>
                     <Typography variant="body2">
-                      {formData.vonAdresse.strasse} {formData.vonAdresse.hausnummer}
+                      {formData.auszugsadresse.strasse} {formData.auszugsadresse.hausnummer}
                     </Typography>
                     <Typography variant="body2">
-                      {formData.vonAdresse.plz} {formData.vonAdresse.ort}
+                      {formData.auszugsadresse.plz} {formData.auszugsadresse.ort}
                     </Typography>
-                    {formData.vonAdresse.etage && (
+                    {formData.auszugsadresse.etage > 0 && (
                       <Typography variant="body2">
-                        {formData.vonAdresse.etage}. Etage
+                        {formData.auszugsadresse.etage}. Etage
+                        {formData.auszugsadresse.aufzug && ' (mit Aufzug)'}
                       </Typography>
                     )}
                   </Grid>
                   <Grid item xs={12} md={6}>
-                    <Typography variant="body2" fontWeight="bold">Nach:</Typography>
+                    <Typography variant="body2" fontWeight="bold">Einzug:</Typography>
                     <Typography variant="body2">
-                      {formData.nachAdresse.strasse} {formData.nachAdresse.hausnummer}
+                      {formData.einzugsadresse.strasse} {formData.einzugsadresse.hausnummer}
                     </Typography>
                     <Typography variant="body2">
-                      {formData.nachAdresse.plz} {formData.nachAdresse.ort}
+                      {formData.einzugsadresse.plz} {formData.einzugsadresse.ort}
                     </Typography>
-                    {formData.nachAdresse.etage && (
+                    {formData.einzugsadresse.etage > 0 && (
                       <Typography variant="body2">
-                        {formData.nachAdresse.etage}. Etage
+                        {formData.einzugsadresse.etage}. Etage
+                        {formData.einzugsadresse.aufzug && ' (mit Aufzug)'}
                       </Typography>
                     )}
                   </Grid>
@@ -440,9 +512,13 @@ const UmzugForm = () => {
                   Termin
                 </Typography>
                 <Typography>
-                  {formData.datum && format(formData.datum, 'EEEE, dd. MMMM yyyy', { locale: de })}
-                  {formData.zeit && ` um ${formData.zeit} Uhr`}
+                  Start: {formData.startDatum && format(formData.startDatum, 'EEEE, dd. MMMM yyyy HH:mm', { locale: de })} Uhr
                 </Typography>
+                {formData.endDatum && formData.endDatum !== formData.startDatum && (
+                  <Typography>
+                    Ende: {format(formData.endDatum, 'EEEE, dd. MMMM yyyy HH:mm', { locale: de })} Uhr
+                  </Typography>
+                )}
               </CardContent>
             </Card>
 
@@ -457,9 +533,9 @@ const UmzugForm = () => {
                   {formData.mitarbeiter.map(m => (
                     <Chip
                       key={m._id}
-                      label={`${m.name} (${m.rolle || 'Helfer'})`}
+                      label={m.name}
                       size="small"
-                      sx={{ mr: 1, mb: 1 }}
+                      sx={{ mr: 1 }}
                     />
                   ))}
                 </Box>
@@ -504,6 +580,29 @@ const UmzugForm = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Notes */}
+            {(formData.bemerkungen || formData.interneBemerkungen) && (
+              <Card sx={{ mb: 2 }}>
+                <CardContent>
+                  <Typography variant="subtitle1" color="primary" gutterBottom>
+                    Bemerkungen
+                  </Typography>
+                  {formData.bemerkungen && (
+                    <Box sx={{ mb: 1 }}>
+                      <Typography variant="body2" fontWeight="bold">Kundenbemerkungen:</Typography>
+                      <Typography variant="body2">{formData.bemerkungen}</Typography>
+                    </Box>
+                  )}
+                  {formData.interneBemerkungen && (
+                    <Box>
+                      <Typography variant="body2" fontWeight="bold">Interne Bemerkungen:</Typography>
+                      <Typography variant="body2">{formData.interneBemerkungen}</Typography>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </Box>
         );
 
@@ -512,10 +611,13 @@ const UmzugForm = () => {
     }
   };
 
+  // Main render
   if (loading) {
     return (
-      <Container sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-        <CircularProgress />
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Box display="flex" justifyContent="center" alignItems="center" height="60vh">
+          <CircularProgress />
+        </Box>
       </Container>
     );
   }
@@ -527,7 +629,18 @@ const UmzugForm = () => {
           {isEditMode ? 'Umzug bearbeiten' : 'Neuen Umzug erstellen'}
         </Typography>
 
-        {/* Stepper */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {isEditMode ? 'Umzug erfolgreich aktualisiert!' : 'Umzug erfolgreich erstellt!'}
+          </Alert>
+        )}
+
         <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
           {STEPS.map((step, index) => (
             <Step key={step.label}>
@@ -536,38 +649,23 @@ const UmzugForm = () => {
           ))}
         </Stepper>
 
-        {/* Alerts */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-        {success && (
-          <Alert severity="success" sx={{ mb: 2 }}>
-            Umzug wurde erfolgreich {isEditMode ? 'aktualisiert' : 'erstellt'}!
-          </Alert>
-        )}
-
-        {/* Step Content */}
-        <Box sx={{ minHeight: 400 }}>
+        <Box sx={{ minHeight: '400px' }}>
           {renderStepContent()}
         </Box>
 
-        {/* Navigation Buttons */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
           <Button
-            variant="outlined"
             onClick={() => navigate('/umzuege')}
             startIcon={<ArrowBack />}
           >
             Abbrechen
           </Button>
 
-          <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box>
             {activeStep > 0 && (
               <Button
                 onClick={handleBack}
-                startIcon={<ArrowBack />}
+                sx={{ mr: 1 }}
               >
                 Zurück
               </Button>
@@ -584,7 +682,7 @@ const UmzugForm = () => {
             ) : (
               <Button
                 variant="contained"
-                color="success"
+                color="primary"
                 onClick={handleSave}
                 disabled={saving}
                 startIcon={saving ? <CircularProgress size={20} /> : <Save />}
