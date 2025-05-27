@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Phone, Search, Plus, Check } from 'lucide-react';
+import { 
+  Person as User, 
+  Email as Mail, 
+  Phone, 
+  Search, 
+  Add as Plus, 
+  Check 
+} from '@mui/icons-material';
 import { clientService } from '../../../services/api';
 import { extractArrayData } from '../../../utils/responseUtils';
 
@@ -60,7 +67,7 @@ const CustomerForm = ({
 
   const handleChange = (field, value) => {
     onChange({
-      ...customer,
+      ...(customer || {}),
       [field]: value
     });
   };
@@ -155,7 +162,7 @@ const CustomerForm = ({
           {searching && (
             <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4">
               <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-600"></div>
                 <span className="ml-2 text-sm text-gray-500">Suche läuft...</span>
               </div>
             </div>
@@ -171,7 +178,7 @@ const CustomerForm = ({
           </label>
           <input
             type="text"
-            value={customer.name || ''}
+            value={customer?.name || ''}
             onChange={(e) => handleChange('name', e.target.value)}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
               getError('name') ? 'border-red-300' : 'border-gray-300'
@@ -190,7 +197,7 @@ const CustomerForm = ({
           <div className="relative">
             <input
               type="tel"
-              value={customer.telefon || ''}
+              value={customer?.telefon || ''}
               onChange={(e) => handleChange('telefon', e.target.value)}
               className={`w-full px-3 py-2 pl-10 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                 getError('telefon') ? 'border-red-300' : 'border-gray-300'
@@ -211,7 +218,7 @@ const CustomerForm = ({
           <div className="relative">
             <input
               type="email"
-              value={customer.email || ''}
+              value={customer?.email || ''}
               onChange={(e) => handleChange('email', e.target.value)}
               className={`w-full px-3 py-2 pl-10 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                 getError('email') ? 'border-red-300' : 'border-gray-300'
@@ -231,7 +238,7 @@ const CustomerForm = ({
             Anmerkungen
           </label>
           <textarea
-            value={customer.anmerkungen || ''}
+            value={customer?.anmerkungen || ''}
             onChange={(e) => handleChange('anmerkungen', e.target.value)}
             rows={2}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -240,7 +247,7 @@ const CustomerForm = ({
         </div>
       </div>
 
-      {customer.id && (
+      {customer?.id && (
         <div className="mt-2 text-sm text-green-600 flex items-center gap-1">
           <Check className="h-4 w-4" />
           Bestehender Kunde ausgewählt

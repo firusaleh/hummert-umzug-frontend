@@ -1,19 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Truck, UserCheck, AlertCircle, Calendar, X } from 'lucide-react';
-import { mitarbeiterService, vehicleService } from '../../../services/api';
+import { 
+  Group as Users, 
+  LocalShipping as Truck, 
+  PersonAddAlt1 as UserCheck, 
+  Error as AlertCircle, 
+  CalendarToday as Calendar, 
+  Close as X 
+} from '@mui/icons-material';
+import { mitarbeiterService, fahrzeugeService } from '../../../services/api';
 import { extractArrayData } from '../../../utils/responseUtils';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
 const TeamAssignment = ({ 
-  selectedMitarbeiter = [], 
-  selectedFahrzeuge = [], 
-  onMitarbeiterChange,
-  onFahrzeugeChange,
-  startDatum,
-  endDatum,
+  employees = [], 
+  vehicles = [], 
+  date,
+  onChange,
   errors = {}
 }) => {
+  // Map props to internal state names
+  const selectedMitarbeiter = employees;
+  const selectedFahrzeuge = vehicles;
+  const startDatum = date;
+  const endDatum = date;
   const [verfuegbareMitarbeiter, setVerfuegbareMitarbeiter] = useState([]);
   const [verfuegbareFahrzeuge, setVerfuegbareFahrzeuge] = useState([]);
   const [loadingMitarbeiter, setLoadingMitarbeiter] = useState(true);
@@ -45,7 +55,7 @@ const TeamAssignment = ({
   useEffect(() => {
     const fetchFahrzeuge = async () => {
       try {
-        const response = await vehicleService.getAll({ 
+        const response = await fahrzeugeService.getAll({ 
           verfuegbar: true 
         });
         const fahrzeuge = extractArrayData(response);
@@ -65,14 +75,14 @@ const TeamAssignment = ({
     const isSelected = selectedMitarbeiter.some(m => m._id === mitarbeiter._id);
     
     if (isSelected) {
-      onMitarbeiterChange(selectedMitarbeiter.filter(m => m._id !== mitarbeiter._id));
+      onChange({ mitarbeiter: selectedMitarbeiter.filter(m => m._id !== mitarbeiter._id) });
     } else {
-      onMitarbeiterChange([...selectedMitarbeiter, {
+      onChange({ mitarbeiter: [...selectedMitarbeiter, {
         _id: mitarbeiter._id,
         name: `${mitarbeiter.vorname} ${mitarbeiter.nachname}`,
         position: mitarbeiter.position,
         rolle: 'Helfer' // Default role
-      }]);
+      }] });
     }
   };
 
@@ -80,31 +90,31 @@ const TeamAssignment = ({
     const isSelected = selectedFahrzeuge.some(f => f._id === fahrzeug._id);
     
     if (isSelected) {
-      onFahrzeugeChange(selectedFahrzeuge.filter(f => f._id !== fahrzeug._id));
+      onChange({ fahrzeuge: selectedFahrzeuge.filter(f => f._id !== fahrzeug._id) });
     } else {
-      onFahrzeugeChange([...selectedFahrzeuge, {
+      onChange({ fahrzeuge: [...selectedFahrzeuge, {
         _id: fahrzeug._id,
         kennzeichen: fahrzeug.kennzeichen,
         typ: fahrzeug.typ,
         ladekapazitaet: fahrzeug.ladekapazitaet
-      }]);
+      }] });
     }
   };
 
   const updateMitarbeiterRole = (mitarbeiterId, rolle) => {
-    onMitarbeiterChange(
-      selectedMitarbeiter.map(m => 
+    onChange({
+      mitarbeiter: selectedMitarbeiter.map(m => 
         m._id === mitarbeiterId ? { ...m, rolle } : m
       )
-    );
+    });
   };
 
   const removeMitarbeiter = (mitarbeiterId) => {
-    onMitarbeiterChange(selectedMitarbeiter.filter(m => m._id !== mitarbeiterId));
+    onChange({ mitarbeiter: selectedMitarbeiter.filter(m => m._id !== mitarbeiterId) });
   };
 
   const removeFahrzeug = (fahrzeugId) => {
-    onFahrzeugeChange(selectedFahrzeuge.filter(f => f._id !== fahrzeugId));
+    onChange({ fahrzeuge: selectedFahrzeuge.filter(f => f._id !== fahrzeugId) });
   };
 
   const getAvailabilityStatus = (mitarbeiter) => {
