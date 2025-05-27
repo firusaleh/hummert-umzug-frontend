@@ -2,16 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
-  ArrowLeft, 
+  ArrowBack as ArrowLeft, 
   Save, 
-  X, 
+  Close as X, 
   Phone, 
-  Mail, 
-  User, 
-  Calendar, 
-  MapPin, 
-  ImagePlus
-} from 'lucide-react';
+  Email as Mail, 
+  Person as User, 
+  CalendarToday as Calendar, 
+  LocationOn as MapPin, 
+  AddPhotoAlternate as ImagePlus
+} from '@mui/icons-material';
 import { mitarbeiterService, configService } from '../../services/api';
 import { toast } from 'react-toastify';
 
@@ -196,6 +196,19 @@ const MitarbeiterForm = () => {
   // Formular absenden (bestehende Methode)
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate required address fields
+    if (!formData.strasse || !formData.plz || !formData.ort) {
+      setError('Bitte füllen Sie alle Pflichtfelder aus. Straße, PLZ und Ort sind erforderlich.');
+      return;
+    }
+    
+    // Validate PLZ format
+    if (!/^\d{5}$/.test(formData.plz)) {
+      setError('Bitte geben Sie eine gültige 5-stellige PLZ ein.');
+      return;
+    }
+    
     setSaving(true);
     setError(null);
     
@@ -450,6 +463,7 @@ const MitarbeiterForm = () => {
           {/* Kontaktdaten */}
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-semibold mb-4 border-b pb-2">Kontaktdaten</h2>
+            <p className="text-sm text-gray-600 mb-4">Alle mit <span className="text-red-500">*</span> markierten Felder sind Pflichtfelder.</p>
             
             <div className="space-y-4">
               <div>
@@ -487,7 +501,7 @@ const MitarbeiterForm = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Straße</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Straße <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <MapPin size={16} className="text-gray-400" />
@@ -498,30 +512,35 @@ const MitarbeiterForm = () => {
                     value={formData.strasse}
                     onChange={handleInputChange}
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
                   />
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">PLZ</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">PLZ <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     name="plz"
                     value={formData.plz}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                    pattern="[0-9]{5}"
+                    title="Bitte geben Sie eine gültige 5-stellige PLZ ein"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ort</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ort <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     name="ort"
                     value={formData.ort}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
                   />
                 </div>
               </div>
