@@ -1,15 +1,24 @@
 import React from 'react';
-import { Calendar, Clock, AlertCircle } from 'lucide-react';
+import { 
+  CalendarToday as Calendar, 
+  AccessTime as Clock, 
+  Info as AlertCircle 
+} from '@mui/icons-material';
 import { format, addDays, isWeekend, isBefore } from 'date-fns';
 import { de } from 'date-fns/locale';
 
 const DateTimeForm = ({ 
-  startDatum, 
-  endDatum, 
-  onStartChange, 
-  onEndChange,
+  date, 
+  time,
+  onChange,
   errors = {} 
 }) => {
+  // Convert Date object to string format for input
+  const dateString = date ? (date instanceof Date ? format(date, 'yyyy-MM-dd') : date) : '';
+  
+  // Internal state to handle start and end dates
+  const startDatum = dateString;
+  const endDatum = dateString; // For now, we'll use same date for both
   // Get minimum date (today)
   const minDate = format(new Date(), 'yyyy-MM-dd');
   
@@ -29,17 +38,16 @@ const DateTimeForm = ({
   };
 
   const handleStartDateChange = (value) => {
-    onStartChange(value);
-    
-    // Auto-update end date if it's before the new start date
-    if (value && endDatum && isBefore(new Date(endDatum), new Date(value))) {
-      onEndChange(getSuggestedEndDate(value));
-    }
-    
-    // Set suggested end date if no end date is set
-    if (value && !endDatum) {
-      onEndChange(getSuggestedEndDate(value));
-    }
+    onChange({ 
+      datum: value ? new Date(value) : null,
+      zeit: time || '08:00'
+    });
+  };
+
+  const handleTimeChange = (value) => {
+    onChange({ 
+      zeit: value
+    });
   };
 
   const formatDateForDisplay = (dateString) => {
@@ -94,8 +102,8 @@ const DateTimeForm = ({
             />
             <Calendar className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
           </div>
-          {errors.startDatum && (
-            <p className="mt-1 text-sm text-red-600">{errors.startDatum}</p>
+          {errors.datum && (
+            <p className="mt-1 text-sm text-red-600">{errors.datum}</p>
           )}
           {startDatum && (
             <p className="mt-1 text-sm text-gray-500">
@@ -118,7 +126,7 @@ const DateTimeForm = ({
             <input
               type="date"
               value={endDatum || ''}
-              onChange={(e) => onEndChange(e.target.value)}
+              onChange={(e) => onChange({ datum: e.target.value ? new Date(e.target.value) : null })}
               min={startDatum || minDate}
               className={`w-full px-3 py-2 pl-10 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                 errors.endDatum ? 'border-red-300' : 'border-gray-300'
@@ -126,8 +134,8 @@ const DateTimeForm = ({
             />
             <Calendar className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
           </div>
-          {errors.endDatum && (
-            <p className="mt-1 text-sm text-red-600">{errors.endDatum}</p>
+          {errors.zeit && (
+            <p className="mt-1 text-sm text-red-600">{errors.zeit}</p>
           )}
           {endDatum && (
             <p className="mt-1 text-sm text-gray-500">
@@ -148,8 +156,9 @@ const DateTimeForm = ({
           </label>
           <div className="relative">
             <select
+              value={time || '08:00'}
+              onChange={(e) => handleTimeChange(e.target.value)}
               className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
-              defaultValue="08:00"
             >
               <option value="06:00">06:00 Uhr</option>
               <option value="07:00">07:00 Uhr</option>

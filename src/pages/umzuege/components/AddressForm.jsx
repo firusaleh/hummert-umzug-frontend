@@ -1,5 +1,10 @@
 import React from 'react';
-import { MapPin, Home, Building, Navigation } from 'lucide-react';
+import { 
+  LocationOn as MapPin, 
+  Home, 
+  Business as Building, 
+  Navigation 
+} from '@mui/icons-material';
 
 const AddressForm = ({ 
   address, 
@@ -11,7 +16,7 @@ const AddressForm = ({
 }) => {
   const handleChange = (field, value) => {
     onChange({
-      ...address,
+      ...(address || {}),
       [field]: value
     });
   };
@@ -37,7 +42,7 @@ const AddressForm = ({
               <div className="relative">
                 <input
                   type="text"
-                  value={address.strasse || ''}
+                  value={address?.strasse || ''}
                   onChange={(e) => handleChange('strasse', e.target.value)}
                   className={`w-full px-3 py-2 pl-10 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                     getError('strasse') ? 'border-red-300' : 'border-gray-300'
@@ -57,7 +62,7 @@ const AddressForm = ({
               </label>
               <input
                 type="text"
-                value={address.hausnummer || ''}
+                value={address?.hausnummer || ''}
                 onChange={(e) => handleChange('hausnummer', e.target.value)}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                   getError('hausnummer') ? 'border-red-300' : 'border-gray-300'
@@ -78,7 +83,7 @@ const AddressForm = ({
           </label>
           <input
             type="text"
-            value={address.plz || ''}
+            value={address?.plz || ''}
             onChange={(e) => {
               const value = e.target.value.replace(/\D/g, '').slice(0, 5);
               handleChange('plz', value);
@@ -100,7 +105,7 @@ const AddressForm = ({
           </label>
           <input
             type="text"
-            value={address.ort || ''}
+            value={address?.ort || ''}
             onChange={(e) => handleChange('ort', e.target.value)}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
               getError('ort') ? 'border-red-300' : 'border-gray-300'
@@ -120,7 +125,7 @@ const AddressForm = ({
           <div className="relative">
             <input
               type="number"
-              value={address.etage || 0}
+              value={address?.etage || 0}
               onChange={(e) => handleChange('etage', parseInt(e.target.value) || 0)}
               min="0"
               max="50"
@@ -139,7 +144,7 @@ const AddressForm = ({
             <label className="inline-flex items-center">
               <input
                 type="checkbox"
-                checked={address.aufzug || false}
+                checked={address?.aufzug || false}
                 onChange={(e) => handleChange('aufzug', e.target.checked)}
                 className="rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
               />
@@ -154,7 +159,7 @@ const AddressForm = ({
             Zusätzliche Informationen
           </label>
           <textarea
-            value={address.zusatzinfo || ''}
+            value={address?.zusatzinfo || ''}
             onChange={(e) => handleChange('zusatzinfo', e.target.value)}
             rows={2}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
