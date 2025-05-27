@@ -820,9 +820,8 @@ class AuthService extends BaseService {
       const response = await api.post('/auth/login', credentials);
       
       if (response.data && response.data.token) {
-        // Store token and user data - backend only sends token, not refreshToken
-        localStorage.setItem(TOKEN_KEYS.access, response.data.token);
-        localStorage.setItem(TOKEN_KEYS.timestamp, Date.now().toString());
+        // Store tokens and user data
+        tokenManager.setTokens(response.data.token, response.data.refreshToken || '');
         
         if (response.data.user) {
           localStorage.setItem(TOKEN_KEYS.user, JSON.stringify(response.data.user));
@@ -840,9 +839,8 @@ class AuthService extends BaseService {
       const response = await api.post('/auth/register', userData);
       
       if (response.data && response.data.token) {
-        // Store token and user data
-        localStorage.setItem(TOKEN_KEYS.access, response.data.token);
-        localStorage.setItem(TOKEN_KEYS.timestamp, Date.now().toString());
+        // Store tokens and user data
+        tokenManager.setTokens(response.data.token, response.data.refreshToken || '');
         
         if (response.data.user) {
           localStorage.setItem(TOKEN_KEYS.user, JSON.stringify(response.data.user));
@@ -868,8 +866,23 @@ class AuthService extends BaseService {
   }
   
   async refreshToken() {
-    // Since backend doesn't support refresh tokens yet, throw error
-    throw new Error('Refresh token not implemented');
+    const refreshToken = tokenManager.getRefreshToken();
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
+    
+    try {
+      const response = await api.post('/auth/refresh', { refreshToken });
+      
+      if (response.data && response.data.token) {
+        tokenManager.setTokens(response.data.token, response.data.refreshToken);
+      }
+      
+      return response;
+    } catch (error) {
+      tokenManager.clearTokens();
+      throw error;
+    }
   }
   
   async checkAuth() {
