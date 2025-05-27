@@ -31,6 +31,7 @@ const MitarbeiterForm = () => {
     email: '',
     eintrittsdatum: '',
     strasse: '',
+    hausnummer: '',
     plz: '',
     ort: '',
     geburtstag: '',
@@ -99,6 +100,7 @@ const MitarbeiterForm = () => {
               email: mitarbeiter.email || mitarbeiter.userId?.email || '',
               eintrittsdatum: mitarbeiter.einstellungsdatum || mitarbeiter.eintrittsdatum || '',
               strasse: mitarbeiter.adresse?.strasse || '',
+              hausnummer: mitarbeiter.adresse?.hausnummer || '',
               plz: mitarbeiter.adresse?.plz || '',
               ort: mitarbeiter.adresse?.ort || '',
               geburtstag: mitarbeiter.geburtstag || '',
@@ -198,8 +200,8 @@ const MitarbeiterForm = () => {
     e.preventDefault();
     
     // Validate required address fields
-    if (!formData.strasse || !formData.plz || !formData.ort) {
-      setError('Bitte füllen Sie alle Pflichtfelder aus. Straße, PLZ und Ort sind erforderlich.');
+    if (!formData.strasse || !formData.hausnummer || !formData.plz || !formData.ort) {
+      setError('Bitte füllen Sie alle Pflichtfelder aus. Straße, Hausnummer, PLZ und Ort sind erforderlich.');
       return;
     }
     
@@ -224,6 +226,7 @@ const MitarbeiterForm = () => {
         geburtstag: formData.geburtstag,
         adresse: {
           strasse: formData.strasse,
+          hausnummer: formData.hausnummer,
           plz: formData.plz,
           ort: formData.ort
         },
@@ -292,7 +295,7 @@ const MitarbeiterForm = () => {
       {/* Kopfzeile mit Navigation */}
       <div className="flex items-center mb-6">
         <Link to="/mitarbeiter" className="mr-4 text-gray-500 hover:text-gray-700">
-          <ArrowLeft size={20} />
+          <ArrowLeft sx={{ fontSize: 20 }} />
         </Link>
         <h1 className="text-2xl font-bold text-gray-800">
           {isNeueModus ? 'Neuen Mitarbeiter anlegen' : 'Mitarbeiter bearbeiten'}
@@ -324,7 +327,7 @@ const MitarbeiterForm = () => {
                     />
                   ) : (
                     <div className="flex flex-col items-center justify-center text-gray-400">
-                      <User size={32} />
+                      <User sx={{ fontSize: 32 }} />
                       <span className="text-xs mt-2">Kein Bild</span>
                     </div>
                   )}
@@ -333,7 +336,7 @@ const MitarbeiterForm = () => {
                   htmlFor="profile-upload" 
                   className="absolute -right-2 bottom-0 bg-blue-500 text-white p-2 rounded-full cursor-pointer hover:bg-blue-600"
                 >
-                  <ImagePlus size={16} />
+                  <ImagePlus sx={{ fontSize: 16 }} />
                 </label>
                 <input 
                   type="file" 
@@ -429,7 +432,7 @@ const MitarbeiterForm = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Eintrittsdatum</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Calendar size={16} className="text-gray-400" />
+                    <Calendar sx={{ fontSize: 16 }} className="text-gray-400" />
                   </div>
                   <input
                     type="date"
@@ -446,7 +449,7 @@ const MitarbeiterForm = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Geburtstag</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Calendar size={16} className="text-gray-400" />
+                    <Calendar sx={{ fontSize: 16 }} className="text-gray-400" />
                   </div>
                   <input
                     type="date"
@@ -470,7 +473,7 @@ const MitarbeiterForm = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Phone size={16} className="text-gray-400" />
+                    <Phone sx={{ fontSize: 16 }} className="text-gray-400" />
                   </div>
                   <input
                     type="tel"
@@ -487,7 +490,7 @@ const MitarbeiterForm = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Mail size={16} className="text-gray-400" />
+                    <Mail sx={{ fontSize: 16 }} className="text-gray-400" />
                   </div>
                   <input
                     type="email"
@@ -500,18 +503,33 @@ const MitarbeiterForm = () => {
                 </div>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Straße <span className="text-red-500">*</span></label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <MapPin size={16} className="text-gray-400" />
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Straße <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <MapPin sx={{ fontSize: 16 }} className="text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      name="strasse"
+                      value={formData.strasse}
+                      onChange={handleInputChange}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Musterstraße"
+                      required
+                    />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nr. <span className="text-red-500">*</span></label>
                   <input
                     type="text"
-                    name="strasse"
-                    value={formData.strasse}
+                    name="hausnummer"
+                    value={formData.hausnummer}
                     onChange={handleInputChange}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="123"
                     required
                   />
                 </div>
@@ -598,7 +616,7 @@ const MitarbeiterForm = () => {
             to="/mitarbeiter" 
             className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center"
           >
-            <X size={16} className="mr-2" /> Abbrechen
+            <X sx={{ fontSize: 16 }} className="mr-2" /> Abbrechen
           </Link>
           
           <button 
@@ -606,7 +624,7 @@ const MitarbeiterForm = () => {
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
             disabled={saving}
           >
-            <Save size={16} className="mr-2" /> 
+            <Save sx={{ fontSize: 16 }} className="mr-2" /> 
             {saving ? 'Wird gespeichert...' : 'Speichern'}
           </button>
         </div>
