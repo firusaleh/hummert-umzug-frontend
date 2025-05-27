@@ -97,8 +97,11 @@ const ServiceSelection = ({ services = [], onChange, errors = {} }) => {
     if (services.length > 0) {
       const formatted = services.map(service => ({
         ...service,
-        quantity: service.quantity || 1,
-        totalPrice: service.price * (service.quantity || 1)
+        beschreibung: service.beschreibung || service.name,
+        preis: service.preis || service.price || 0,
+        menge: service.menge || service.quantity || 1,
+        quantity: service.menge || service.quantity || 1,
+        totalPrice: (service.preis || service.price || 0) * (service.menge || service.quantity || 1)
       }));
       setSelectedServices(formatted);
     }
@@ -118,16 +121,19 @@ const ServiceSelection = ({ services = [], onChange, errors = {} }) => {
       const newService = {
         id: serviceId,
         category,
+        beschreibung: service.name,
         name: service.name,
         basePrice: service.basePrice,
+        preis: service.basePrice,
         price: service.basePrice,
         unit: service.unit,
+        menge: 1,
         quantity: 1,
         totalPrice: service.basePrice
       };
       const updated = [...selectedServices, newService];
       setSelectedServices(updated);
-      onChange(updated);
+      onChange(updated.map(s => ({ beschreibung: s.beschreibung || s.name, preis: s.preis || s.price, menge: s.menge || s.quantity })));
     }
   };
 
@@ -137,14 +143,15 @@ const ServiceSelection = ({ services = [], onChange, errors = {} }) => {
         const qty = Math.max(1, parseInt(quantity) || 1);
         return {
           ...service,
+          menge: qty,
           quantity: qty,
-          totalPrice: service.price * qty
+          totalPrice: (service.preis || service.price) * qty
         };
       }
       return service;
     });
     setSelectedServices(updated);
-    onChange(updated);
+    onChange(updated.map(s => ({ beschreibung: s.beschreibung || s.name, preis: s.preis || s.price, menge: s.menge || s.quantity })));
   };
 
   const handlePriceChange = (serviceId, price) => {
@@ -153,14 +160,15 @@ const ServiceSelection = ({ services = [], onChange, errors = {} }) => {
         const newPrice = parseFloat(price) || 0;
         return {
           ...service,
+          preis: newPrice,
           price: newPrice,
-          totalPrice: newPrice * service.quantity
+          totalPrice: newPrice * (service.menge || service.quantity)
         };
       }
       return service;
     });
     setSelectedServices(updated);
-    onChange(updated);
+    onChange(updated.map(s => ({ beschreibung: s.beschreibung || s.name, preis: s.preis || s.price, menge: s.menge || s.quantity })));
   };
 
   const handleAddCustomService = () => {
@@ -168,16 +176,19 @@ const ServiceSelection = ({ services = [], onChange, errors = {} }) => {
       const newService = {
         id: `custom_${Date.now()}`,
         category: 'custom',
+        beschreibung: customService.name,
         name: customService.name,
         basePrice: parseFloat(customService.price),
+        preis: parseFloat(customService.price),
         price: parseFloat(customService.price),
         unit: customService.unit,
+        menge: customService.quantity,
         quantity: customService.quantity,
         totalPrice: parseFloat(customService.price) * customService.quantity
       };
       const updated = [...selectedServices, newService];
       setSelectedServices(updated);
-      onChange(updated);
+      onChange(updated.map(s => ({ beschreibung: s.beschreibung || s.name, preis: s.preis || s.price, menge: s.menge || s.quantity })));
       
       // Reset form
       setCustomService({
@@ -193,7 +204,7 @@ const ServiceSelection = ({ services = [], onChange, errors = {} }) => {
   const handleRemoveService = (serviceId) => {
     const updated = selectedServices.filter(s => s.id !== serviceId);
     setSelectedServices(updated);
-    onChange(updated);
+    onChange(updated.map(s => ({ beschreibung: s.beschreibung || s.name, preis: s.preis || s.price, menge: s.menge || s.quantity })));
   };
 
   const calculateTotal = () => {

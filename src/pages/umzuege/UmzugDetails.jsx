@@ -1,12 +1,12 @@
-// src/pages/umzuege/UmzugDetails.jsx
+// src/pages/umzuege/UmzugDetails.jsx - Enhanced with API integration
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Calendar, 
   Clock, 
   MapPin, 
-  TruckElectric, 
+  Truck, 
   Users, 
   Phone, 
   Mail,
@@ -14,98 +14,178 @@ import {
   MessageSquare,
   Clipboard,
   Edit,
-  Trash2
+  Trash2,
+  Euro,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
+import { format } from 'date-fns';
+import { de } from 'date-fns/locale';
+import { toast } from 'react-toastify';
+import { umzuegeService } from '../../services/api';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
+import ErrorAlert from '../../components/common/ErrorAlert';
 
-// Beispieldaten für einen Umzug
-const mockUmzug = {
-  id: 1,
-  kunde: {
-    name: 'Familie Becker',
-    kontaktperson: 'Thomas Becker',
-    telefon: '+49 176 12345678',
-    email: 'thomas.becker@example.com'
-  },
-  typ: 'Privat',
-  status: 'Geplant',
-  datum: '15.05.2025',
-  uhrzeit: '08:00 - 16:00',
-  startadresse: 'Rosenweg 8, 10115 Berlin',
-  zieladresse: 'Tulpenallee 23, 80333 München',
-  umzugsvolumen: '70m³',
-  etage_start: '3. OG (mit Aufzug)',
-  etage_ziel: '2. OG (ohne Aufzug)',
-  mitarbeiter: [
-    { id: 1, name: 'Max Mustermann', rolle: 'Teamleiter' },
-    { id: 2, name: 'Anna Schmidt', rolle: 'Packer' },
-    { id: 3, name: 'Lukas Meyer', rolle: 'Fahrer' },
-    { id: 4, name: 'Julia Weber', rolle: 'Packer' }
-  ],
-  fahrzeuge: [
-    { id: 1, kennzeichen: 'B-HU 1234', typ: '7,5t LKW' },
-    { id: 2, kennzeichen: 'B-HU 5678', typ: 'Transporter' }
-  ],
-  notizen: 'Klavier muss transportiert werden. Kunde hat spezielle Verpackungswünsche für die Kunstsammlung.',
-  aufnahmeBericht: 'Aufnahme_Becker_2025-04-20.pdf',
-  preisangebot: 'Angebot_Becker_2025-04-22.pdf',
-  vertrag: 'Vertrag_Becker_2025-04-25.pdf',
-  aktivitaeten: [
-    { id: 1, datum: '20.04.2025', uhrzeit: '14:30', typ: 'Aufnahme', benutzer: 'Sarah Müller', notiz: 'Aufnahme vor Ort durchgeführt.' },
-    { id: 2, datum: '22.04.2025', uhrzeit: '10:15', typ: 'Angebot erstellt', benutzer: 'Markus Wolf', notiz: 'Angebot an Kunden versendet.' },
-    { id: 3, datum: '25.04.2025', uhrzeit: '16:45', typ: 'Vertrag', benutzer: 'Markus Wolf', notiz: 'Vertrag vom Kunden unterschrieben erhalten.' },
-    { id: 4, datum: '28.04.2025', uhrzeit: '09:00', typ: 'Ressourcenplanung', benutzer: 'Sarah Müller', notiz: 'Team und Fahrzeuge zugewiesen.' }
-  ]
+// StatusBadge Component
+const StatusBadge = ({ status }) => {
+  const statusConfig = {
+    geplant: { bgColor: 'bg-blue-100', textColor: 'text-blue-800', label: 'Geplant', icon: Calendar },
+    bestaetigt: { bgColor: 'bg-purple-100', textColor: 'text-purple-800', label: 'Bestätigt', icon: CheckCircle },
+    in_bearbeitung: { bgColor: 'bg-yellow-100', textColor: 'text-yellow-800', label: 'In Bearbeitung', icon: RefreshCw },
+    abgeschlossen: { bgColor: 'bg-green-100', textColor: 'text-green-800', label: 'Abgeschlossen', icon: CheckCircle },
+    storniert: { bgColor: 'bg-red-100', textColor: 'text-red-800', label: 'Storniert', icon: XCircle }
+  };
+  
+  const config = statusConfig[status] || { 
+    bgColor: 'bg-gray-100', 
+    textColor: 'text-gray-800', 
+    label: status || 'Unbekannt',
+    icon: AlertCircle
+  };
+  
+  const Icon = config.icon;
+  
+  return (
+    <span className={`px-3 py-1 inline-flex items-center text-sm leading-5 font-semibold rounded-full ${config.bgColor} ${config.textColor}`}>
+      <Icon className="w-4 h-4 mr-1" />
+      {config.label}
+    </span>
+  );
+};
+
+// Role Badge Component
+const RoleBadge = ({ rolle }) => {
+  const roleConfig = {
+    fahrer: { bgColor: 'bg-blue-100', textColor: 'text-blue-800', label: 'Fahrer' },
+    helfer: { bgColor: 'bg-green-100', textColor: 'text-green-800', label: 'Helfer' },
+    projektleiter: { bgColor: 'bg-purple-100', textColor: 'text-purple-800', label: 'Projektleiter' }
+  };
+  
+  const config = roleConfig[rolle] || { 
+    bgColor: 'bg-gray-100', 
+    textColor: 'text-gray-800', 
+    label: rolle || 'Mitarbeiter' 
+  };
+  
+  return (
+    <span className={`px-2 py-1 text-xs font-medium rounded ${config.bgColor} ${config.textColor}`}>
+      {config.label}
+    </span>
+  );
 };
 
 const UmzugDetails = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [umzug, setUmzug] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [neueNotiz, setNeueNotiz] = useState('');
+  const [addingNotiz, setAddingNotiz] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  // Simuliere API-Aufruf
+  // Load Umzug data
   useEffect(() => {
-    const fetchUmzug = () => {
-      // In einer echten Anwendung würde hier ein API-Aufruf mit der ID stattfinden
-      setUmzug(mockUmzug);
-      setLoading(false);
-    };
-
-    fetchUmzug();
+    loadUmzugData();
   }, [id]);
 
-  const handleNotizSubmit = (e) => {
+  const loadUmzugData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await umzuegeService.getById(id);
+      setUmzug(response.data);
+    } catch (err) {
+      console.error('Error loading Umzug:', err);
+      setError(err.response?.data?.message || 'Fehler beim Laden der Umzugsdaten');
+      toast.error('Fehler beim Laden der Umzugsdaten');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Format address for display
+  const formatAddress = (address) => {
+    if (!address) return 'Keine Adresse angegeben';
+    const { strasse, hausnummer, plz, ort, etage, aufzug } = address;
+    const addressStr = `${strasse} ${hausnummer}, ${plz} ${ort}`;
+    const etageStr = etage ? `${etage}. OG` : 'EG';
+    const aufzugStr = aufzug ? 'mit Aufzug' : 'ohne Aufzug';
+    return { addressStr, details: `${etageStr} (${aufzugStr})` };
+  };
+
+  // Handle adding a note
+  const handleNotizSubmit = async (e) => {
     e.preventDefault();
     
     if (!neueNotiz.trim()) return;
     
-    // Make sure umzug and aktivitaeten exist
-    if (!umzug || !umzug.aktivitaeten) return;
+    try {
+      setAddingNotiz(true);
+      
+      const updatedNotizen = [
+        ...(umzug.notizen || []),
+        {
+          text: neueNotiz,
+          datum: new Date().toISOString(),
+          ersteller: 'Aktueller Benutzer' // Would come from auth context
+        }
+      ];
+      
+      await umzuegeService.update(id, { notizen: updatedNotizen });
+      
+      // Reload data to get updated state
+      await loadUmzugData();
+      
+      setNeueNotiz('');
+      toast.success('Notiz erfolgreich hinzugefügt');
+    } catch (err) {
+      console.error('Error adding note:', err);
+      toast.error('Fehler beim Hinzufügen der Notiz');
+    } finally {
+      setAddingNotiz(false);
+    }
+  };
+
+  // Handle deletion
+  const handleDelete = async () => {
+    if (!window.confirm('Möchten Sie diesen Umzug wirklich löschen?')) {
+      return;
+    }
     
-    // In einer echten Anwendung würde hier ein API-Aufruf stattfinden
-    const neueAktivitaet = {
-      id: umzug.aktivitaeten.length + 1,
-      datum: new Date().toLocaleDateString('de-DE'),
-      uhrzeit: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
-      typ: 'Notiz',
-      benutzer: 'Angemeldeter Benutzer', // In einer echten Anwendung aus dem Auth-Kontext nehmen
-      notiz: neueNotiz
-    };
-    
-    setUmzug({
-      ...umzug,
-      aktivitaeten: [...umzug.aktivitaeten, neueAktivitaet]
-    });
-    
-    setNeueNotiz('');
+    try {
+      setDeleting(true);
+      await umzuegeService.delete(id);
+      toast.success('Umzug erfolgreich gelöscht');
+      navigate('/umzuege');
+    } catch (err) {
+      console.error('Error deleting Umzug:', err);
+      toast.error('Fehler beim Löschen des Umzugs');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Handle status change
+  const handleStatusChange = async (newStatus) => {
+    try {
+      await umzuegeService.update(id, { status: newStatus });
+      await loadUmzugData();
+      toast.success('Status erfolgreich aktualisiert');
+    } catch (err) {
+      console.error('Error updating status:', err);
+      toast.error('Fehler beim Aktualisieren des Status');
+    }
   };
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
+  }
+
+  if (error) {
+    return <ErrorAlert message={error} onRetry={loadUmzugData} />;
   }
 
   if (!umzug) {
@@ -116,321 +196,359 @@ const UmzugDetails = () => {
     );
   }
 
-  // StatusBadge Komponente
-  const StatusBadge = ({ status }) => {
-    let bgColor, textColor;
-    
-    switch (status) {
-      case 'Geplant':
-        bgColor = 'bg-blue-100';
-        textColor = 'text-blue-800';
-        break;
-      case 'In Vorbereitung':
-        bgColor = 'bg-yellow-100';
-        textColor = 'text-yellow-800';
-        break;
-      case 'Abgeschlossen':
-        bgColor = 'bg-green-100';
-        textColor = 'text-green-800';
-        break;
-      default:
-        bgColor = 'bg-gray-100';
-        textColor = 'text-gray-800';
-    }
-    
-    return (
-      <span className={`px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full ${bgColor} ${textColor}`}>
-        {status}
-      </span>
-    );
-  };
+  const auszugsadresse = formatAddress(umzug.auszugsadresse);
+  const einzugsadresse = formatAddress(umzug.einzugsadresse);
 
   return (
     <div>
-      {/* Kopfzeile mit Navigation und Aktionen */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 space-y-4 md:space-y-0">
-        <div className="flex items-center">
-          <Link to="/umzuege" className="mr-4 text-gray-500 hover:text-gray-700">
-            <ArrowLeft size={20} />
+      {/* Header with navigation and actions */}
+      <div className="mb-8 flex justify-between items-center">
+        <div className="flex items-center space-x-4">
+          <Link
+            to="/umzuege"
+            className="flex items-center text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Zurück zur Übersicht
           </Link>
-          <h1 className="text-2xl font-bold text-gray-800">Umzugsdetails</h1>
-          <StatusBadge status={umzug.status} className="ml-4" />
+          <h1 className="text-3xl font-bold text-gray-900">
+            Umzug Details - {umzug.auftraggeber?.name || 'Unbekannt'}
+          </h1>
         </div>
-        
-        <div className="flex space-x-3">
-          <Link 
-            to={`/umzuege/${id}/bearbeiten`}
-            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg flex items-center"
+        <div className="flex space-x-2">
+          <Link
+            to={`/umzuege/${id}/edit`}
+            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center"
           >
-            <Edit size={16} className="mr-2" /> Bearbeiten
+            <Edit className="w-4 h-4 mr-2" />
+            Bearbeiten
           </Link>
-          <button 
-            className="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg flex items-center"
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded inline-flex items-center disabled:opacity-50"
           >
-            <Trash2 size={16} className="mr-2" /> Löschen
+            <Trash2 className="w-4 h-4 mr-2" />
+            {deleting ? 'Löschen...' : 'Löschen'}
           </button>
         </div>
       </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Hauptinformationen */}
+
+      {/* Main content grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left column - Main information */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Übersicht */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4 border-b pb-2">Übersicht</h2>
+          {/* Status and basic info */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <div className="flex justify-between items-start mb-4">
+              <h2 className="text-xl font-semibold">Grundinformationen</h2>
+              <StatusBadge status={umzug.status} />
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Kunde</h3>
-                <p className="text-gray-900 font-medium">{umzug.kunde.name}</p>
+                <p className="text-sm text-gray-500">Kundennummer</p>
+                <p className="font-medium">{umzug.kundennummer || 'Nicht angegeben'}</p>
               </div>
-              
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Umzugstyp</h3>
-                <p className="text-gray-900">{umzug.typ}</p>
+                <p className="text-sm text-gray-500">Umzugsdatum</p>
+                <p className="font-medium flex items-center">
+                  <Calendar className="w-4 h-4 mr-2 text-gray-400" />
+                  {format(new Date(umzug.startDatum), 'dd.MM.yyyy', { locale: de })}
+                </p>
               </div>
-              
-              <div className="flex items-start">
-                <Calendar size={18} className="mt-0.5 mr-2 text-gray-400" />
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">Datum</h3>
-                  <p className="text-gray-900">{umzug.datum}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start">
-                <Clock size={18} className="mt-0.5 mr-2 text-gray-400" />
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">Uhrzeit</h3>
-                  <p className="text-gray-900">{umzug.uhrzeit}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start">
-                <MapPin size={18} className="mt-0.5 mr-2 text-gray-400" />
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">Startadresse</h3>
-                  <p className="text-gray-900">{umzug.startadresse}</p>
-                  <p className="text-sm text-gray-600">{umzug.etage_start}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start">
-                <MapPin size={18} className="mt-0.5 mr-2 text-gray-400" />
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">Zieladresse</h3>
-                  <p className="text-gray-900">{umzug.zieladresse}</p>
-                  <p className="text-sm text-gray-600">{umzug.etage_ziel}</p>
-                </div>
-              </div>
-              
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Umzugsvolumen</h3>
-                <p className="text-gray-900">{umzug.umzugsvolumen}</p>
+                <p className="text-sm text-gray-500">Zeitraum</p>
+                <p className="font-medium flex items-center">
+                  <Clock className="w-4 h-4 mr-2 text-gray-400" />
+                  {format(new Date(umzug.startDatum), 'HH:mm')} - 
+                  {format(new Date(umzug.endDatum), 'HH:mm')} Uhr
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Zahlungsstatus</p>
+                <p className="font-medium flex items-center">
+                  {umzug.preis?.bezahlt ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
+                      Bezahlt
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-4 h-4 mr-2 text-red-500" />
+                      Offen
+                    </>
+                  )}
+                </p>
               </div>
             </div>
           </div>
-          
-          {/* Team und Ressourcen */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4 border-b pb-2">Team und Ressourcen</h2>
-            
-            <div className="mb-6">
-              <div className="flex items-center mb-2">
-                <Users size={18} className="mr-2 text-gray-400" />
-                <h3 className="text-md font-medium">Mitarbeiter</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                {umzug.mitarbeiter.map((ma) => (
-                  <div key={ma.id} className="flex items-center p-3 border rounded-lg">
-                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white mr-3">
-                      {ma.name.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{ma.name}</p>
-                      <p className="text-xs text-gray-500">{ma.rolle}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex items-center mb-2">
-                <TruckElectric size={18} className="mr-2 text-gray-400" />
-                <h3 className="text-md font-medium">Fahrzeuge</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                {umzug.fahrzeuge.map((fahrzeug) => (
-                  <div key={fahrzeug.id} className="flex items-center p-3 border rounded-lg">
-                    <div className="p-2 bg-gray-100 rounded-lg mr-3">
-                      <TruckElectric size={20} className="text-gray-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{fahrzeug.kennzeichen}</p>
-                      <p className="text-xs text-gray-500">{fahrzeug.typ}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          
-          {/* Dokumente */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4 border-b pb-2">Dokumente</h2>
-            
-            <div className="space-y-3">
-              {umzug.aufnahmeBericht && (
-                <div className="flex items-center p-3 border rounded-lg">
-                  <div className="p-2 bg-blue-100 rounded-lg mr-3">
-                    <Clipboard size={20} className="text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Aufnahmebericht</p>
-                    <p className="text-xs text-gray-500">{umzug.aufnahmeBericht}</p>
-                  </div>
-                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                    Öffnen
-                  </button>
-                </div>
-              )}
-              
-              {umzug.preisangebot && (
-                <div className="flex items-center p-3 border rounded-lg">
-                  <div className="p-2 bg-green-100 rounded-lg mr-3">
-                    <FileText size={20} className="text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Preisangebot</p>
-                    <p className="text-xs text-gray-500">{umzug.preisangebot}</p>
-                  </div>
-                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                    Öffnen
-                  </button>
-                </div>
-              )}
-              
-              {umzug.vertrag && (
-                <div className="flex items-center p-3 border rounded-lg">
-                  <div className="p-2 bg-purple-100 rounded-lg mr-3">
-                    <FileText size={20} className="text-purple-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Vertrag</p>
-                    <p className="text-xs text-gray-500">{umzug.vertrag}</p>
-                  </div>
-                  <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                    Öffnen
-                  </button>
-                </div>
-              )}
-              
-              <button className="w-full mt-3 flex items-center justify-center py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                <span className="text-sm font-medium">Dokument hinzufügen</span>
-              </button>
-            </div>
-          </div>
-          
-          {/* Notizen */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4 border-b pb-2">Notizen</h2>
-            
-            <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-gray-700 whitespace-pre-line">{umzug.notizen}</p>
-            </div>
-            
-            <form onSubmit={handleNotizSubmit}>
-              <div className="mb-3">
-                <textarea
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows="3"
-                  placeholder="Neue Notiz hinzufügen..."
-                  value={neueNotiz}
-                  onChange={(e) => setNeueNotiz(e.target.value)}
-                ></textarea>
-              </div>
-              
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg flex items-center justify-center"
-                disabled={!neueNotiz.trim()}
-              >
-                <MessageSquare size={16} className="mr-2" /> Notiz hinzufügen
-              </button>
-            </form>
-          </div>
-        </div>
-        
-        {/* Seitenleiste */}
-        <div className="space-y-6">
-          {/* Kundeninformationen */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4 border-b pb-2">Kundeninformationen</h2>
+
+          {/* Addresses */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-xl font-semibold mb-4">Adressen</h2>
             
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Kontaktperson</h3>
-                <p className="text-gray-900 font-medium">{umzug.kunde.kontaktperson}</p>
-              </div>
-              
-              <div className="flex items-start">
-                <Phone size={18} className="mt-0.5 mr-2 text-gray-400" />
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">Telefon</h3>
-                  <p className="text-gray-900">{umzug.kunde.telefon}</p>
+                <p className="text-sm text-gray-500 mb-1">Auszugsadresse</p>
+                <div className="flex items-start">
+                  <MapPin className="w-5 h-5 mr-2 text-gray-400 mt-0.5" />
+                  <div>
+                    <p className="font-medium">{auszugsadresse.addressStr}</p>
+                    <p className="text-sm text-gray-600">{auszugsadresse.details}</p>
+                    {umzug.auszugsadresse.entfernung > 0 && (
+                      <p className="text-sm text-gray-600">
+                        Entfernung zum Parkplatz: {umzug.auszugsadresse.entfernung}m
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
               
-              <div className="flex items-start">
-                <Mail size={18} className="mt-0.5 mr-2 text-gray-400" />
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Einzugsadresse</p>
+                <div className="flex items-start">
+                  <MapPin className="w-5 h-5 mr-2 text-gray-400 mt-0.5" />
+                  <div>
+                    <p className="font-medium">{einzugsadresse.addressStr}</p>
+                    <p className="text-sm text-gray-600">{einzugsadresse.details}</p>
+                    {umzug.einzugsadresse.entfernung > 0 && (
+                      <p className="text-sm text-gray-600">
+                        Entfernung zum Parkplatz: {umzug.einzugsadresse.entfernung}m
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {umzug.zwischenstopps?.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">E-Mail</h3>
-                  <p className="text-gray-900">{umzug.kunde.email}</p>
+                  <p className="text-sm text-gray-500 mb-1">Zwischenstopps</p>
+                  {umzug.zwischenstopps.map((stopp, index) => {
+                    const stoppAddr = formatAddress(stopp);
+                    return (
+                      <div key={index} className="flex items-start mt-2">
+                        <MapPin className="w-5 h-5 mr-2 text-gray-400 mt-0.5" />
+                        <div>
+                          <p className="font-medium">{stoppAddr.addressStr}</p>
+                          <p className="text-sm text-gray-600">{stoppAddr.details}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Team and vehicles */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-xl font-semibold mb-4">Team & Fahrzeuge</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+                  <Users className="w-4 h-4 mr-2" />
+                  Mitarbeiter ({umzug.mitarbeiter?.length || 0})
+                </h3>
+                <div className="space-y-2">
+                  {umzug.mitarbeiter?.map((mitarbeiter, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <span className="text-sm">
+                        {mitarbeiter.mitarbeiterId?.name || 'Unbekannt'}
+                      </span>
+                      <RoleBadge rolle={mitarbeiter.rolle} />
+                    </div>
+                  ))}
+                  {(!umzug.mitarbeiter || umzug.mitarbeiter.length === 0) && (
+                    <p className="text-sm text-gray-500">Keine Mitarbeiter zugewiesen</p>
+                  )}
                 </div>
               </div>
               
-              <div className="pt-3 border-t flex flex-col space-y-2">
-                <button className="w-full py-2 px-3 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 flex items-center justify-center">
-                  <Phone size={16} className="mr-2" /> Anrufen
-                </button>
-                <button className="w-full py-2 px-3 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 flex items-center justify-center">
-                  <Mail size={16} className="mr-2" /> E-Mail senden
-                </button>
+              <div>
+                <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+                  <Truck className="w-4 h-4 mr-2" />
+                  Fahrzeuge ({umzug.fahrzeuge?.length || 0})
+                </h3>
+                <div className="space-y-2">
+                  {umzug.fahrzeuge?.map((fahrzeug, index) => (
+                    <div key={index} className="bg-gray-50 p-2 rounded">
+                      <p className="text-sm font-medium">{fahrzeug.kennzeichen}</p>
+                      <p className="text-xs text-gray-600">{fahrzeug.typ}</p>
+                    </div>
+                  ))}
+                  {(!umzug.fahrzeuge || umzug.fahrzeuge.length === 0) && (
+                    <p className="text-sm text-gray-500">Keine Fahrzeuge zugewiesen</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-          
-          {/* Aktivitätenprotokoll */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4 border-b pb-2">Aktivitätenprotokoll</h2>
-            
-            <div className="relative">
-              <div className="absolute top-0 bottom-0 left-2.5 w-0.5 bg-gray-200"></div>
-              
-              <div className="space-y-6">
-                {umzug.aktivitaeten.map((aktivitaet, index) => (
-                  <div key={aktivitaet.id} className="relative pl-8">
-                    <div className="absolute left-0 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                      <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
-                    </div>
-                    
+
+          {/* Additional services */}
+          {umzug.extraLeistungen?.length > 0 && (
+            <div className="bg-white shadow rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-4">Zusatzleistungen</h2>
+              <div className="space-y-2">
+                {umzug.extraLeistungen.map((leistung, index) => (
+                  <div key={index} className="flex justify-between items-center">
                     <div>
-                      <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-1">
-                        <p className="text-sm font-medium text-gray-900">{aktivitaet.typ}</p>
-                        <div className="text-xs text-gray-500">
-                          {aktivitaet.datum} um {aktivitaet.uhrzeit}
-                        </div>
-                      </div>
-                      
-                      <p className="text-sm text-gray-700">{aktivitaet.notiz}</p>
-                      <p className="text-xs text-gray-500 mt-1">Von: {aktivitaet.benutzer}</p>
+                      <p className="font-medium">{leistung.beschreibung}</p>
+                      <p className="text-sm text-gray-600">Menge: {leistung.menge}</p>
                     </div>
+                    <p className="font-medium">{leistung.preis}€</p>
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right column - Contact, pricing, notes */}
+        <div className="space-y-6">
+          {/* Customer contact */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-xl font-semibold mb-4">Kundenkontakt</h2>
+            
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm text-gray-500">Auftraggeber</p>
+                <p className="font-medium">{umzug.auftraggeber?.name || 'Nicht angegeben'}</p>
+              </div>
+              
+              {umzug.auftraggeber?.telefon && (
+                <div className="flex items-center">
+                  <Phone className="w-4 h-4 mr-2 text-gray-400" />
+                  <a href={`tel:${umzug.auftraggeber.telefon}`} className="text-blue-600 hover:underline">
+                    {umzug.auftraggeber.telefon}
+                  </a>
+                </div>
+              )}
+              
+              {umzug.auftraggeber?.email && (
+                <div className="flex items-center">
+                  <Mail className="w-4 h-4 mr-2 text-gray-400" />
+                  <a href={`mailto:${umzug.auftraggeber.email}`} className="text-blue-600 hover:underline">
+                    {umzug.auftraggeber.email}
+                  </a>
+                </div>
+              )}
+
+              {umzug.kontakte?.length > 1 && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-500 mb-2">Weitere Kontakte</p>
+                  {umzug.kontakte.slice(1).map((kontakt, index) => (
+                    <div key={index} className="text-sm mb-2">
+                      <p className="font-medium">{kontakt.name}</p>
+                      {kontakt.telefon && <p>{kontakt.telefon}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Pricing */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-xl font-semibold mb-4">Preisübersicht</h2>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Netto:</span>
+                <span className="font-medium">{umzug.preis?.netto || 0}€</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">MwSt ({umzug.preis?.mwst || 19}%):</span>
+                <span className="font-medium">
+                  {((umzug.preis?.netto || 0) * ((umzug.preis?.mwst || 19) / 100)).toFixed(2)}€
+                </span>
+              </div>
+              <div className="border-t pt-2">
+                <div className="flex justify-between">
+                  <span className="font-semibold">Brutto:</span>
+                  <span className="font-semibold text-lg">{umzug.preis?.brutto || 0}€</span>
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Zahlungsart:</span>
+                  <span className="font-medium capitalize">{umzug.preis?.zahlungsart || 'Rechnung'}</span>
+                </div>
+                <div className="flex justify-between items-center mt-2">
+                  <span className="text-gray-600">Status:</span>
+                  {umzug.preis?.bezahlt ? (
+                    <span className="text-green-600 font-medium flex items-center">
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      Bezahlt
+                    </span>
+                  ) : (
+                    <span className="text-red-600 font-medium flex items-center">
+                      <XCircle className="w-4 h-4 mr-1" />
+                      Offen
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-xl font-semibold mb-4">Notizen</h2>
+            
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {umzug.notizen?.map((notiz, index) => (
+                <div key={index} className="bg-gray-50 p-3 rounded">
+                  <p className="text-sm">{notiz.text}</p>
+                  <div className="mt-1 text-xs text-gray-500">
+                    {notiz.ersteller} - {format(new Date(notiz.datum), 'dd.MM.yyyy HH:mm', { locale: de })}
+                  </div>
+                </div>
+              ))}
+              
+              {(!umzug.notizen || umzug.notizen.length === 0) && (
+                <p className="text-sm text-gray-500">Keine Notizen vorhanden</p>
+              )}
+            </div>
+            
+            <form onSubmit={handleNotizSubmit} className="mt-4">
+              <textarea
+                value={neueNotiz}
+                onChange={(e) => setNeueNotiz(e.target.value)}
+                placeholder="Neue Notiz hinzufügen..."
+                className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows="2"
+              />
+              <button
+                type="submit"
+                disabled={addingNotiz || !neueNotiz.trim()}
+                className="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm disabled:opacity-50"
+              >
+                {addingNotiz ? 'Hinzufügen...' : 'Notiz hinzufügen'}
+              </button>
+            </form>
+          </div>
+
+          {/* Status actions */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-xl font-semibold mb-4">Status ändern</h2>
+            
+            <div className="space-y-2">
+              {['geplant', 'bestaetigt', 'in_bearbeitung', 'abgeschlossen', 'storniert'].map((status) => (
+                <button
+                  key={status}
+                  onClick={() => handleStatusChange(status)}
+                  disabled={umzug.status === status}
+                  className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                    umzug.status === status
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  <StatusBadge status={status} />
+                </button>
+              ))}
             </div>
           </div>
         </div>

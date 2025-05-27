@@ -106,9 +106,8 @@ const UmzugForm = () => {
     fahrzeuge: [],
     
     // Additional services and notes
-    zusatzleistungen: [],
-    bemerkungen: '',
-    interneBemerkungen: '',
+    extraLeistungen: [],
+    notizen: [],
     
     // Pricing
     preis: {
@@ -167,9 +166,8 @@ const UmzugForm = () => {
         status: umzug.status || 'geplant',
         mitarbeiter: umzug.mitarbeiter || [],
         fahrzeuge: umzug.fahrzeuge || [],
-        zusatzleistungen: umzug.zusatzleistungen || [],
-        bemerkungen: umzug.bemerkungen || '',
-        interneBemerkungen: umzug.interneBemerkungen || '',
+        extraLeistungen: umzug.extraLeistungen || [],
+        notizen: umzug.notizen || [],
         preis: umzug.preis || {
           netto: 0,
           brutto: 0,
@@ -315,9 +313,8 @@ const UmzugForm = () => {
         status: formData.status,
         mitarbeiter: formData.mitarbeiter.map(m => m._id || m),
         fahrzeuge: formData.fahrzeuge.map(f => f._id || f),
-        zusatzleistungen: formData.zusatzleistungen,
-        bemerkungen: formData.bemerkungen,
-        interneBemerkungen: formData.interneBemerkungen,
+        extraLeistungen: formData.extraLeistungen,
+        notizen: formData.notizen,
         preis: formData.preis
       };
 
@@ -348,8 +345,8 @@ const UmzugForm = () => {
 
   // Calculate total price
   const calculateTotalPrice = () => {
-    const serviceTotal = formData.zusatzleistungen.reduce(
-      (sum, service) => sum + (service.totalPrice || 0),
+    const serviceTotal = formData.extraLeistungen.reduce(
+      (sum, service) => sum + (service.preis * (service.menge || 1)),
       0
     );
     return serviceTotal;
@@ -429,8 +426,8 @@ const UmzugForm = () => {
       case 4:
         return (
           <ServiceSelection
-            services={formData.zusatzleistungen}
-            onChange={(zusatzleistungen) => setFormData({ ...formData, zusatzleistungen })}
+            services={formData.extraLeistungen}
+            onChange={(extraLeistungen) => setFormData({ ...formData, extraLeistungen })}
             errors={errors}
           />
         );
