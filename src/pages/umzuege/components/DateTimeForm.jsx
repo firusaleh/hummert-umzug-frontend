@@ -1,225 +1,286 @@
-import React from 'react';
-import { 
-  CalendarToday as Calendar, 
-  AccessTime as Clock, 
-  Info as AlertCircle 
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Grid,
+  TextField,
+  Typography,
+  Paper,
+  Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip,
+  InputAdornment
+} from '@mui/material';
+import {
+  CalendarToday,
+  AccessTime,
+  Event,
+  Schedule,
+  Warning
 } from '@mui/icons-material';
-import { format, addDays, isWeekend, isBefore } from 'date-fns';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { de } from 'date-fns/locale';
+import { format, isWeekend, addHours, startOfDay, setHours, setMinutes } from 'date-fns';
+
+const TIME_SLOTS = [
+  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+  '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+  '18:00', '19:00', '20:00'
+];
+
+const DURATION_OPTIONS = [
+  { value: 2, label: '2 Stunden' },
+  { value: 4, label: '4 Stunden' },
+  { value: 6, label: '6 Stunden' },
+  { value: 8, label: '8 Stunden (1 Tag)' },
+  { value: 12, label: '12 Stunden' },
+  { value: 16, label: '16 Stunden (2 Tage)' },
+  { value: 24, label: '24 Stunden (3 Tage)' }
+];
 
 const DateTimeForm = ({ 
-  date, 
+  date,
   time,
   onChange,
-  errors = {} 
+  errors = {}
 }) => {
-  // Convert Date object to string format for input
-  const dateString = date ? (date instanceof Date ? format(date, 'yyyy-MM-dd') : date) : '';
-  
-  // Internal state to handle start and end dates
-  const startDatum = dateString;
-  const endDatum = dateString; // For now, we'll use same date for both
-  // Get minimum date (today)
-  const minDate = format(new Date(), 'yyyy-MM-dd');
-  
-  // Calculate suggested end date (next business day after start)
-  const getSuggestedEndDate = (startDate) => {
-    if (!startDate) return '';
-    
-    let endDate = new Date(startDate);
-    endDate = addDays(endDate, 1);
-    
-    // Skip weekends
-    while (isWeekend(endDate)) {
-      endDate = addDays(endDate, 1);
-    }
-    
-    return format(endDate, 'yyyy-MM-dd');
-  };
+  // Local state for form fields
+  const [selectedDate, setSelectedDate] = useState(date || null);
+  const [selectedTime, setSelectedTime] = useState(time || '08:00');
+  const [duration, setDuration] = useState(8);
+  const [endDate, setEndDate] = useState(null);
+  const [endTime, setEndTime] = useState('17:00');
 
-  const handleStartDateChange = (value) => {
-    onChange({ 
-      datum: value ? new Date(value) : null,
-      zeit: time || '08:00'
+  // Update local state when props change
+  useEffect(() => {
+    if (date !== selectedDate) {
+      setSelectedDate(date);
+    }
+    if (time !== selectedTime) {
+      setSelectedTime(time || '08:00');
+    }
+  }, [date, time]);
+
+  // Calculate end date/time based on start and duration
+  useEffect(() => {
+    if (selectedDate && selectedTime) {
+      const [hours, minutes] = selectedTime.split(':').map(Number);
+      const startDateTime = setMinutes(setHours(selectedDate, hours), minutes);
+      const endDateTime = addHours(startDateTime, duration);
+      
+      setEndDate(endDateTime);
+      setEndTime(format(endDateTime, 'HH:mm'));
+    }
+  }, [selectedDate, selectedTime, duration]);
+
+  // Handle date change
+  const handleDateChange = (newDate) => {
+    setSelectedDate(newDate);
+    
+    // Call parent onChange with both date and time
+    onChange({
+      datum: newDate,
+      zeit: selectedTime
     });
   };
 
-  const handleTimeChange = (value) => {
-    onChange({ 
-      zeit: value
+  // Handle time change
+  const handleTimeChange = (newTime) => {
+    setSelectedTime(newTime);
+    
+    // Call parent onChange with both date and time
+    onChange({
+      datum: selectedDate,
+      zeit: newTime
     });
   };
 
-  const formatDateForDisplay = (dateString) => {
-    if (!dateString) return '';
-    try {
-      return format(new Date(dateString), 'dd. MMMM yyyy', { locale: de });
-    } catch {
-      return dateString;
-    }
+  // Handle duration change
+  const handleDurationChange = (event) => {
+    setDuration(event.target.value);
   };
 
-  const getDayOfWeek = (dateString) => {
-    if (!dateString) return '';
-    try {
-      return format(new Date(dateString), 'EEEE', { locale: de });
-    } catch {
-      return '';
-    }
-  };
+  // Check if date is weekend
+  const isDateWeekend = selectedDate && isWeekend(selectedDate);
 
-  const isDateWeekend = (dateString) => {
-    if (!dateString) return false;
-    try {
-      return isWeekend(new Date(dateString));
-    } catch {
-      return false;
-    }
+  // Format date for display
+  const formatDateDisplay = (date) => {
+    if (!date) return '';
+    return format(date, 'EEEE, dd. MMMM yyyy', { locale: de });
   };
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-        <Calendar className="h-5 w-5 text-gray-400" />
-        Umzugstermin
-      </h3>
+    <Paper sx={{ p: 3 }}>
+      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Event />
+        Termin und Zeitplanung
+      </Typography>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Start Date */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Startdatum <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <input
-              type="date"
-              value={startDatum || ''}
-              onChange={(e) => handleStartDateChange(e.target.value)}
-              min={minDate}
-              className={`w-full px-3 py-2 pl-10 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                errors.startDatum ? 'border-red-300' : 'border-gray-300'
-              }`}
+      <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={de}>
+        <Grid container spacing={3}>
+          {/* Date Selection */}
+          <Grid item xs={12} md={6}>
+            <DatePicker
+              label="Umzugsdatum"
+              value={selectedDate}
+              onChange={handleDateChange}
+              format="dd.MM.yyyy"
+              slotProps={{
+                textField: {
+                  fullWidth: true,
+                  required: true,
+                  error: Boolean(errors.datum),
+                  helperText: errors.datum,
+                  InputProps: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <CalendarToday />
+                      </InputAdornment>
+                    )
+                  }
+                }
+              }}
+              minDate={new Date()}
             />
-            <Calendar className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-          </div>
-          {errors.datum && (
-            <p className="mt-1 text-sm text-red-600">{errors.datum}</p>
-          )}
-          {startDatum && (
-            <p className="mt-1 text-sm text-gray-500">
-              {getDayOfWeek(startDatum)}
-              {isDateWeekend(startDatum) && (
-                <span className="ml-2 text-orange-600 font-medium">
-                  (Wochenende - Zuschlag möglich)
-                </span>
-              )}
-            </p>
-          )}
-        </div>
+            
+            {selectedDate && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {formatDateDisplay(selectedDate)}
+                </Typography>
+                {isDateWeekend && (
+                  <Chip
+                    size="small"
+                    icon={<Warning />}
+                    label="Wochenende - Zuschläge möglich"
+                    color="warning"
+                    sx={{ ml: 2 }}
+                  />
+                )}
+              </Box>
+            )}
+          </Grid>
 
-        {/* End Date */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Enddatum <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <input
-              type="date"
-              value={endDatum || ''}
-              onChange={(e) => onChange({ datum: e.target.value ? new Date(e.target.value) : null })}
-              min={startDatum || minDate}
-              className={`w-full px-3 py-2 pl-10 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                errors.endDatum ? 'border-red-300' : 'border-gray-300'
-              }`}
+          {/* Start Time Selection */}
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth required error={Boolean(errors.zeit)}>
+              <InputLabel>Startzeit</InputLabel>
+              <Select
+                value={selectedTime}
+                onChange={(e) => handleTimeChange(e.target.value)}
+                label="Startzeit"
+                startAdornment={
+                  <InputAdornment position="start">
+                    <AccessTime />
+                  </InputAdornment>
+                }
+              >
+                {TIME_SLOTS.map((slot) => (
+                  <MenuItem key={slot} value={slot}>
+                    {slot} Uhr
+                  </MenuItem>
+                ))}
+              </Select>
+              {errors.zeit && (
+                <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                  {errors.zeit}
+                </Typography>
+              )}
+            </FormControl>
+          </Grid>
+
+          {/* Duration Selection */}
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth>
+              <InputLabel>Geschätzte Dauer</InputLabel>
+              <Select
+                value={duration}
+                onChange={handleDurationChange}
+                label="Geschätzte Dauer"
+                startAdornment={
+                  <InputAdornment position="start">
+                    <Schedule />
+                  </InputAdornment>
+                }
+              >
+                {DURATION_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          {/* End Time Display */}
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              label="Voraussichtliches Ende"
+              value={endDate ? `${format(endDate, 'dd.MM.yyyy')} um ${endTime} Uhr` : ''}
+              disabled
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Event />
+                  </InputAdornment>
+                )
+              }}
             />
-            <Calendar className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-          </div>
-          {errors.zeit && (
-            <p className="mt-1 text-sm text-red-600">{errors.zeit}</p>
+          </Grid>
+
+          {/* Additional Time Options */}
+          <Grid item xs={12}>
+            <Alert severity="info" icon={<Schedule />}>
+              <Typography variant="body2">
+                <strong>Zeitplanung:</strong> Die angegebene Dauer ist eine Schätzung. 
+                Bei Bedarf können zusätzliche Stunden vor Ort vereinbart werden.
+              </Typography>
+            </Alert>
+          </Grid>
+
+          {/* Summary */}
+          {selectedDate && selectedTime && (
+            <Grid item xs={12}>
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Zusammenfassung
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Start:
+                    </Typography>
+                    <Typography variant="body1">
+                      {format(selectedDate, 'dd.MM.yyyy')} um {selectedTime} Uhr
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Voraussichtliches Ende:
+                    </Typography>
+                    <Typography variant="body1">
+                      {endDate && format(endDate, 'dd.MM.yyyy')} um {endTime} Uhr
+                    </Typography>
+                  </Grid>
+                  {duration >= 8 && (
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary">
+                        Mehrtägiger Umzug geplant ({Math.ceil(duration / 8)} Arbeitstage)
+                      </Typography>
+                    </Grid>
+                  )}
+                </Grid>
+              </Paper>
+            </Grid>
           )}
-          {endDatum && (
-            <p className="mt-1 text-sm text-gray-500">
-              {getDayOfWeek(endDatum)}
-              {isDateWeekend(endDatum) && (
-                <span className="ml-2 text-orange-600 font-medium">
-                  (Wochenende - Zuschlag möglich)
-                </span>
-              )}
-            </p>
-          )}
-        </div>
-
-        {/* Time Slots */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Startzeit
-          </label>
-          <div className="relative">
-            <select
-              value={time || '08:00'}
-              onChange={(e) => handleTimeChange(e.target.value)}
-              className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
-            >
-              <option value="06:00">06:00 Uhr</option>
-              <option value="07:00">07:00 Uhr</option>
-              <option value="08:00">08:00 Uhr</option>
-              <option value="09:00">09:00 Uhr</option>
-              <option value="10:00">10:00 Uhr</option>
-              <option value="11:00">11:00 Uhr</option>
-              <option value="12:00">12:00 Uhr</option>
-              <option value="13:00">13:00 Uhr</option>
-              <option value="14:00">14:00 Uhr</option>
-              <option value="15:00">15:00 Uhr</option>
-              <option value="16:00">16:00 Uhr</option>
-              <option value="17:00">17:00 Uhr</option>
-              <option value="18:00">18:00 Uhr</option>
-            </select>
-            <Clock className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Geschätzte Dauer
-          </label>
-          <select
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            defaultValue="8"
-          >
-            <option value="2">2 Stunden</option>
-            <option value="4">4 Stunden</option>
-            <option value="6">6 Stunden</option>
-            <option value="8">8 Stunden (1 Tag)</option>
-            <option value="16">16 Stunden (2 Tage)</option>
-            <option value="24">24 Stunden (3 Tage)</option>
-            <option value="32">32 Stunden (4 Tage)</option>
-            <option value="40">40 Stunden (5 Tage)</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Date Summary */}
-      {startDatum && endDatum && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-medium text-blue-900">Umzugszeitraum:</p>
-              <p className="text-blue-700">
-                {formatDateForDisplay(startDatum)} bis {formatDateForDisplay(endDatum)}
-              </p>
-              {startDatum === endDatum ? (
-                <p className="text-blue-600 mt-1">Eintägiger Umzug geplant</p>
-              ) : (
-                <p className="text-blue-600 mt-1">
-                  Mehrtägiger Umzug über {Math.ceil((new Date(endDatum) - new Date(startDatum)) / (1000 * 60 * 60 * 24)) + 1} Tage
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+        </Grid>
+      </LocalizationProvider>
+    </Paper>
   );
 };
 
