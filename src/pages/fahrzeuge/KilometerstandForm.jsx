@@ -64,7 +64,7 @@ const KilometerstandForm = () => {
         throw new Error('Der neue Kilometerstand muss größer als der aktuelle sein');
       }
       
-      const response = await fahrzeugeService.updateKilometerstand(id, Number(kilometerstand));
+      const response = await fahrzeugeService.updateMileage(id, { kilometerstand: Number(kilometerstand) });
       
       if (response.success === false) {
         throw new Error(response.message || 'Fehler beim Aktualisieren des Kilometerstands');
