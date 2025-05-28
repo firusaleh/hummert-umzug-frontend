@@ -12,14 +12,16 @@ import {
   LocationOn as MapPin, 
   AddPhotoAlternate as ImagePlus
 } from '@mui/icons-material';
-import { mitarbeiterService, configService } from '../../services/api';
+import { mitarbeiterService, configService, userService } from '../../services/api';
 import { toast } from 'react-toastify';
+import { useAuth } from '../../hooks/useAuth';
 
 // Configuration options will be loaded dynamically
 
 const MitarbeiterForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const isNeueModus = !id;
   
   // State für Formularfelder
@@ -234,14 +236,37 @@ const MitarbeiterForm = () => {
         isActive: formData.status === 'Aktiv',
         status: formData.status,
         verfuegbarkeit: formData.verfuegbarkeit,
-        faehigkeiten: formData.faehigkeiten,
-        // Füge die Benutzer-ID hinzu, die vom Backend erwartet wird
-        userId: localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).id : null
+        faehigkeiten: formData.faehigkeiten
       };
       
       let response;
       
       if (isNeueModus) {
+        // First create a user account for the employee
+        const userData = {
+          name: `${formData.vorname} ${formData.nachname}`,
+          email: formData.email,
+          password: 'temp123456', // Temporary password - should be changed by employee
+          role: 'mitarbeiter'
+        };
+        
+        try {
+          const userResponse = await userService.create(userData);
+          mitarbeiterData.userId = userResponse.data._id || userResponse.data.id;
+        } catch (userError) {
+          // If email already exists, try to find the user
+          if (userError.response?.status === 409) {
+            const existingUsers = await userService.getAll({ email: formData.email });
+            if (existingUsers.data && existingUsers.data.length > 0) {
+              mitarbeiterData.userId = existingUsers.data[0]._id || existingUsers.data[0].id;
+            } else {
+              throw new Error('E-Mail bereits vergeben, aber Benutzer nicht gefunden');
+            }
+          } else {
+            throw userError;
+          }
+        }
+        
         // Neuen Mitarbeiter erstellen
         response = await mitarbeiterService.create(mitarbeiterData);
         

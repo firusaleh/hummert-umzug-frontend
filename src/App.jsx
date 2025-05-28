@@ -26,6 +26,7 @@ import AufnahmeForm from './pages/aufnahmen/AufnahmeForm';
 // Mitarbeiter-Pages
 import MitarbeiterList from './pages/mitarbeiter/MitarbeiterList';
 import MitarbeiterForm from './pages/mitarbeiter/MitarbeiterForm';
+import MitarbeiterDetails from './pages/mitarbeiter/MitarbeiterDetails';
 
 // Fahrzeuge-Pages
 import FahrzeugeList from './pages/fahrzeuge/FahrzeugeList';
@@ -195,7 +196,7 @@ const App = () => {
       <Route path="/mitarbeiter/:id" element={
         <ProtectedRoute>
           <MainLayout>
-            <MitarbeiterForm />
+            <MitarbeiterDetails />
           </MainLayout>
         </ProtectedRoute>
       } />
