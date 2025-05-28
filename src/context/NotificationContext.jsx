@@ -1,7 +1,8 @@
 // src/context/NotificationContext.jsx
 import React, { createContext, useState, useContext, useCallback, useMemo, useEffect } from 'react';
-import { notificationService } from '../services/api';
+import notificationService from '../services/notificationService';
 import { useAuth } from './AuthContext';
+import { useApp } from './AppContext';
 
 // Create Context
 export const NotificationContext = createContext({
@@ -33,6 +34,7 @@ export const useNotifications = () => {
 
 export const NotificationProvider = ({ children }) => {
   const { user } = useAuth();
+  const { addNotification: showToast } = useApp();
   
   // State
   const [notifications, setNotifications] = useState([]);
@@ -70,17 +72,24 @@ export const NotificationProvider = ({ children }) => {
     
     try {
       const response = await notificationService.getAll(params);
-      setNotifications(response.data.notifications);
+      // Handle different response formats
+      const notificationData = response.data.notifications || response.data.benachrichtigungen || response.data.data || [];
+      setNotifications(Array.isArray(notificationData) ? notificationData : []);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
       const errorMessage = error.response?.data?.message || 'Fehler beim Laden der Benachrichtigungen';
       setError(errorMessage);
+      showToast({
+        type: 'error',
+        message: errorMessage,
+        duration: 5000
+      });
       return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, showToast]);
 
   // Mark notification as read
   const markAsRead = useCallback(async (id, read = true) => {
@@ -91,14 +100,27 @@ export const NotificationProvider = ({ children }) => {
         n._id === id ? { ...n, gelesen: read } : n
       ));
       
+      if (read) {
+        showToast({
+          type: 'success',
+          message: 'Als gelesen markiert',
+          duration: 2000
+        });
+      }
+      
       return { success: true };
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
       const errorMessage = error.response?.data?.message || 'Fehler beim Markieren der Benachrichtigung';
       setError(errorMessage);
+      showToast({
+        type: 'error',
+        message: errorMessage,
+        duration: 5000
+      });
       return { success: false, error: errorMessage };
     }
-  }, []);
+  }, [showToast]);
 
   // Mark all as read
   const markAllAsRead = useCallback(async () => {
@@ -240,9 +262,14 @@ export const NotificationProvider = ({ children }) => {
       
       try {
         const response = await notificationService.getPreferences();
-        setPreferences(response.data.preferences);
+        // Handle different response formats
+        const prefsData = response.data.preferences || response.data.einstellungen || response.data;
+        if (prefsData && typeof prefsData === 'object') {
+          setPreferences(prev => ({ ...prev, ...prefsData }));
+        }
       } catch (error) {
         console.error('Failed to fetch preferences:', error);
+        // Don't show error toast for preferences, just use defaults
       }
     };
     
