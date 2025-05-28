@@ -22,6 +22,7 @@ import UmzuegeMonatsansicht from './pages/umzuege/UmzuegeMonatsansicht';
 // Aufnahmen-Pages
 import AufnahmenList from './pages/aufnahmen/AufnahmenList';
 import AufnahmeForm from './pages/aufnahmen/AufnahmeForm';
+import AufnahmeDetails from './pages/aufnahmen/AufnahmeDetails';
 
 // Mitarbeiter-Pages
 import MitarbeiterList from './pages/mitarbeiter/MitarbeiterList';
@@ -163,7 +164,7 @@ const App = () => {
       <Route path="/aufnahmen/:id" element={
         <ProtectedRoute>
           <MainLayout>
-            <AufnahmeForm />
+            <AufnahmeDetails />
           </MainLayout>
         </ProtectedRoute>
       } />
