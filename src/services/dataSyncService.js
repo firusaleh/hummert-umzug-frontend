@@ -1,6 +1,7 @@
 // Data Synchronization Service
 // Handles real-time data updates across all components
 
+import { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import EventEmitter from 'events';
 
@@ -415,11 +416,11 @@ const dataSyncService = new DataSyncService();
 
 // Helper hooks for React components
 export const useDataSync = (entityType, options = {}) => {
-  const [data, setData] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState(null);
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     let unsubscribe;
 
     const handleUpdate = (eventType, eventData) => {
