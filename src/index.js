@@ -7,6 +7,7 @@ import { AppProvider } from './context/AppContext';
 import { DataSyncProvider } from './context/DataSyncContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { UmzugProvider } from './context/UmzugContext';
+import { MitarbeiterProvider } from './context/MitarbeiterContext';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import './assets/styles.css';
 
@@ -20,7 +21,9 @@ root.render(
             <DataSyncProvider>
               <NotificationProvider>
                 <UmzugProvider>
-                  <App />
+                  <MitarbeiterProvider>
+                    <App />
+                  </MitarbeiterProvider>
                 </UmzugProvider>
               </NotificationProvider>
             </DataSyncProvider>
