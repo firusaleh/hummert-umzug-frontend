@@ -1,0 +1,279 @@
+{
+  "summary": {
+    "total": 20,
+    "passed": 6,
+    "failed": 4,
+    "skipped": 10,
+    "successRate": "60.00%",
+    "timestamp": "2025-05-28T12:09:59.914Z",
+    "duration": 17
+  },
+  "coverage": {
+    "overall": 75,
+    "components": {
+      "Dashboard": 50
+    },
+    "services": {},
+    "routes": 100
+  },
+  "tests": [
+    {
+      "category": "Auth",
+      "name": "Login Component Rendering",
+      "status": "failed",
+      "duration": 1,
+      "startTime": 1748434199918,
+      "error": "Login component not found",
+      "endTime": 1748434199919
+    },
+    {
+      "category": "Auth",
+      "name": "Token Storage Mechanism",
+      "status": "skipped",
+      "duration": 0,
+      "startTime": 1748434199919,
+      "reason": "Auth service not found",
+      "endTime": 1748434199919
+    },
+    {
+      "category": "Auth",
+      "name": "Refresh Token Support",
+      "status": "passed",
+      "duration": 1,
+      "startTime": 1748434199919,
+      "details": "Refresh token logic found",
+      "endTime": 1748434199920
+    },
+    {
+      "category": "Auth",
+      "name": "Protected Route Component",
+      "status": "passed",
+      "duration": 1,
+      "startTime": 1748434199920,
+      "details": "Protected route properly configured",
+      "endTime": 1748434199921
+    },
+    {
+      "category": "API",
+      "name": "UmzugService Implementation",
+      "status": "skipped",
+      "duration": 0,
+      "startTime": 1748434199921,
+      "reason": "umzugService.js not found",
+      "endTime": 1748434199921
+    },
+    {
+      "category": "API",
+      "name": "MitarbeiterService Implementation",
+      "status": "skipped",
+      "duration": 0,
+      "startTime": 1748434199921,
+      "reason": "mitarbeiterService.js not found",
+      "endTime": 1748434199921
+    },
+    {
+      "category": "API",
+      "name": "FahrzeugService Implementation",
+      "status": "skipped",
+      "duration": 1,
+      "startTime": 1748434199921,
+      "reason": "fahrzeugService.js not found",
+      "endTime": 1748434199922
+    },
+    {
+      "category": "API",
+      "name": "NotificationService Implementation",
+      "status": "skipped",
+      "duration": 1,
+      "startTime": 1748434199922,
+      "reason": "notificationService.js not found",
+      "endTime": 1748434199923
+    },
+    {
+      "category": "API",
+      "name": "TimeTrackingService Implementation",
+      "status": "skipped",
+      "duration": 0,
+      "startTime": 1748434199923,
+      "reason": "zeiterfassungService.js not found",
+      "endTime": 1748434199923
+    },
+    {
+      "category": "Component",
+      "name": "Dashboard",
+      "status": "failed",
+      "duration": 1,
+      "startTime": 1748434199923,
+      "error": "Missing features: statistics",
+      "endTime": 1748434199924
+    },
+    {
+      "category": "Component",
+      "name": "UmzuegeListe",
+      "status": "skipped",
+      "duration": 0,
+      "startTime": 1748434199924,
+      "reason": "Component found at alternative path: pages/Umzuege/UmzuegeList.jsx",
+      "endTime": 1748434199924
+    },
+    {
+      "category": "Component",
+      "name": "MitarbeiterListe",
+      "status": "skipped",
+      "duration": 1,
+      "startTime": 1748434199924,
+      "reason": "Component found at alternative path: pages/Mitarbeiter/MitarbeiterList.jsx",
+      "endTime": 1748434199925
+    },
+    {
+      "category": "Component",
+      "name": "FahrzeugeListe",
+      "status": "skipped",
+      "duration": 0,
+      "startTime": 1748434199925,
+      "reason": "Component found at alternative path: pages/Fahrzeuge/FahrzeugeList.jsx",
+      "endTime": 1748434199925
+    },
+    {
+      "category": "Component",
+      "name": "Benachrichtigungen",
+      "status": "skipped",
+      "duration": 0,
+      "startTime": 1748434199925,
+      "reason": "Component file not found",
+      "endTime": 1748434199925
+    },
+    {
+      "category": "Routes",
+      "name": "Route Definition",
+      "status": "passed",
+      "duration": 0,
+      "startTime": 1748434199925,
+      "details": "All 7 routes configured",
+      "endTime": 1748434199925
+    },
+    {
+      "category": "Routes",
+      "name": "Navigation Component",
+      "status": "passed",
+      "duration": 1,
+      "startTime": 1748434199925,
+      "details": "Navigation properly implemented",
+      "endTime": 1748434199926
+    },
+    {
+      "category": "DataFlow",
+      "name": "Context Provider Setup",
+      "status": "passed",
+      "duration": 0,
+      "startTime": 1748434199926,
+      "details": "5 context providers found",
+      "endTime": 1748434199926
+    },
+    {
+      "category": "DataFlow",
+      "name": "Error Boundary Implementation",
+      "status": "passed",
+      "duration": 0,
+      "startTime": 1748434199926,
+      "details": "Error boundary properly implemented",
+      "endTime": 1748434199926
+    },
+    {
+      "category": "Performance",
+      "name": "Code Splitting",
+      "status": "failed",
+      "duration": 1,
+      "startTime": 1748434199926,
+      "error": "No code splitting found",
+      "endTime": 1748434199927
+    },
+    {
+      "category": "Performance",
+      "name": "Memoization Usage",
+      "status": "failed",
+      "duration": 4,
+      "startTime": 1748434199927,
+      "error": "Insufficient memoization usage",
+      "endTime": 1748434199931
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "high",
+      "category": "Failed Tests",
+      "description": "Fix 4 failing tests",
+      "tests": [
+        {
+          "name": "Login Component Rendering",
+          "error": "Login component not found"
+        },
+        {
+          "name": "Dashboard",
+          "error": "Missing features: statistics"
+        },
+        {
+          "name": "Code Splitting",
+          "error": "No code splitting found"
+        },
+        {
+          "name": "Memoization Usage",
+          "error": "Insufficient memoization usage"
+        }
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Test Coverage",
+      "description": "Improve test coverage to at least 80%",
+      "current": "75%"
+    },
+    {
+      "priority": "medium",
+      "category": "Missing Implementation",
+      "description": "10 tests were skipped due to missing files",
+      "tests": [
+        {
+          "name": "Token Storage Mechanism",
+          "reason": "Auth service not found"
+        },
+        {
+          "name": "UmzugService Implementation",
+          "reason": "umzugService.js not found"
+        },
+        {
+          "name": "MitarbeiterService Implementation",
+          "reason": "mitarbeiterService.js not found"
+        },
+        {
+          "name": "FahrzeugService Implementation",
+          "reason": "fahrzeugService.js not found"
+        },
+        {
+          "name": "NotificationService Implementation",
+          "reason": "notificationService.js not found"
+        },
+        {
+          "name": "TimeTrackingService Implementation",
+          "reason": "zeiterfassungService.js not found"
+        },
+        {
+          "name": "UmzuegeListe",
+          "reason": "Component found at alternative path: pages/Umzuege/UmzuegeList.jsx"
+        },
+        {
+          "name": "MitarbeiterListe",
+          "reason": "Component found at alternative path: pages/Mitarbeiter/MitarbeiterList.jsx"
+        },
+        {
+          "name": "FahrzeugeListe",
+          "reason": "Component found at alternative path: pages/Fahrzeuge/FahrzeugeList.jsx"
+        },
+        {
+          "name": "Benachrichtigungen",
+          "reason": "Component file not found"
+        }
+      ]
+    }
+  ]
+}

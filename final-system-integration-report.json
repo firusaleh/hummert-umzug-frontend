@@ -1,0 +1,170 @@
+{
+  "summary": {
+    "total": 12,
+    "passed": 1,
+    "failed": 11,
+    "duration": "6.43s",
+    "timestamp": "2025-05-28T12:04:56.597Z"
+  },
+  "environment": {
+    "apiUrl": "http://localhost:5001/api",
+    "frontendUrl": "http://localhost:3000",
+    "nodeVersion": "v23.11.0",
+    "platform": "darwin"
+  },
+  "tests": [
+    {
+      "name": "Login Flow",
+      "status": "failed",
+      "duration": 80,
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000",
+      "startTime": "2025-05-28T12:04:54.454Z",
+      "endTime": "2025-05-28T12:04:54.534Z"
+    },
+    {
+      "name": "Token Refresh",
+      "status": "failed",
+      "duration": 68,
+      "error": "SecurityError: Failed to read the 'localStorage' property from 'Window': Access is denied for this document.",
+      "startTime": "2025-05-28T12:04:54.534Z",
+      "endTime": "2025-05-28T12:04:54.602Z"
+    },
+    {
+      "name": "Protected Route Navigation",
+      "status": "failed",
+      "duration": 72,
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/umzuege",
+      "startTime": "2025-05-28T12:04:54.602Z",
+      "endTime": "2025-05-28T12:04:54.674Z"
+    },
+    {
+      "name": "Umzüge API Integration",
+      "status": "failed",
+      "duration": 70,
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/umzuege",
+      "startTime": "2025-05-28T12:04:54.674Z",
+      "endTime": "2025-05-28T12:04:54.744Z"
+    },
+    {
+      "name": "Mitarbeiter API Integration",
+      "status": "failed",
+      "duration": 69,
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/mitarbeiter",
+      "startTime": "2025-05-28T12:04:54.744Z",
+      "endTime": "2025-05-28T12:04:54.813Z"
+    },
+    {
+      "name": "Fahrzeuge API Integration",
+      "status": "failed",
+      "duration": 71,
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/fahrzeuge",
+      "startTime": "2025-05-28T12:04:54.813Z",
+      "endTime": "2025-05-28T12:04:54.884Z"
+    },
+    {
+      "name": "Benachrichtigungen API Integration",
+      "status": "failed",
+      "duration": 69,
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/benachrichtigungen",
+      "startTime": "2025-05-28T12:04:54.884Z",
+      "endTime": "2025-05-28T12:04:54.953Z"
+    },
+    {
+      "name": "Cross-Component Data Flow",
+      "status": "failed",
+      "duration": 73,
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/umzuege",
+      "startTime": "2025-05-28T12:04:54.953Z",
+      "endTime": "2025-05-28T12:04:55.026Z"
+    },
+    {
+      "name": "Real-time Updates",
+      "status": "failed",
+      "duration": 54,
+      "error": "Execution context was destroyed, most likely because of a navigation.",
+      "startTime": "2025-05-28T12:04:55.026Z",
+      "endTime": "2025-05-28T12:04:55.080Z"
+    },
+    {
+      "name": "API Error Handling",
+      "status": "failed",
+      "duration": 74,
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/non-existent-page",
+      "startTime": "2025-05-28T12:04:55.080Z",
+      "endTime": "2025-05-28T12:04:55.154Z"
+    },
+    {
+      "name": "Network Error Handling",
+      "status": "passed",
+      "duration": 1216,
+      "error": null,
+      "startTime": "2025-05-28T12:04:55.154Z",
+      "endTime": "2025-05-28T12:04:56.370Z"
+    },
+    {
+      "name": "Page Load Performance",
+      "status": "failed",
+      "duration": 226,
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000",
+      "startTime": "2025-05-28T12:04:56.371Z",
+      "endTime": "2025-05-28T12:04:56.597Z"
+    }
+  ],
+  "errors": [
+    {
+      "test": "Login Flow",
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000",
+      "stack": "Error: net::ERR_CONNECTION_REFUSED at http://localhost:3000\n    at navigate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:183:27)\n    at async Deferred.race (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/util/Deferred.js:36:20)\n    at async CdpFrame.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:149:25)\n    at async CdpPage.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/api/Page.js:574:20)\n    at async /Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:142:7\n    at async SystemIntegrationTester.runTest (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:117:7)\n    at async SystemIntegrationTester.testAuthentication (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:141:5)\n    at async SystemIntegrationTester.run (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:466:7)"
+    },
+    {
+      "test": "Token Refresh",
+      "error": "SecurityError: Failed to read the 'localStorage' property from 'Window': Access is denied for this document.",
+      "stack": "DOMException: SecurityError: Failed to read the 'localStorage' property from 'Window': Access is denied for this document.\n    at #evaluate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/ExecutionContext.js:391:56)\n    at async ExecutionContext.evaluate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/ExecutionContext.js:277:16)\n    at async IsolatedWorld.evaluate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/IsolatedWorld.js:100:16)\n    at async CdpFrame.evaluate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/api/Frame.js:364:20)\n    at async CdpPage.evaluate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/api/Page.js:817:20)\n    at async /Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:172:7\n    at async SystemIntegrationTester.runTest (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:117:7)\n    at async SystemIntegrationTester.testAuthentication (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:170:5)\n    at async SystemIntegrationTester.run (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:466:7)"
+    },
+    {
+      "test": "Protected Route Navigation",
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/umzuege",
+      "stack": "Error: net::ERR_CONNECTION_REFUSED at http://localhost:3000/umzuege\n    at navigate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:183:27)\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:569:9)\n    at process.processTimers (node:internal/timers:543:7)\n    at async Deferred.race (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/util/Deferred.js:36:20)\n    at async CdpFrame.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:149:25)\n    at async CdpPage.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/api/Page.js:574:20)\n    at async /Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:206:9\n    at async SystemIntegrationTester.runTest (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:117:7)\n    at async SystemIntegrationTester.testNavigation (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:196:5)"
+    },
+    {
+      "test": "Umzüge API Integration",
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/umzuege",
+      "stack": "Error: net::ERR_CONNECTION_REFUSED at http://localhost:3000/umzuege\n    at navigate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:183:27)\n    at async Deferred.race (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/util/Deferred.js:36:20)\n    at async CdpFrame.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:149:25)\n    at async CdpPage.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/api/Page.js:574:20)\n    at async /Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:220:7\n    at async SystemIntegrationTester.runTest (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:117:7)\n    at async SystemIntegrationTester.testAPIIntegrations (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:219:5)\n    at async SystemIntegrationTester.run (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:468:7)"
+    },
+    {
+      "test": "Mitarbeiter API Integration",
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/mitarbeiter",
+      "stack": "Error: net::ERR_CONNECTION_REFUSED at http://localhost:3000/mitarbeiter\n    at navigate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:183:27)\n    at async Deferred.race (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/util/Deferred.js:36:20)\n    at async CdpFrame.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:149:25)\n    at async CdpPage.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/api/Page.js:574:20)\n    at async /Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:251:7\n    at async SystemIntegrationTester.runTest (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:117:7)\n    at async SystemIntegrationTester.testAPIIntegrations (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:250:5)\n    at async SystemIntegrationTester.run (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:468:7)"
+    },
+    {
+      "test": "Fahrzeuge API Integration",
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/fahrzeuge",
+      "stack": "Error: net::ERR_CONNECTION_REFUSED at http://localhost:3000/fahrzeuge\n    at navigate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:183:27)\n    at async Deferred.race (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/util/Deferred.js:36:20)\n    at async CdpFrame.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:149:25)\n    at async CdpPage.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/api/Page.js:574:20)\n    at async /Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:266:7\n    at async SystemIntegrationTester.runTest (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:117:7)\n    at async SystemIntegrationTester.testAPIIntegrations (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:265:5)\n    at async SystemIntegrationTester.run (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:468:7)"
+    },
+    {
+      "test": "Benachrichtigungen API Integration",
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/benachrichtigungen",
+      "stack": "Error: net::ERR_CONNECTION_REFUSED at http://localhost:3000/benachrichtigungen\n    at navigate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:183:27)\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:569:9)\n    at process.processTimers (node:internal/timers:543:7)\n    at async Deferred.race (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/util/Deferred.js:36:20)\n    at async CdpFrame.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:149:25)\n    at async CdpPage.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/api/Page.js:574:20)\n    at async /Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:281:7\n    at async SystemIntegrationTester.runTest (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:117:7)\n    at async SystemIntegrationTester.testAPIIntegrations (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:280:5)"
+    },
+    {
+      "test": "Cross-Component Data Flow",
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/umzuege",
+      "stack": "Error: net::ERR_CONNECTION_REFUSED at http://localhost:3000/umzuege\n    at navigate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:183:27)\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:569:9)\n    at process.processTimers (node:internal/timers:543:7)\n    at async Deferred.race (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/util/Deferred.js:36:20)\n    at async CdpFrame.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:149:25)\n    at async CdpPage.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/api/Page.js:574:20)\n    at async /Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:299:7\n    at async SystemIntegrationTester.runTest (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:117:7)\n    at async SystemIntegrationTester.testDataFlow (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:297:5)"
+    },
+    {
+      "test": "Real-time Updates",
+      "error": "Execution context was destroyed, most likely because of a navigation.",
+      "stack": "Error: Execution context was destroyed, most likely because of a navigation.\n    at rewriteError (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/ExecutionContext.js:457:15)\n    at async #evaluate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/ExecutionContext.js:389:60)\n    at async ExecutionContext.evaluate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/ExecutionContext.js:277:16)\n    at async IsolatedWorld.evaluate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/IsolatedWorld.js:100:16)\n    at async CdpFrame.evaluate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/api/Frame.js:364:20)\n    at async CdpPage.evaluate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/api/Page.js:817:20)\n    at async /Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:323:28\n    at async SystemIntegrationTester.runTest (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:117:7)\n    at async SystemIntegrationTester.testDataFlow (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:321:5)\n    at async SystemIntegrationTester.run (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:469:7)"
+    },
+    {
+      "test": "API Error Handling",
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/non-existent-page",
+      "stack": "Error: net::ERR_CONNECTION_REFUSED at http://localhost:3000/non-existent-page\n    at navigate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:183:27)\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:569:9)\n    at process.processTimers (node:internal/timers:543:7)\n    at async Deferred.race (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/util/Deferred.js:36:20)\n    at async CdpFrame.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:149:25)\n    at async CdpPage.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/api/Page.js:574:20)\n    at async /Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:337:7\n    at async SystemIntegrationTester.runTest (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:117:7)\n    at async SystemIntegrationTester.testErrorHandling (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:335:5)"
+    },
+    {
+      "test": "Page Load Performance",
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000",
+      "stack": "Error: net::ERR_CONNECTION_REFUSED at http://localhost:3000\n    at navigate (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:183:27)\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:569:9)\n    at process.processTimers (node:internal/timers:543:7)\n    at async Deferred.race (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/util/Deferred.js:36:20)\n    at async CdpFrame.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/cdp/Frame.js:149:25)\n    at async CdpPage.goto (/Users/firashattab/hummert-umzug-app/frontend/node_modules/puppeteer-core/lib/cjs/puppeteer/api/Page.js:574:20)\n    at async /Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:374:7\n    at async SystemIntegrationTester.runTest (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:117:7)\n    at async SystemIntegrationTester.testPerformance (/Users/firashattab/hummert-umzug-app/frontend/final-system-integration-test.js:365:5)"
+    }
+  ]
+}

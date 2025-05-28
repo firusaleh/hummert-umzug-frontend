@@ -6,8 +6,9 @@ import api from '../../../services/api';
 
 const AngebotForm = ({ angebot, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
-    angebotsnummer: '',
-    kunde: {
+    angebotNummer: '',
+    kunde: '',
+    kundeDaten: {
       name: '',
       email: '',
       telefon: '',
@@ -18,24 +19,25 @@ const AngebotForm = ({ angebot, onSave, onCancel }) => {
         ort: ''
       }
     },
-    umzugId: '',
-    datum: format(new Date(), 'yyyy-MM-dd'),
+    umzug: '',
+    erstelltAm: format(new Date(), 'yyyy-MM-dd'),
     gueltigBis: format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
-    positionen: [
+    positionsliste: [
       {
-        beschreibung: '',
+        bezeichnung: '',
         menge: 1,
+        einheit: 'Stück',
         einzelpreis: 0,
         gesamtpreis: 0
       }
     ],
     zwischensumme: 0,
-    mwstSatz: 19,
+    mehrwertsteuer: 19,
     mwstBetrag: 0,
     gesamtbetrag: 0,
     zahlungsbedingungen: 'Zahlbar innerhalb 30 Tagen nach Rechnungsstellung',
-    anmerkungen: '',
-    status: 'entwurf'
+    notizen: '',
+    status: 'Entwurf'
   });
 
   const [umzuege, setUmzuege] = useState([]);
@@ -59,11 +61,11 @@ const AngebotForm = ({ angebot, onSave, onCancel }) => {
       const year = new Date().getFullYear();
       const count = angebote.filter(a => a.angebotsnummer?.includes(year)).length + 1;
       const nummer = `ANG-${year}-${String(count).padStart(4, '0')}`;
-      setFormData(prev => ({ ...prev, angebotsnummer: nummer }));
+      setFormData(prev => ({ ...prev, angebotNummer: nummer }));
     } catch (error) {
       console.error('Error generating quote number:', error);
       const fallback = `ANG-${Date.now()}`;
-      setFormData(prev => ({ ...prev, angebotsnummer: fallback }));
+      setFormData(prev => ({ ...prev, angebotNummer: fallback }));
     }
   };
 
@@ -122,7 +124,7 @@ const AngebotForm = ({ angebot, onSave, onCancel }) => {
   };
 
   const handlePositionChange = (index, field, value) => {
-    const newPositionen = [...formData.positionen];
+    const newPositionen = [...formData.positionsliste];
     newPositionen[index][field] = value;
 
     // Calculate line total
@@ -132,18 +134,19 @@ const AngebotForm = ({ angebot, onSave, onCancel }) => {
         parseFloat(newPositionen[index].einzelpreis || 0);
     }
 
-    setFormData(prev => ({ ...prev, positionen: newPositionen }));
+    setFormData(prev => ({ ...prev, positionsliste: newPositionen }));
     calculateTotals(newPositionen);
   };
 
   const addPosition = () => {
     setFormData(prev => ({
       ...prev,
-      positionen: [
-        ...prev.positionen,
+      positionsliste: [
+        ...prev.positionsliste,
         {
-          beschreibung: '',
+          bezeichnung: '',
           menge: 1,
+          einheit: 'Stück',
           einzelpreis: 0,
           gesamtpreis: 0
         }

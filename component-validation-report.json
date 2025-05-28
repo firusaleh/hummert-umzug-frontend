@@ -1,0 +1,1050 @@
+{
+  "summary": {
+    "totalComponents": 30,
+    "validComponents": 9,
+    "totalServices": 5,
+    "validServices": 1,
+    "totalRoutes": 33,
+    "totalErrors": 1
+  },
+  "components": [
+    {
+      "name": "Modal.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/Modal.jsx",
+      "valid": false,
+      "issues": [
+        "useEffect used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "layouts/AuthLayout.js",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/layouts/AuthLayout.js",
+      "valid": true,
+      "issues": [],
+      "hasTests": false
+    },
+    {
+      "name": "layouts/MainLayout.js",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/layouts/MainLayout.js",
+      "valid": false,
+      "issues": [
+        "useState used without import",
+        "useEffect used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "forms/ClientForm.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/forms/ClientForm.jsx",
+      "valid": false,
+      "issues": [
+        "useState used without import",
+        "useEffect used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "forms/ProjectForm.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/forms/ProjectForm.jsx",
+      "valid": false,
+      "issues": [
+        "useState used without import",
+        "useEffect used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "forms/TaskForm.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/forms/TaskForm.jsx",
+      "valid": false,
+      "issues": [
+        "useState used without import",
+        "useEffect used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "finanzen/AngebotForm.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/finanzen/AngebotForm.jsx",
+      "valid": false,
+      "issues": [
+        "useState used without import",
+        "useEffect used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "finanzen/ProjektkostenForm.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/finanzen/ProjektkostenForm.jsx",
+      "valid": false,
+      "issues": [
+        "useState used without import",
+        "useEffect used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "finanzen/RechnungForm.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/finanzen/RechnungForm.jsx",
+      "valid": false,
+      "issues": [
+        "useState used without import",
+        "useEffect used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "files/FileList.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/files/FileList.jsx",
+      "valid": false,
+      "issues": [
+        "useState used without import",
+        "useEffect used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "files/FileUpload.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/files/FileUpload.jsx",
+      "valid": false,
+      "issues": [
+        "useState used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "examples/ErrorHandlingExample.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/examples/ErrorHandlingExample.jsx",
+      "valid": false,
+      "issues": [
+        "useState used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "common/ErrorAlert.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/common/ErrorAlert.jsx",
+      "valid": false,
+      "issues": [
+        "useState used without import",
+        "useEffect used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "common/ErrorBoundary.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/common/ErrorBoundary.jsx",
+      "valid": true,
+      "issues": [],
+      "hasTests": false
+    },
+    {
+      "name": "common/Form.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/common/Form.jsx",
+      "valid": true,
+      "issues": [],
+      "hasTests": false
+    },
+    {
+      "name": "common/FormField.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/common/FormField.jsx",
+      "valid": true,
+      "issues": [],
+      "hasTests": false
+    },
+    {
+      "name": "common/InfiniteScrollList.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/common/InfiniteScrollList.jsx",
+      "valid": false,
+      "issues": [
+        "useEffect used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "common/LoadMoreButton.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/common/LoadMoreButton.jsx",
+      "valid": true,
+      "issues": [],
+      "hasTests": false
+    },
+    {
+      "name": "common/LoadingSpinner.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/common/LoadingSpinner.jsx",
+      "valid": true,
+      "issues": [],
+      "hasTests": false
+    },
+    {
+      "name": "common/PaginatedTable.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/common/PaginatedTable.jsx",
+      "valid": true,
+      "issues": [],
+      "hasTests": false
+    },
+    {
+      "name": "common/Pagination.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/common/Pagination.jsx",
+      "valid": true,
+      "issues": [],
+      "hasTests": false
+    },
+    {
+      "name": "common/PrivateRoute.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/common/PrivateRoute.jsx",
+      "valid": true,
+      "issues": [],
+      "hasTests": false
+    },
+    {
+      "name": "auth/RegisterForm.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/auth/RegisterForm.jsx",
+      "valid": false,
+      "issues": [
+        "useState used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "admin/RateLimitDashboard.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/admin/RateLimitDashboard.jsx",
+      "valid": false,
+      "issues": [
+        "useState used without import",
+        "useEffect used without import"
+      ],
+      "hasTests": false
+    },
+    {
+      "name": "__tests__/ClientForm.test.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/__tests__/ClientForm.test.jsx",
+      "valid": false,
+      "issues": [
+        "Missing export"
+      ],
+      "hasTests": true
+    },
+    {
+      "name": "__tests__/FileUpload.test.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/__tests__/FileUpload.test.jsx",
+      "valid": false,
+      "issues": [
+        "Missing export"
+      ],
+      "hasTests": true
+    },
+    {
+      "name": "__tests__/MainLayout.test.js",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/__tests__/MainLayout.test.js",
+      "valid": false,
+      "issues": [
+        "Missing export"
+      ],
+      "hasTests": true
+    },
+    {
+      "name": "__tests__/Modal.test.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/__tests__/Modal.test.jsx",
+      "valid": false,
+      "issues": [
+        "Missing export"
+      ],
+      "hasTests": true
+    },
+    {
+      "name": "__tests__/Pagination.test.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/__tests__/Pagination.test.jsx",
+      "valid": false,
+      "issues": [
+        "Missing export"
+      ],
+      "hasTests": true
+    },
+    {
+      "name": "__tests__/PrivateRoute.test.jsx",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/components/__tests__/PrivateRoute.test.jsx",
+      "valid": false,
+      "issues": [
+        "Missing export"
+      ],
+      "hasTests": true
+    }
+  ],
+  "services": [
+    {
+      "name": "api.js",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/services/api.js",
+      "valid": true,
+      "issues": [],
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/${id}"
+        },
+        {
+          "method": "GET",
+          "path": "/users/me"
+        },
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/${id}/export"
+        },
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/${id}/arbeitszeiten"
+        },
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/${id}/monatsbericht"
+        },
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/${id}/export"
+        },
+        {
+          "method": "GET",
+          "path": "/finanzen/angebote"
+        },
+        {
+          "method": "GET",
+          "path": "/finanzen/angebote/${id}"
+        },
+        {
+          "method": "GET",
+          "path": "/finanzen/rechnungen"
+        },
+        {
+          "method": "GET",
+          "path": "/finanzen/rechnungen/${id}"
+        },
+        {
+          "method": "GET",
+          "path": "/finanzen/projektkosten"
+        },
+        {
+          "method": "GET",
+          "path": "/finanzen/projektkosten/${id}"
+        },
+        {
+          "method": "GET",
+          "path": "/finanzen/uebersicht"
+        },
+        {
+          "method": "GET",
+          "path": "/finanzen/monatsuebersicht/${year}"
+        },
+        {
+          "method": "GET",
+          "path": "/finanzen/berichte/umsatz"
+        },
+        {
+          "method": "GET",
+          "path": "/finanzen/berichte/kosten"
+        },
+        {
+          "method": "GET",
+          "path": "/finanzen/berichte/forderungen"
+        },
+        {
+          "method": "GET",
+          "path": "/finanzen/export/rechnungen"
+        },
+        {
+          "method": "GET",
+          "path": "/finanzen/export/kosten"
+        },
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/ungelesen"
+        },
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/einstellungen"
+        },
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/${id}"
+        },
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/mitarbeiter"
+        },
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/projekte"
+        },
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/statistics"
+        },
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/report/monthly"
+        },
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/report/project"
+        },
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/report/overtime"
+        },
+        {
+          "method": "GET",
+          "path": "${this.endpoint}/export"
+        },
+        {
+          "method": "GET",
+          "path": "/projects"
+        },
+        {
+          "method": "GET",
+          "path": "/projects/${id}"
+        },
+        {
+          "method": "GET",
+          "path": "/tasks"
+        },
+        {
+          "method": "GET",
+          "path": "/tasks/${id}"
+        },
+        {
+          "method": "GET",
+          "path": "/fahrzeuge"
+        },
+        {
+          "method": "GET",
+          "path": "/fahrzeuge/${id}"
+        },
+        {
+          "method": "GET",
+          "path": "/auth/check"
+        },
+        {
+          "method": "GET",
+          "path": "/auth/me"
+        },
+        {
+          "method": "GET",
+          "path": "/health"
+        },
+        {
+          "method": "GET",
+          "path": "/clients"
+        },
+        {
+          "method": "GET",
+          "path": "/clients/${id}"
+        },
+        {
+          "method": "GET",
+          "path": "/clients/${clientId}/umzuege"
+        },
+        {
+          "method": "GET",
+          "path": "/clients/${clientId}/statistics"
+        },
+        {
+          "method": "GET",
+          "path": "/files/download/${id}"
+        },
+        {
+          "method": "GET",
+          "path": "/files"
+        },
+        {
+          "method": "GET",
+          "path": "/files/${id}"
+        },
+        {
+          "method": "POST",
+          "path": "/auth/refresh"
+        },
+        {
+          "method": "POST",
+          "path": "/users/change-password"
+        },
+        {
+          "method": "POST",
+          "path": "/users/avatar"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/status"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/tasks"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/notes"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/documents"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/invoice"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/arbeitszeiten"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/qualifikationen"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/dokumente"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/raeume"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/raeume/${raumId}/moebel"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/fotos"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/angebot"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/angebote"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/angebote/${id}/versenden"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/rechnungen"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/rechnungen/${id}/zahlungen"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/rechnungen/${id}/mahnungen"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/rechnungen/${id}/stornieren"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/projektkosten"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/projektkosten/${id}/genehmigung"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/projektkosten/${id}/bezahlung"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/uebersicht/generieren"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/uebersicht/${year}/${month}/finalisieren"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/masse"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/task-erinnerungen"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/email"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/checkout"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/pause"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/${id}/approve"
+        },
+        {
+          "method": "POST",
+          "path": "${this.endpoint}/bulk-approve"
+        },
+        {
+          "method": "POST",
+          "path": "/projects"
+        },
+        {
+          "method": "POST",
+          "path": "/tasks"
+        },
+        {
+          "method": "POST",
+          "path": "/fahrzeuge"
+        },
+        {
+          "method": "POST",
+          "path": "/fahrzeuge/${id}/kilometerstand"
+        },
+        {
+          "method": "POST",
+          "path": "/auth/login"
+        },
+        {
+          "method": "POST",
+          "path": "/auth/register"
+        },
+        {
+          "method": "POST",
+          "path": "/auth/logout"
+        },
+        {
+          "method": "POST",
+          "path": "/auth/refresh"
+        },
+        {
+          "method": "POST",
+          "path": "/users/change-password"
+        },
+        {
+          "method": "POST",
+          "path": "/auth/forgot-password"
+        },
+        {
+          "method": "POST",
+          "path": "/auth/reset-password"
+        },
+        {
+          "method": "POST",
+          "path": "/clients"
+        },
+        {
+          "method": "POST",
+          "path": "/files/upload"
+        },
+        {
+          "method": "PUT",
+          "path": "${this.endpoint}/${id}"
+        },
+        {
+          "method": "PUT",
+          "path": "/users/me"
+        },
+        {
+          "method": "PUT",
+          "path": "${this.endpoint}/${id}/tasks/${taskId}"
+        },
+        {
+          "method": "PUT",
+          "path": "${this.endpoint}/${id}/arbeitszeiten/${arbeitszeitId}"
+        },
+        {
+          "method": "PUT",
+          "path": "${this.endpoint}/${id}/raeume/${raumId}"
+        },
+        {
+          "method": "PUT",
+          "path": "${this.endpoint}/${id}/raeume/${raumId}/moebel/${moebelId}"
+        },
+        {
+          "method": "PUT",
+          "path": "/finanzen/angebote/${id}"
+        },
+        {
+          "method": "PUT",
+          "path": "/finanzen/rechnungen/${id}"
+        },
+        {
+          "method": "PUT",
+          "path": "/finanzen/projektkosten/${id}"
+        },
+        {
+          "method": "PUT",
+          "path": "${this.endpoint}/${id}/gelesen"
+        },
+        {
+          "method": "PUT",
+          "path": "${this.endpoint}/alle-gelesen"
+        },
+        {
+          "method": "PUT",
+          "path": "${this.endpoint}/einstellungen"
+        },
+        {
+          "method": "PUT",
+          "path": "${this.endpoint}/${id}"
+        },
+        {
+          "method": "PUT",
+          "path": "/projects/${id}"
+        },
+        {
+          "method": "PUT",
+          "path": "/tasks/${id}"
+        },
+        {
+          "method": "PUT",
+          "path": "/fahrzeuge/${id}"
+        },
+        {
+          "method": "PUT",
+          "path": "/users/me"
+        },
+        {
+          "method": "PUT",
+          "path": "/clients/${id}"
+        },
+        {
+          "method": "PUT",
+          "path": "/files/${id}"
+        },
+        {
+          "method": "DELETE",
+          "path": "${this.endpoint}/${id}"
+        },
+        {
+          "method": "DELETE",
+          "path": "${this.endpoint}/${id}/tasks/${taskId}"
+        },
+        {
+          "method": "DELETE",
+          "path": "${this.endpoint}/${id}/arbeitszeiten/${arbeitszeitId}"
+        },
+        {
+          "method": "DELETE",
+          "path": "${this.endpoint}/${id}/qualifikationen/${qualifikationId}"
+        },
+        {
+          "method": "DELETE",
+          "path": "${this.endpoint}/${id}/raeume/${raumId}"
+        },
+        {
+          "method": "DELETE",
+          "path": "${this.endpoint}/${id}/raeume/${raumId}/moebel/${moebelId}"
+        },
+        {
+          "method": "DELETE",
+          "path": "/finanzen/angebote/${id}"
+        },
+        {
+          "method": "DELETE",
+          "path": "/finanzen/rechnungen/${id}"
+        },
+        {
+          "method": "DELETE",
+          "path": "/finanzen/projektkosten/${id}"
+        },
+        {
+          "method": "DELETE",
+          "path": "${this.endpoint}/alle-gelesen"
+        },
+        {
+          "method": "DELETE",
+          "path": "${this.endpoint}/${id}"
+        },
+        {
+          "method": "DELETE",
+          "path": "/projects/${id}"
+        },
+        {
+          "method": "DELETE",
+          "path": "/tasks/${id}"
+        },
+        {
+          "method": "DELETE",
+          "path": "/fahrzeuge/${id}"
+        },
+        {
+          "method": "DELETE",
+          "path": "/clients/${id}"
+        },
+        {
+          "method": "DELETE",
+          "path": "/files/${id}"
+        },
+        {
+          "method": "PATCH",
+          "path": "${this.endpoint}/${id}"
+        }
+      ]
+    },
+    {
+      "name": "configService.js",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/services/configService.js",
+      "valid": false,
+      "issues": [
+        "No base URL configuration found",
+        "No authorization headers found"
+      ],
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/config/all"
+        },
+        {
+          "method": "GET",
+          "path": "/config/umzug-statuses"
+        },
+        {
+          "method": "GET",
+          "path": "/config/payment-methods"
+        },
+        {
+          "method": "GET",
+          "path": "/config/employee-positions"
+        },
+        {
+          "method": "GET",
+          "path": "/config/employee-skills"
+        },
+        {
+          "method": "GET",
+          "path": "/config/employee-roles"
+        },
+        {
+          "method": "GET",
+          "path": "/config/vehicle-types"
+        },
+        {
+          "method": "GET",
+          "path": "/config/vehicle-statuses"
+        },
+        {
+          "method": "GET",
+          "path": "/config/license-classes"
+        }
+      ]
+    },
+    {
+      "name": "financeService.js",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/services/financeService.js",
+      "valid": false,
+      "issues": [
+        "No base URL configuration found",
+        "No authorization headers found"
+      ],
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/finanzen/export/${type}"
+        },
+        {
+          "method": "GET",
+          "path": "/finanzen/search"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/rechnungen"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/angebote"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/angebote/${quoteId}/convert-to-invoice"
+        },
+        {
+          "method": "POST",
+          "path": "/finanzen/projektkosten"
+        },
+        {
+          "method": "PUT",
+          "path": "/finanzen/rechnungen/${id}"
+        },
+        {
+          "method": "PUT",
+          "path": "/finanzen/angebote/${id}"
+        },
+        {
+          "method": "PUT",
+          "path": "/finanzen/projektkosten/${id}"
+        },
+        {
+          "method": "PUT",
+          "path": "/finanzen/rechnungen/bulk-status"
+        },
+        {
+          "method": "DELETE",
+          "path": "/finanzen/rechnungen/${id}"
+        },
+        {
+          "method": "DELETE",
+          "path": "/finanzen/angebote/${id}"
+        },
+        {
+          "method": "DELETE",
+          "path": "/finanzen/projektkosten/${id}"
+        },
+        {
+          "method": "DELETE",
+          "path": "/finanzen/rechnungen/bulk"
+        }
+      ]
+    },
+    {
+      "name": "utils.js",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/services/utils.js",
+      "valid": false,
+      "issues": [
+        "No base URL configuration found",
+        "No authorization headers found"
+      ],
+      "endpoints": []
+    },
+    {
+      "name": "websocket.js",
+      "path": "/Users/firashattab/hummert-umzug-app/frontend/src/services/websocket.js",
+      "valid": false,
+      "issues": [
+        "No base URL configuration found",
+        "No error handling found"
+      ],
+      "endpoints": []
+    }
+  ],
+  "utils": [],
+  "routes": [
+    "/login",
+    "/register",
+    "/",
+    "/dashboard",
+    "/umzuege",
+    "/umzuege/uebersicht",
+    "/umzuege/neu",
+    "/umzuege/:id",
+    "/umzuege/:id/bearbeiten",
+    "/aufnahmen",
+    "/aufnahmen/neu",
+    "/aufnahmen/:id",
+    "/aufnahmen/:id/bearbeiten",
+    "/mitarbeiter",
+    "/mitarbeiter/neu",
+    "/mitarbeiter/:id",
+    "/mitarbeiter/:id/bearbeiten",
+    "/zeitachse",
+    "/benachrichtigungen",
+    "/einstellungen",
+    "/finanzen",
+    "/finanzen/rechnungen",
+    "/finanzen/rechnungen/neu",
+    "/finanzen/rechnungen/:id",
+    "/finanzen/rechnungen/:id/bearbeiten",
+    "/zeiterfassung",
+    "/fahrzeuge",
+    "/fahrzeuge/neu",
+    "/fahrzeuge/:id",
+    "/fahrzeuge/:id/bearbeiten",
+    "/fahrzeuge/:id/kilometerstand",
+    "/404",
+    "*"
+  ],
+  "errors": [
+    {
+      "type": "missing_directory",
+      "path": "src/styles",
+      "error": "Directory not found"
+    }
+  ],
+  "timestamp": "2025-05-28T12:07:41.036Z",
+  "recommendations": [
+    {
+      "category": "Components",
+      "priority": "high",
+      "message": "Fix 21 components with validation issues",
+      "details": [
+        "Modal.jsx: useEffect used without import",
+        "layouts/MainLayout.js: useState used without import, useEffect used without import",
+        "forms/ClientForm.jsx: useState used without import, useEffect used without import",
+        "forms/ProjectForm.jsx: useState used without import, useEffect used without import",
+        "forms/TaskForm.jsx: useState used without import, useEffect used without import",
+        "finanzen/AngebotForm.jsx: useState used without import, useEffect used without import",
+        "finanzen/ProjektkostenForm.jsx: useState used without import, useEffect used without import",
+        "finanzen/RechnungForm.jsx: useState used without import, useEffect used without import",
+        "files/FileList.jsx: useState used without import, useEffect used without import",
+        "files/FileUpload.jsx: useState used without import",
+        "examples/ErrorHandlingExample.jsx: useState used without import",
+        "common/ErrorAlert.jsx: useState used without import, useEffect used without import",
+        "common/InfiniteScrollList.jsx: useEffect used without import",
+        "auth/RegisterForm.jsx: useState used without import",
+        "admin/RateLimitDashboard.jsx: useState used without import, useEffect used without import",
+        "__tests__/ClientForm.test.jsx: Missing export",
+        "__tests__/FileUpload.test.jsx: Missing export",
+        "__tests__/MainLayout.test.js: Missing export",
+        "__tests__/Modal.test.jsx: Missing export",
+        "__tests__/Pagination.test.jsx: Missing export",
+        "__tests__/PrivateRoute.test.jsx: Missing export"
+      ]
+    },
+    {
+      "category": "Services",
+      "priority": "high",
+      "message": "Fix 4 services with validation issues",
+      "details": [
+        "configService.js: No base URL configuration found, No authorization headers found",
+        "financeService.js: No base URL configuration found, No authorization headers found",
+        "utils.js: No base URL configuration found, No authorization headers found",
+        "websocket.js: No base URL configuration found, No error handling found"
+      ]
+    },
+    {
+      "category": "Testing",
+      "priority": "medium",
+      "message": "Add tests for 24 components",
+      "details": [
+        "Modal.jsx",
+        "layouts/AuthLayout.js",
+        "layouts/MainLayout.js",
+        "forms/ClientForm.jsx",
+        "forms/ProjectForm.jsx",
+        "forms/TaskForm.jsx",
+        "finanzen/AngebotForm.jsx",
+        "finanzen/ProjektkostenForm.jsx",
+        "finanzen/RechnungForm.jsx",
+        "files/FileList.jsx",
+        "files/FileUpload.jsx",
+        "examples/ErrorHandlingExample.jsx",
+        "common/ErrorAlert.jsx",
+        "common/ErrorBoundary.jsx",
+        "common/Form.jsx",
+        "common/FormField.jsx",
+        "common/InfiniteScrollList.jsx",
+        "common/LoadMoreButton.jsx",
+        "common/LoadingSpinner.jsx",
+        "common/PaginatedTable.jsx",
+        "common/Pagination.jsx",
+        "common/PrivateRoute.jsx",
+        "auth/RegisterForm.jsx",
+        "admin/RateLimitDashboard.jsx"
+      ]
+    },
+    {
+      "category": "Infrastructure",
+      "priority": "high",
+      "message": "Fix infrastructure errors",
+      "details": [
+        "missing_directory: Directory not found"
+      ]
+    }
+  ]
+}

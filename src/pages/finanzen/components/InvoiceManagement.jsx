@@ -12,11 +12,12 @@ import api from '../../../services/api';
 import PaymentTracking from './PaymentTracking';
 
 const STATUS_CONFIG = {
-  entwurf: { label: 'Entwurf', color: 'bg-gray-100 text-gray-800', icon: FileText },
-  versendet: { label: 'Versendet', color: 'bg-blue-100 text-blue-800', icon: Send },
-  bezahlt: { label: 'Bezahlt', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-  ueberfaellig: { label: 'Überfällig', color: 'bg-red-100 text-red-800', icon: AlertTriangle },
-  storniert: { label: 'Storniert', color: 'bg-gray-100 text-gray-600', icon: XCircle }
+  Entwurf: { label: 'Entwurf', color: 'bg-gray-100 text-gray-800', icon: FileText },
+  Gesendet: { label: 'Gesendet', color: 'bg-blue-100 text-blue-800', icon: Send },
+  Bezahlt: { label: 'Bezahlt', color: 'bg-green-100 text-green-800', icon: CheckCircle },
+  'Überfällig': { label: 'Überfällig', color: 'bg-red-100 text-red-800', icon: AlertTriangle },
+  Teilbezahlt: { label: 'Teilbezahlt', color: 'bg-yellow-100 text-yellow-800', icon: CreditCard },
+  Storniert: { label: 'Storniert', color: 'bg-gray-100 text-gray-600', icon: XCircle }
 };
 
 export default function InvoiceManagement() {
@@ -111,7 +112,7 @@ export default function InvoiceManagement() {
   
   const handleMarkAsPaid = async (id) => {
     try {
-      await api.put(`/finanzen/rechnungen/${id}`, { status: 'bezahlt' });
+      await api.put(`/finanzen/rechnungen/${id}`, { status: 'Bezahlt' });
       fetchInvoices();
     } catch (err) {
       console.error('Error updating invoice:', err);
@@ -121,18 +122,18 @@ export default function InvoiceManagement() {
   
   const getStatusDisplay = (invoice) => {
     // Check if overdue
-    if (invoice.status !== 'bezahlt' && invoice.status !== 'storniert' && invoice.faelligkeitsdatum) {
+    if (invoice.status !== 'Bezahlt' && invoice.status !== 'Storniert' && invoice.faelligkeitsdatum) {
       try {
         const dueDate = new Date(invoice.faelligkeitsdatum);
-        if (dueDate < new Date()) {
-          return STATUS_CONFIG.ueberfaellig;
+        if (dueDate < new Date() && invoice.status !== 'Überfällig') {
+          return STATUS_CONFIG['Überfällig'];
         }
       } catch (e) {
         // Invalid date
       }
     }
     
-    return STATUS_CONFIG[invoice.status] || STATUS_CONFIG.entwurf;
+    return STATUS_CONFIG[invoice.status] || STATUS_CONFIG.Entwurf;
   };
   
   if (loading) {
@@ -255,7 +256,7 @@ export default function InvoiceManagement() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <p className="text-sm font-medium text-gray-900">
-                        {invoice.rechnungsnummer}
+                        {invoice.rechnungNummer || invoice.rechnungsnummer}
                       </p>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -265,8 +266,8 @@ export default function InvoiceManagement() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <p className="text-sm text-gray-500">
-                        {invoice.rechnungsdatum 
-                          ? format(new Date(invoice.rechnungsdatum), 'dd.MM.yyyy')
+                        {(invoice.ausstellungsdatum || invoice.rechnungsdatum)
+                          ? format(new Date(invoice.ausstellungsdatum || invoice.rechnungsdatum), 'dd.MM.yyyy')
                           : '-'
                         }
                       </p>

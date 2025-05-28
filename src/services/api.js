@@ -636,38 +636,67 @@ class NotificationService extends BaseService {
     super('/benachrichtigungen');
   }
   
+  // Get unread count
+  async getUnreadCount() {
+    return this.handleResponse(api.get(`${this.endpoint}/ungelesen`));
+  }
+  
+  // Mark as read
   async markAsRead(id, gelesen = true) {
     return this.handleResponse(
-      api.put(`${this.endpoint}/${id}/read`, { gelesen })
+      api.put(`${this.endpoint}/${id}/gelesen`, { gelesen })
     );
   }
   
+  // Mark all as read
   async markAllAsRead() {
-    return this.handleResponse(api.put(`${this.endpoint}/mark-all-read`));
+    return this.handleResponse(api.put(`${this.endpoint}/alle-gelesen`));
   }
   
+  // Delete all read notifications
   async deleteAllRead() {
-    return this.handleResponse(api.delete(`${this.endpoint}/delete-all-read`));
+    return this.handleResponse(api.delete(`${this.endpoint}/alle-gelesen`));
   }
   
+  // Get notification settings
+  async getSettings() {
+    return this.handleResponse(api.get(`${this.endpoint}/einstellungen`));
+  }
+  
+  // Update notification settings
+  async updateSettings(settings) {
+    return this.handleResponse(
+      api.put(`${this.endpoint}/einstellungen`, settings)
+    );
+  }
+  
+  // Deprecated - for backward compatibility
   async getPreferences() {
-    return this.handleResponse(api.get(`${this.endpoint}/preferences`));
+    return this.getSettings();
   }
   
   async updatePreferences(preferences) {
-    return this.handleResponse(
-      api.put(`${this.endpoint}/preferences`, preferences)
-    );
+    return this.updateSettings(preferences);
   }
   
-  async subscribeToPush(subscription) {
-    return this.handleResponse(
-      api.post(`${this.endpoint}/subscribe`, { subscription })
-    );
+  // Create notification (admin only)
+  async createNotification(data) {
+    return this.handleResponse(api.post(this.endpoint, data));
   }
   
-  async unsubscribeFromPush() {
-    return this.handleResponse(api.post(`${this.endpoint}/unsubscribe`));
+  // Create mass notifications (admin only)
+  async createMassNotification(data) {
+    return this.handleResponse(api.post(`${this.endpoint}/masse`, data));
+  }
+  
+  // Create task reminders (admin only)
+  async createTaskReminders() {
+    return this.handleResponse(api.post(`${this.endpoint}/task-erinnerungen`));
+  }
+  
+  // Send email notification (admin only)
+  async sendEmailNotification(data) {
+    return this.handleResponse(api.post(`${this.endpoint}/email`, data));
   }
 }
 
@@ -677,8 +706,48 @@ class TimeTrackingService extends BaseService {
     super('/zeiterfassung');
   }
   
+  // Get time entries with filters
+  async getAll(params = {}) {
+    return this.handleResponse(api.get(this.endpoint, { params }));
+  }
+  
+  // Get single time entry
+  async getById(id) {
+    return this.handleResponse(api.get(`${this.endpoint}/${id}`));
+  }
+  
+  // Create new time entry (same as checkIn)
+  async create(zeiterfassungData) {
+    return this.handleResponse(api.post(this.endpoint, zeiterfassungData));
+  }
+  
   async checkIn(zeiterfassungData) {
     return this.handleResponse(api.post(this.endpoint, zeiterfassungData));
+  }
+  
+  // Update time entry
+  async update(id, updates) {
+    return this.handleResponse(api.put(`${this.endpoint}/${id}`, updates));
+  }
+  
+  // Delete time entry
+  async delete(id) {
+    return this.handleResponse(api.delete(`${this.endpoint}/${id}`));
+  }
+  
+  // Get employees for time tracking
+  async getMitarbeiter() {
+    return this.handleResponse(api.get(`${this.endpoint}/mitarbeiter`));
+  }
+  
+  // Get projects for time tracking
+  async getUmzugsprojekte() {
+    return this.handleResponse(api.get(`${this.endpoint}/projekte`));
+  }
+  
+  // Get statistics
+  async getStatistics(params = {}) {
+    return this.handleResponse(api.get(`${this.endpoint}/statistics`, { params }));
   }
   
   async checkOut(id, endzeit) {

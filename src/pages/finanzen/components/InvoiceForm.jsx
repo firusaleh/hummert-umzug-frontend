@@ -18,26 +18,28 @@ export default function InvoiceForm() {
   const [projects, setProjects] = useState([]);
   
   const [formData, setFormData] = useState({
-    rechnungsnummer: '',
+    rechnungNummer: '',
     kunde: '',
     kundeName: '',
-    projekt: '',
-    rechnungsdatum: format(new Date(), 'yyyy-MM-dd'),
+    umzug: '',
+    ausstellungsdatum: format(new Date(), 'yyyy-MM-dd'),
     faelligkeitsdatum: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
-    status: 'entwurf',
-    positionen: [
+    status: 'Entwurf',
+    positionsliste: [
       {
-        beschreibung: '',
+        bezeichnung: '',
         menge: 1,
+        einheit: 'Stück',
         einzelpreis: 0,
         gesamtpreis: 0
       }
     ],
     zwischensumme: 0,
-    mwstSatz: 19,
+    mehrwertsteuer: 19,
     mwstBetrag: 0,
     gesamtbetrag: 0,
-    notizen: ''
+    notizen: '',
+    zahlungsmethode: 'Überweisung'
   });
   
   // Fetch customers and projects
@@ -50,7 +52,10 @@ export default function InvoiceForm() {
         ]);
         
         setCustomers(Array.isArray(customersRes.data) ? customersRes.data : []);
-        setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : []);
+        
+        // Fetch Umzüge instead of projects
+        const umzuegeRes = await api.get('/umzuege');
+        setProjects(Array.isArray(umzuegeRes.data?.data) ? umzuegeRes.data.data : Array.isArray(umzuegeRes.data) ? umzuegeRes.data : []);
       } catch (err) {
         console.error('Error fetching data:', err);
       }
@@ -74,15 +79,16 @@ export default function InvoiceForm() {
       
       setFormData({
         ...invoice,
-        rechnungsdatum: invoice.rechnungsdatum 
-          ? format(new Date(invoice.rechnungsdatum), 'yyyy-MM-dd')
+        ausstellungsdatum: invoice.ausstellungsdatum 
+          ? format(new Date(invoice.ausstellungsdatum), 'yyyy-MM-dd')
           : format(new Date(), 'yyyy-MM-dd'),
         faelligkeitsdatum: invoice.faelligkeitsdatum
           ? format(new Date(invoice.faelligkeitsdatum), 'yyyy-MM-dd')
           : format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
-        positionen: invoice.positionen || [{
-          beschreibung: '',
+        positionsliste: invoice.positionsliste || [{
+          bezeichnung: '',
           menge: 1,
+          einheit: 'Stück',
           einzelpreis: 0,
           gesamtpreis: 0
         }]
@@ -104,7 +110,7 @@ export default function InvoiceForm() {
   };
   
   const handlePositionChange = (index, field, value) => {
-    const newPositionen = [...formData.positionen];
+    const newPositionen = [...formData.positionsliste];
     newPositionen[index][field] = value;
     
     // Calculate total for this position
@@ -115,7 +121,7 @@ export default function InvoiceForm() {
     
     setFormData(prev => ({
       ...prev,
-      positionen: newPositionen
+      positionsliste: newPositionen
     }));
     
     calculateTotals(newPositionen);
@@ -124,9 +130,10 @@ export default function InvoiceForm() {
   const addPosition = () => {
     setFormData(prev => ({
       ...prev,
-      positionen: [...prev.positionen, {
-        beschreibung: '',
+      positionsliste: [...prev.positionsliste, {
+        bezeichnung: '',
         menge: 1,
+        einheit: 'Stück',
         einzelpreis: 0,
         gesamtpreis: 0
       }]
@@ -134,11 +141,11 @@ export default function InvoiceForm() {
   };
   
   const removePosition = (index) => {
-    if (formData.positionen.length > 1) {
-      const newPositionen = formData.positionen.filter((_, i) => i !== index);
+    if (formData.positionsliste.length > 1) {
+      const newPositionen = formData.positionsliste.filter((_, i) => i !== index);
       setFormData(prev => ({
         ...prev,
-        positionen: newPositionen
+        positionsliste: newPositionen
       }));
       calculateTotals(newPositionen);
     }
@@ -146,7 +153,7 @@ export default function InvoiceForm() {
   
   const calculateTotals = (positionen) => {
     const zwischensumme = positionen.reduce((sum, pos) => sum + pos.gesamtpreis, 0);
-    const mwstBetrag = zwischensumme * (formData.mwstSatz / 100);
+    const mwstBetrag = zwischensumme * (formData.mehrwertsteuer / 100);
     const gesamtbetrag = zwischensumme + mwstBetrag;
     
     setFormData(prev => ({
@@ -167,7 +174,7 @@ export default function InvoiceForm() {
       const data = {
         ...formData,
         kunde: formData.kunde || undefined,
-        projekt: formData.projekt || undefined
+        umzug: formData.umzug || undefined
       };
       
       if (isEdit) {
@@ -236,8 +243,8 @@ export default function InvoiceForm() {
               </label>
               <input
                 type="text"
-                name="rechnungsnummer"
-                value={formData.rechnungsnummer}
+                name="rechnungNummer"
+                value={formData.rechnungNummer}
                 onChange={handleChange}
                 required
                 className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
@@ -254,10 +261,12 @@ export default function InvoiceForm() {
                 onChange={handleChange}
                 className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
               >
-                <option value="entwurf">Entwurf</option>
-                <option value="versendet">Versendet</option>
-                <option value="bezahlt">Bezahlt</option>
-                <option value="storniert">Storniert</option>
+                <option value="Entwurf">Entwurf</option>
+                <option value="Gesendet">Gesendet</option>
+                <option value="Bezahlt">Bezahlt</option>
+                <option value="Überfällig">Überfällig</option>
+                <option value="Teilbezahlt">Teilbezahlt</option>
+                <option value="Storniert">Storniert</option>
               </select>
             </div>
             
@@ -295,12 +304,12 @@ export default function InvoiceForm() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Rechnungsdatum
+                Ausstellungsdatum
               </label>
               <input
                 type="date"
-                name="rechnungsdatum"
-                value={formData.rechnungsdatum}
+                name="ausstellungsdatum"
+                value={formData.ausstellungsdatum}
                 onChange={handleChange}
                 required
                 className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
@@ -338,17 +347,17 @@ export default function InvoiceForm() {
           </div>
           
           <div className="space-y-4">
-            {formData.positionen.map((position, index) => (
+            {formData.positionsliste.map((position, index) => (
               <div key={index} className="border border-gray-200 rounded-lg p-4">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                   <div className="md:col-span-5">
                     <label className="block text-sm font-medium text-gray-700">
-                      Beschreibung
+                      Bezeichnung
                     </label>
                     <input
                       type="text"
-                      value={position.beschreibung}
-                      onChange={(e) => handlePositionChange(index, 'beschreibung', e.target.value)}
+                      value={position.bezeichnung}
+                      onChange={(e) => handlePositionChange(index, 'bezeichnung', e.target.value)}
                       className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </div>
@@ -394,7 +403,7 @@ export default function InvoiceForm() {
                   </div>
                   
                   <div className="md:col-span-1 flex items-end">
-                    {formData.positionen.length > 1 && (
+                    {formData.positionsliste.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removePosition(index)}
@@ -420,7 +429,7 @@ export default function InvoiceForm() {
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">MwSt ({formData.mwstSatz}%)</span>
+              <span className="text-gray-600">MwSt ({formData.mehrwertsteuer}%)</span>
               <span className="font-medium">
                 {formData.mwstBetrag.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
               </span>
