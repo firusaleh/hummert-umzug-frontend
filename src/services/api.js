@@ -4,7 +4,7 @@ import configService from './configService';
 
 // API Configuration
 const API_CONFIG = {
-  baseURL: process.env.REACT_APP_API_URL || '/api',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
   timeout: 30000, // 30 seconds
   retryAttempts: 3,
   retryDelay: 1000, // 1 second
@@ -26,7 +26,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  withCredentials: false,
+  withCredentials: false, // Set to true if you need cookies/sessions
 });
 
 // Token management utilities
